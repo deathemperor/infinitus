@@ -267,9 +267,11 @@ public struct SwapdCLI: Sendable {
     }
 
     /// Spend one of the slot's banked limit resets as that slot; the live
-    /// login is untouched. The reply is a forced-fetch list.
-    public func reset(provider: Provider, slot: Int) async throws -> SwapdList {
-        try await listVerb(["reset", String(slot)], provider: provider)
+    /// login is untouched. The reply is a forced-fetch list. `kind` is one
+    /// the list named under `resets.kinds`, so only a swapd that splits the
+    /// bank is ever handed `--kind`.
+    public func reset(provider: Provider, slot: Int, kind: String? = nil) async throws -> SwapdList {
+        try await listVerb(["reset", String(slot)] + (kind.map { ["--kind", $0] } ?? []), provider: provider)
     }
 
     /// One cheapest request under the slot's own login so its window starts

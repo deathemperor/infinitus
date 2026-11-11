@@ -11,6 +11,9 @@ import {
   WAIT_ADD_STILL_RUNNING,
   accountCommandArgs,
   accountsPageState,
+  resetOfferAction,
+  resetOffers,
+  resetsSummary,
   rowFlip,
   withFlip,
   addAccountCommandArgs,
@@ -267,8 +270,40 @@ describe("row actions", () => {
       endsAt: "2026-10-22T16:00:00Z",
       hold: "cooldown",
       holdUntil: "2026-09-24T00:00:00Z",
+      kinds: [],
     });
     expect(rowAt(fleet()).resets).toBeNull();
+  });
+
+  it("splits Claude's bank by kind, offering only the kinds with a reset left", () => {
+    const resets = rowAt(
+      fleet({
+        accounts: [
+          account({
+            resets: {
+              available: 1,
+              total: 2,
+              nextGrantId: "full-reset-2611",
+              kinds: [
+                { kind: "weekly", available: 1, total: 1, nextGrantId: "full-reset-2611" },
+                { kind: "fable", available: 0, total: 1, label: "One Fable reset" },
+              ],
+            },
+          }),
+        ],
+      }),
+    ).resets;
+    if (resets === null) throw new Error("expected a bank");
+    expect(resetsSummary(resets)).toBe("Weekly 1 of 1 · Fable 0 of 1 banked");
+    expect(resetOffers(resets).map((offer) => [offer.kind, resetOfferAction(offer)])).toEqual([
+      ["weekly", "Use Weekly reset"],
+    ]);
+    // An unsplit bank is one offer, spent without a kind.
+    const plain = rowAt(
+      fleet({ accounts: [account({ resets: { available: 1, total: 1 } })] }),
+    ).resets;
+    if (plain === null) throw new Error("expected a bank");
+    expect(resetOffers(plain).map((offer) => offer.kind)).toEqual([null]);
   });
 
   it("reports the held flag on the row", () => {
@@ -305,6 +340,11 @@ describe("command arguments", () => {
     expect(accountCommandArgs("claude", row, "reset")).toEqual({
       command: "reset",
       args: ["claude", "2"],
+    });
+    expect(accountCommandArgs("claude", row, "reset", "fable")).toEqual({
+      command: "reset",
+      args: ["claude", "2"],
+      options: { kind: "fable" },
     });
   });
 

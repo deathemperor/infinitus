@@ -78,8 +78,34 @@ const Grant = Schema.Struct({
   paused: Schema.optional(Schema.Boolean),
   usable_now: Schema.optional(Schema.Boolean),
   use_requires_limit: Schema.optional(Schema.Boolean),
+  type: Schema.optional(Schema.NullOr(Schema.String)),
+  clears: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
+  gives_back_weekly: Schema.optional(Schema.NullOr(Schema.Boolean)),
+  unavailable_reason: Schema.optional(Schema.NullOr(Schema.String)),
 });
 const decodeGrant = Schema.decodeUnknownOption(Grant);
+type Grant = typeof Grant.Type;
+
+/** Claude split its bank by kind once grants carried these; an answer without them is not split. */
+const namesKind = (grant: Grant) =>
+  grant.type != null || grant.clears != null || grant.gives_back_weekly != null;
+
+/** The order the CLI's `/reset` lists kinds in. */
+const KIND_ORDER = ["session", "weekly", "fable", "full"];
+
+/**
+ * What a reset from `grant` refills, the CLI's rule: one that gives back what Fable used of the
+ * week is `fable` whatever its `type` says (Claude labels it `full`), else its `type`, else what it
+ * `clears`.
+ */
+function grantKind(grant: Grant): string {
+  if (grant.gives_back_weekly) return "fable";
+  if (grant.type) return grant.type;
+  const clears = grant.clears ?? [];
+  const session = clears.includes("five_hour");
+  const other = clears.some((window) => window !== "five_hour");
+  return session && !other ? "session" : other && !session ? "weekly" : "full";
+}
 const CedarEmber = Schema.Struct({
   eligible: Schema.Boolean,
   at_limit: Schema.optional(Schema.NullOr(Schema.Boolean)),
@@ -201,7 +227,58 @@ export function claudeResetCreditsToContract(
     ...(next ? { nextCreditId: next.id } : {}),
     ...(label ? { label } : {}),
     ...(hold ? { nextHold: hold } : {}),
+    ...(live.some(namesKind)
+      ? { kinds: creditKinds(live, status.at_limit === true, cooldownUntil, nowMs) }
+      : {}),
   };
+}
+
+/**
+ * The live grants by kind. A kind's credit is its first grant Claude calls usable now, the one the
+ * CLI's `/reset` claims for that kind, which need not be `next_grant_id`.
+ */
+function creditKinds(
+  live: ReadonlyArray<Grant>,
+  atLimit: boolean,
+  cooldownUntil: string | undefined,
+  nowMs: number,
+): ServerProviderResetCredits["kinds"] {
+  const byKind = new Map<string, Grant[]>();
+  for (const grant of live) {
+    const kind = grantKind(grant);
+    byKind.set(kind, [...(byKind.get(kind) ?? []), grant]);
+  }
+  const rank = (kind: string) => {
+    const index = KIND_ORDER.indexOf(kind);
+    return index === -1 ? KIND_ORDER.length : index;
+  };
+  return [...byKind.entries()]
+    .toSorted(([a], [b]) => rank(a) - rank(b))
+    .map(([kind, grants]) => {
+      const availableCount = grants.reduce((sum, grant) => sum + grant.resets_left, 0);
+      const target = grants.find((grant) => grant.usable_now && grant.resets_left > 0);
+      const shown = target ?? grants.find((grant) => grant.resets_left > 0) ?? grants[0]!;
+      const hold: ServerProviderResetCredits["nextHold"] =
+        availableCount === 0
+          ? undefined
+          : cooldownUntil
+            ? { reason: "cooldown", until: cooldownUntil }
+            : target
+              ? undefined
+              : shown.unavailable_reason === "needs_limit" || (shown.use_requires_limit && !atLimit)
+                ? { reason: "notAtLimit" }
+                : { reason: "blocked" };
+      const expiresAt = isoFuture(shown.ends_at, nowMs);
+      const label = shown.label?.trim();
+      return {
+        kind,
+        availableCount,
+        ...(expiresAt ? { nextExpiresAt: expiresAt } : {}),
+        ...(target ? { nextCreditId: target.id } : {}),
+        ...(label ? { label } : {}),
+        ...(hold ? { nextHold: hold } : {}),
+      };
+    });
 }
 
 /** `security find-generic-password -w`: the item's payload, or nothing. Stdout is never logged. */

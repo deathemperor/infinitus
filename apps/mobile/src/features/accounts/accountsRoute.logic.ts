@@ -10,7 +10,11 @@ import {
   type FleetSectionModel,
   type ForecastModel,
   INFINITUS_COMMAND_TIMEOUT_MESSAGE,
+  type AccountResetOffer,
   resetHoldText,
+  resetOfferAction,
+  resetOfferEffect,
+  resetOffers,
   resetsSummary,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
@@ -123,23 +127,37 @@ function upcoming(iso: string, nowMs: number): string {
 }
 
 /** The row's context menu, one entry per action the shared model allows —
-    nothing is re-derived from capabilities here. Ids are the actions. Rename
-    needs a text prompt, which only iOS's Alert offers (`canPrompt`). */
+    nothing is re-derived from capabilities here. Ids are the actions, a reset
+    of one kind `reset:<kind>` (`rowMenuChoice` reads them back). Rename needs
+    a text prompt, which only iOS's Alert offers (`canPrompt`). */
 export function rowMenuActions(
   row: AccountRowModel,
   options: { readonly canPrompt: boolean },
 ): ReadonlyArray<MenuAction> {
-  return (
-    row.actions
-      .filter((action) => action !== "rename" || options.canPrompt)
+  return row.actions
+    .filter((action) => action !== "rename" || options.canPrompt)
+    .flatMap((action): ReadonlyArray<MenuAction> => {
+      if (action !== "reset") {
+        return [{ id: action, title: actionTitle(action, row), image: ACTION_SYMBOL[action] }];
+      }
       // A held reset is not offered; the row's resets line says why.
-      .filter((action) => action !== "reset" || row.resets?.hold === null)
-      .map((action) => ({
-        id: action,
-        title: actionTitle(action, row),
-        image: ACTION_SYMBOL[action],
-      }))
-  );
+      return (row.resets === null ? [] : resetOffers(row.resets))
+        .filter((offer) => offer.hold === null)
+        .map((offer) => ({
+          id: offer.kind === null ? "reset" : `reset:${offer.kind}`,
+          title: offer.kind === null ? actionTitle(action, row) : resetOfferAction(offer),
+          image: ACTION_SYMBOL.reset,
+        }));
+    });
+}
+
+/** A menu id back as the action and, for a reset of one kind, that kind. */
+export function rowMenuChoice(id: string): {
+  readonly action: AccountAction;
+  readonly kind: string | undefined;
+} {
+  const [action, kind] = id.split(":", 2);
+  return { action: action as AccountAction, kind };
 }
 
 const ACTION_SYMBOL: Record<AccountAction, string> = {
@@ -198,19 +216,33 @@ export function switchConfirmation(
 }
 
 /** The confirm before a banked reset is spent: the provider gives none back. */
-export function resetConfirmation(row: AccountRowModel): {
+export function resetConfirmation(
+  row: AccountRowModel,
+  kind?: string,
+): {
   readonly title: string;
   readonly message: string;
 } {
+  const offer: AccountResetOffer | null =
+    kind === undefined || row.resets === null
+      ? null
+      : (resetOffers(row.resets).find((candidate) => candidate.kind === kind) ?? null);
   return {
-    title: `Use a reset on ${row.label}?`,
-    message:
-      "This spends one of the account's banked limit resets. The provider does not give it back.",
+    title: `Use ${offer?.title ? `a ${offer.title} reset` : "a reset"} on ${row.label}?`,
+    message: resetOfferEffect(offer),
   };
 }
 
-/** The row's resets line: the count, and what stops the next one. */
+/** The row's resets line: the count, and what stops the next one (each
+    kind's, named, on a split bank). */
 export function resetsLine(resets: AccountResetsModel): string {
+  if (resets.kinds.length > 0) {
+    const holds = resetOffers(resets).flatMap((offer) => {
+      const hold = resetHoldText(offer);
+      return hold === null ? [] : [`${offer.title}: ${hold}`];
+    });
+    return [resetsSummary(resets), ...holds].join(" · ");
+  }
   const hold = resetHoldText(resets);
   return hold === null ? resetsSummary(resets) : `${resetsSummary(resets)} · ${hold}`;
 }

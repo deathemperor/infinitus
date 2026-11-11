@@ -107,12 +107,18 @@ def fleet(active):
         account(10, "juliet", "Max 20x", [win("5h", 0.0), win("7d", 0.0)], active == 10),
     ]
 
-# Banked limit resets (#1554), one per condition: alpha's is spendable,
+# Banked limit resets (#1554), one per condition: alpha's splits into a
+# weekly and a Fable reset, each spent on its own (`reset 1 --kind fable`),
 # bravo's waits for a limit, charlie (dead) can spend one now. A spent
 # reset is remembered in the state until `reset` (no ident) forgets it.
 RESETS = {
-    1: {"available": 1, "total": 1, "nextGrantId": "launch",
-        "label": "Claude Opus 5.5 launch: one usage-limit reset for Pro and Max"},
+    1: {"available": 2, "total": 2, "nextGrantId": "full-reset",
+        "label": "One full limit reset",
+        "kinds": [
+            {"kind": "weekly", "available": 1, "total": 1, "nextGrantId": "full-reset",
+             "label": "One full limit reset"},
+            {"kind": "fable", "available": 1, "total": 1, "nextGrantId": "launch-fable",
+             "label": "New model launch: one Fable reset"}]},
     2: {"available": 1, "total": 2, "nextGrantId": "launch",
         "label": "Claude Opus 5.5 launch: one usage-limit reset for Pro and Max",
         "hold": {"reason": "notAtLimit"}},
@@ -126,7 +132,19 @@ def resets_for(n, st):
         return None
     bank = dict(bank)
     bank["endsAt"] = iso(24 * 29)
-    spent = st.get("resetsSpent", {}).get(str(n), 0)
+    spent_by = st.get("resetsSpent", {})
+    if "kinds" in bank:
+        kinds = []
+        for k in bank["kinds"]:
+            k = dict(k)
+            if spent_by.get(f"{n}:{k['kind']}", 0):
+                k["available"] = 0
+                k.pop("nextGrantId", None)
+            kinds.append(k)
+        bank["kinds"] = kinds
+        bank["available"] = sum(k["available"] for k in kinds)
+        return bank
+    spent = spent_by.get(str(n), 0)
     left = max(0, bank["available"] - spent)
     bank["available"] = left
     if spent:
@@ -202,11 +220,14 @@ def parse_args(argv):
             provider = argv[i + 1]; i += 2
         elif a == "--slot" and i + 1 < len(argv):
             slot = int(argv[i + 1]); i += 2
+        elif a == "--kind" and i + 1 < len(argv):
+            i += 2
         else:
             pos.append(a); i += 1
     return provider, slot, pos
 
 _, slot_flag, pos = parse_args(sys.argv[1:])
+kind_flag = next((sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--kind"), None)
 cmd = pos[0] if pos else ""
 rest = pos[1:]
 
@@ -265,12 +286,21 @@ elif cmd == "reset" and slot_arg() is not None:
     bank = resets_for(n, st)
     if bank is None:
         err("invalid-input", f"slot {n} has no banked reset")
+    key = str(n)
+    if "kinds" in bank:
+        # Unnamed spends the kind of the grant the provider names next.
+        kind = kind_flag or next(k["kind"] for k in bank["kinds"] if k.get("nextGrantId") == bank["nextGrantId"])
+        found = next((k for k in bank["kinds"] if k["kind"] == kind), None)
+        if found is None:
+            err("invalid-input", f"slot {n} has no banked {kind} reset")
+        bank = found
+        key = f"{n}:{kind}"
     if bank["available"] == 0:
         err("invalid-input", f"slot {n} has no reset left")
     if bank.get("hold"):
         err("invalid-input", f"slot {n}'s reset cannot be spent now: it spends only once the account is at a limit")
     spent = st.setdefault("resetsSpent", {})
-    spent[str(n)] = spent.get(str(n), 0) + 1
+    spent[key] = spent.get(key, 0) + 1
     save(st)
     print(json.dumps(list_payload(refreshed_slot=n)))
 elif cmd == "reset":

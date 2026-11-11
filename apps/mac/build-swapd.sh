@@ -12,7 +12,9 @@ set -eu
 # 0.3.2: #56 released, with #57 (a test).
 # + #60: with every account spent, one whose reset has already passed is re-checked after a minute, not five; the daemon had slept past the account coming back.
 # 0.3.3: #60 released.
+# + #63: a store-changing verb wakes the daemon from any process.
+# + #65: `list` splits banked resets by kind (`resets.kinds`: Claude's Fable and weekly resets), and `reset <slot> --kind <kind>` spends that kind.
 cargo install --locked --git https://github.com/deathemperor/swapd \
-    --rev c32c7f0606f9ebd6ef34c3c2df0d2741bedca768 \
+    --rev 040cdde83cff2f340e7b57bdad846b742cfe88d1 \
     --root "$INFINITUS_ENGINE_BUILD_ROOT" swapd
 "$INFINITUS_ENGINE_BUILD_ROOT/bin/swapd" --version

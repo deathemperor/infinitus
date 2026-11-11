@@ -18,6 +18,7 @@ import {
   paceRemainingPercent,
   remainingPercent,
 } from "@infinitus/shared/usageLimits";
+import { resetKindTitle } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { type ReactNode, useContext, useRef, useState } from "react";
 import { Atom } from "effect/reactivity";
 import { Linking, Pressable, View } from "react-native";
@@ -243,6 +244,7 @@ function resetHoldText(credits: ServerProviderResetCredits, now: number): string
   }
 }
 
+/** Banked reset credits; a bank split by kind (Claude's Fable and weekly resets) gets a line per kind. */
 export function ResetCredits(props: {
   readonly environmentId: EnvironmentId;
   readonly input: ProviderConsumeResetCreditInput;
@@ -250,7 +252,32 @@ export function ResetCredits(props: {
   readonly now: number;
   readonly dense?: boolean;
 }) {
-  const { environmentId, input, credits, now, dense = false } = props;
+  const { credits, input } = props;
+  if (!credits.kinds?.length) return <ResetCreditLine {...props} />;
+  return (
+    <View className="gap-1">
+      {credits.kinds.map((kind) => (
+        <ResetCreditLine
+          key={kind.kind}
+          {...props}
+          input={kind.nextCreditId ? { ...input, creditId: kind.nextCreditId } : input}
+          credits={kind}
+          kind={kind.kind}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ResetCreditLine(props: {
+  readonly environmentId: EnvironmentId;
+  readonly input: ProviderConsumeResetCreditInput;
+  readonly credits: ServerProviderResetCredits;
+  readonly now: number;
+  readonly dense?: boolean;
+  readonly kind?: string;
+}) {
+  const { environmentId, input, credits, now, dense = false, kind } = props;
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const consume = useAtomCommand(serverEnvironment.consumeResetCredit, {
     reportFailure: false,
@@ -262,12 +289,13 @@ export function ResetCredits(props: {
   const expiresIn = credits.nextExpiresAt
     ? formatDuration(Date.parse(credits.nextExpiresAt) - now)
     : null;
-  const summary =
+  const summary = `${kind ? `${resetKindTitle(kind)} · ` : ""}${
     credits.availableCount === 0
       ? "No reset credits banked"
       : `${credits.availableCount} ${credits.availableCount === 1 ? "reset credit" : "reset credits"} banked${
           expiresIn ? ` · next expires in ${expiresIn}` : ""
-        }`;
+        }`
+  }`;
   // Why the next credit waits: Claude's resets work only at a limit and cool
   // down between claims. The button holds rather than spending a tap on "no".
   const hold = resetHoldText(credits, now);
@@ -292,8 +320,10 @@ export function ResetCredits(props: {
   const confirm = () => {
     if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     Dialog.alert(
-      "Use a reset credit?",
-      "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
+      kind ? `Use a ${resetKindTitle(kind)} reset?` : "Use a reset credit?",
+      kind === "fable"
+        ? "This redeems one Fable reset and returns what Fable used to your weekly limit. It cannot be undone."
+        : "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Use credit", onPress: () => void redeem() },

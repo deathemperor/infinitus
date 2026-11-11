@@ -72,7 +72,7 @@ final class PeerFleetsTests: XCTestCase {
         let engine = PeerEngine(machine: "env-1", machineLabel: "HyperNovae", remoteEngine: "swapd",
                                 capabilities: [.reset], fleets: [], remoteKeys: [.claude: "swapd/claude"],
                                 connected: true, queue: queue)
-        let run = Task { try await engine.reset(fleet: .claude, number: 2) }
+        let run = Task { try await engine.reset(fleet: .claude, number: 2, kind: nil) }
         var drained: [PeerFleets.Command] = []
         while drained.isEmpty { drained = await queue.drain(); await Task.yield() }
         XCTAssertEqual(drained.map { ($0.command, $0.args, $0.options) }.map { "\($0) \($1) \($2)" },
@@ -80,6 +80,13 @@ final class PeerFleetsTests: XCTestCase {
         await queue.resolve(.init(id: drained[0].id, ok: true))
         let refreshed = try await run.value
         XCTAssertNil(refreshed)
+        // A kind (a Fable reset) rides as the verb's own option.
+        let fable = Task { try await engine.reset(fleet: .claude, number: 2, kind: "fable") }
+        drained = []
+        while drained.isEmpty { drained = await queue.drain(); await Task.yield() }
+        XCTAssertEqual(drained.map(\.options), [["kind": "fable"]])
+        await queue.resolve(.init(id: drained[0].id, ok: true))
+        _ = try await fable.value
     }
 
     func testAQueuedCommandWaitsForItsResult() async throws {

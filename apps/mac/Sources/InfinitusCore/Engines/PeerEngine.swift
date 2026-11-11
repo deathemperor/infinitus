@@ -91,8 +91,8 @@ public actor PeerEngine: AccountEngine {
 
     /// Spends one of that account's banked resets there (#1554); the other
     /// machine's own `reset` verb re-checks the bank and its hold.
-    public func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]? {
-        try await send("reset", fleet: fleet, [String(number)])
+    public func reset(fleet: Provider, number: Int, kind: String?) async throws -> [EngineFleet]? {
+        try await send("reset", fleet: fleet, [String(number)], options: kind.map { ["kind": $0] } ?? [:])
         return nil
     }
 }

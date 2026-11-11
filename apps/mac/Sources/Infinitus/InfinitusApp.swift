@@ -340,9 +340,25 @@ struct MenuContent: View {
             Button("Use reset") { model.commitPendingReset() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This spends one of account "
-                 + "\(model.pendingReset.map(String.init) ?? "?")'s banked limit resets "
-                 + "and clears its windows now. The provider does not give it back.")
+            Text(resetConfirmText(model.pendingReset))
+        }
+    }
+
+    /// A Fable reset gives back what Fable used of the week rather than
+    /// clearing the windows, Claude's own wording.
+    private func resetConfirmText(_ pick: ResetPick?) -> String {
+        let account = pick.map { String($0.number) } ?? "?"
+        switch pick?.kind {
+        case "fable":
+            return "This spends one of account \(account)'s banked Fable resets and returns what "
+                + "Fable used to its weekly limit. The provider does not give it back."
+        case let kind?:
+            let title = AccountResets.Kind.title(kind).lowercased()
+            return "This spends one of account \(account)'s banked \(title) resets and clears "
+                + "those windows now. The provider does not give it back."
+        case nil:
+            return "This spends one of account \(account)'s banked limit resets "
+                + "and clears its windows now. The provider does not give it back."
         }
     }
 

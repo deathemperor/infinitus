@@ -18,6 +18,7 @@ import {
   paceRemainingPercent,
   remainingPercent,
 } from "@infinitus/shared/usageLimits";
+import { resetKindTitle } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { Fragment, useLayoutEffect, useState } from "react";
 
@@ -275,21 +276,23 @@ export function ResetCreditDialog({
   onOpenChange,
   onConfirm,
   disabled = false,
+  kind,
 }: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onConfirm: () => void;
   readonly disabled?: boolean;
+  /** The kind being redeemed; a Fable reset refills differently. */
+  readonly kind?: string;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Use a reset credit?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This redeems one credit on your account and clears the current rate-limit windows. It
-            cannot be undone.
-          </AlertDialogDescription>
+          <AlertDialogTitle>
+            {kind ? `Use a ${resetKindTitle(kind)} reset?` : "Use a reset credit?"}
+          </AlertDialogTitle>
+          <AlertDialogDescription>{resetCreditEffect(kind)}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
@@ -337,7 +340,10 @@ function resetHoldText(credits: ServerProviderResetCredits, now: number): string
   }
 }
 
-/** Banked reset credits with the redeem button and its confirm, self-contained. */
+/**
+ * Banked reset credits with the redeem button and its confirm, self-contained. A bank split by
+ * kind (Claude's Fable and weekly resets) gets a line, and a button, per kind.
+ */
 export function ResetCredits({
   environmentId,
   input,
@@ -349,6 +355,40 @@ export function ResetCredits({
   readonly credits: ServerProviderResetCredits;
   readonly now: number;
 }) {
+  if (!credits.kinds?.length) {
+    return (
+      <ResetCreditLine environmentId={environmentId} input={input} credits={credits} now={now} />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {credits.kinds.map((kind) => (
+        <ResetCreditLine
+          key={kind.kind}
+          environmentId={environmentId}
+          input={kind.nextCreditId ? { ...input, creditId: kind.nextCreditId } : input}
+          credits={kind}
+          kind={kind.kind}
+          now={now}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ResetCreditLine({
+  environmentId,
+  input,
+  credits,
+  kind,
+  now,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly input: ProviderConsumeResetCreditInput;
+  readonly credits: ServerProviderResetCredits;
+  readonly kind?: string;
+  readonly now: number;
+}) {
   const { canManageProviders, confirming, setConfirming, busy, status, redeem } = useResetCredit(
     environmentId,
     input,
@@ -357,7 +397,10 @@ export function ResetCredits({
   const hold = resetHoldText(credits, now);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      <span className="tabular-nums">{resetCreditsSummary(credits, now)}</span>
+      <span className="tabular-nums">
+        {kind ? `${resetKindTitle(kind)} · ` : ""}
+        {resetCreditsSummary(credits, now)}
+      </span>
       {credits.availableCount > 0 ? (
         <Button
           size="xs"
@@ -381,9 +424,17 @@ export function ResetCredits({
         onOpenChange={setConfirming}
         onConfirm={() => void redeem()}
         disabled={!canManageProviders}
+        {...(kind ? { kind } : {})}
       />
     </div>
   );
+}
+
+/** What redeeming does; a Fable reset gives back what Fable used of the week (Claude's wording). */
+function resetCreditEffect(kind: string | undefined): string {
+  return kind === "fable"
+    ? "This redeems one Fable reset and returns what Fable used to your weekly limit. It cannot be undone."
+    : "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.";
 }
 
 /** Advance now only on explicit refresh to avoid page repaints from ticking. */

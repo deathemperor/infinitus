@@ -14,6 +14,8 @@ import {
   paceRemainingPercent,
   remainingPercent,
 } from "@infinitus/shared/usageLimits";
+import { resetKindTitle } from "@infinitus/client-runtime/state/infinitusAccounts";
+import type { ServerProviderResetCredits } from "@infinitus/contracts";
 import type { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { normalizeProviderAccentColor } from "@infinitus/client-runtime/state/provider-instance-display";
 import { AlertTriangleIcon, ExternalLinkIcon, TicketIcon } from "lucide-react";
@@ -207,7 +209,7 @@ function SegmentPopover({
               className="ms-auto"
               onClick={onRedeem}
             >
-              {redeem.busy ? "Using…" : "Use reset"}
+              {redeem.busy ? "Using…" : `Use ${nextKindTitle(credits)}reset`}
             </Button>
           </span>
         </div>
@@ -691,4 +693,10 @@ function LimitNotices({ notices }: { readonly notices: readonly string[] }) {
       ))}
     </Alert>
   );
+}
+
+/** "Fable " when the bank is split by kind: this button redeems the provider's next credit. */
+function nextKindTitle(credits: ServerProviderResetCredits): string {
+  const kind = credits.kinds?.find((candidate) => candidate.nextCreditId === credits.nextCreditId);
+  return kind ? `${resetKindTitle(kind.kind)} ` : "";
 }

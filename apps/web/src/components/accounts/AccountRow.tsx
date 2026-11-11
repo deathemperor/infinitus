@@ -1,8 +1,12 @@
 import {
   type AccountAction,
+  type AccountResetOffer,
   type AccountResetsModel,
   type AccountRowModel,
   resetHoldText,
+  resetOfferAction,
+  resetOfferEffect,
+  resetOffers,
   resetsSummary,
   type UsageWindowBar,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
@@ -123,8 +127,9 @@ function actionLabel(row: AccountRowModel, action: AccountAction): string {
 
 /**
  * The account's banked limit resets (#1554): a ticket count that opens what
- * the bank holds, what stops the next one, and the redeem button. Spending
- * one is the engine's `reset`, so it asks first like `remove` does.
+ * the bank holds, what stops each reset, and a redeem button per kind (Claude
+ * banks Fable and weekly resets apart). Spending one is the engine's `reset`,
+ * so it asks first like `remove` does.
  */
 function ResetsPopover({
   row,
@@ -138,10 +143,10 @@ function ResetsPopover({
   /** The fleet offers `reset` on this row (capability and a bank with something left). */
   readonly canRedeem: boolean;
   readonly busy: boolean;
-  readonly onRedeem: () => void;
+  readonly onRedeem: (offer: AccountResetOffer) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const hold = resetHoldText(resets);
+  const offers = resetOffers(resets);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -159,24 +164,31 @@ function ResetsPopover({
       <PopoverPopup side="bottom" align="start" className="w-72">
         <div className="flex flex-col gap-2 text-xs">
           <span className="font-medium text-foreground tabular-nums">{resetsSummary(resets)}</span>
-          {resets.label === null ? null : (
-            <span className="text-muted-foreground">{resets.label}</span>
-          )}
-          {hold === null ? null : <span className="text-muted-foreground">{hold}</span>}
-          {canRedeem ? (
-            <Button
-              size="xs"
-              variant="outline"
-              className="self-start"
-              disabled={busy || hold !== null}
-              onClick={() => {
-                setOpen(false);
-                onRedeem();
-              }}
-            >
-              {busy ? "Using…" : "Use reset"}
-            </Button>
-          ) : null}
+          {offers.map((offer) => {
+            const hold = resetHoldText(offer);
+            return (
+              <div key={offer.kind ?? ""} className="flex flex-col gap-1">
+                {offer.label === null ? null : (
+                  <span className="text-muted-foreground">{offer.label}</span>
+                )}
+                {hold === null ? null : <span className="text-muted-foreground">{hold}</span>}
+                {canRedeem ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="self-start"
+                    disabled={busy || hold !== null}
+                    onClick={() => {
+                      setOpen(false);
+                      onRedeem(offer);
+                    }}
+                  >
+                    {busy ? "Using…" : resetOfferAction(offer)}
+                  </Button>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </PopoverPopup>
     </Popover>
@@ -211,7 +223,7 @@ export function AccountRow({
   /** `remove` deletes the credential from the engine, so it asks first. */
   const [confirmRemove, setConfirmRemove] = useState(false);
   /** `reset` spends a banked reset the provider will not give back. */
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmReset, setConfirmReset] = useState<AccountResetOffer | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = pendingAction !== null;
 
@@ -286,7 +298,7 @@ export function AccountRow({
             resets={row.resets}
             canRedeem={row.actions.includes("reset")}
             busy={busy}
-            onRedeem={() => setConfirmReset(true)}
+            onRedeem={setConfirmReset}
           />
         )}
         <span className="ms-auto flex items-center gap-2">
@@ -374,24 +386,27 @@ export function AccountRow({
           </AlertDialogFooter>
         </AlertDialogPopup>
       </AlertDialog>
-      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+      <AlertDialog
+        open={confirmReset !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmReset(null);
+        }}
+      >
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>Use a reset on {row.label}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This spends one of the account&apos;s banked limit resets. The provider does not give
-              it back.
-            </AlertDialogDescription>
+            <AlertDialogDescription>{resetOfferEffect(confirmReset)}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
             <Button
               onClick={() => {
-                setConfirmReset(false);
-                onAction("reset");
+                const offer = confirmReset;
+                setConfirmReset(null);
+                onAction("reset", offer?.kind ?? undefined);
               }}
             >
-              Use reset
+              {confirmReset === null ? "Use reset" : resetOfferAction(confirmReset)}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

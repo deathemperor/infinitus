@@ -612,19 +612,21 @@ struct AccountRowMenu<M: FleetModel>: View {
                       systemImage: warm ? "flame.slash" : "flame")
             }
         }
-        if let resets = account.resets, resets.available > 0, model.capabilities.contains(.reset) {
-            Button {
-                model.pendingReset = account.number
-            } label: {
-                Label(resetMenuTitle(resets), systemImage: "ticket")
+        if let resets = account.resets, model.capabilities.contains(.reset) {
+            ForEach(resets.picks, id: \.kind) { offer in
+                Button {
+                    model.pendingReset = ResetPick(number: account.number, kind: offer.kind)
+                } label: {
+                    Label(resetMenuTitle(offer), systemImage: "ticket")
+                }
+                .disabled(offer.hold != nil)
             }
-            .disabled(resets.hold != nil)
         }
     }
 }
 
-func resetMenuTitle(_ resets: AccountResets) -> String {
-    "Use banked reset (\(resets.available) of \(resets.total) left)"
+func resetMenuTitle(_ offer: ResetPick.Offer) -> String {
+    "Use \(offer.title.map { "\($0) " } ?? "banked ")reset (\(offer.available) of \(offer.total) left)"
 }
 
 /// The account's banked limit resets (#1554): a ticket and the count,
@@ -637,30 +639,59 @@ struct AccountResetMark<M: FleetModel>: View {
     let account: Account
 
     var body: some View {
-        if let resets = account.resets, resets.available > 0, model.capabilities.contains(.reset) {
-            Button {
-                if resets.hold == nil { model.pendingReset = account.number }
-            } label: {
-                HStack(spacing: 1) {
-                    Image(systemName: "ticket")
-                    Text(String(resets.available))
+        if let resets = account.resets, model.capabilities.contains(.reset) {
+            let offers = resets.picks
+            let usable = offers.filter { $0.hold == nil }
+            if !offers.isEmpty {
+                // Two usable kinds (Fable and weekly) are a choice, so the
+                // mark opens a menu of them; one is staged straight away.
+                if usable.count > 1 {
+                    Menu {
+                        ForEach(usable, id: \.kind) { offer in
+                            Button(resetMenuTitle(offer)) {
+                                model.pendingReset = ResetPick(number: account.number, kind: offer.kind)
+                            }
+                        }
+                    } label: { mark(offers, usable: true) }
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .instantTip(Self.tip(offers))
+                } else {
+                    Button {
+                        if let offer = usable.first {
+                            model.pendingReset = ResetPick(number: account.number, kind: offer.kind)
+                        }
+                    } label: { mark(offers, usable: !usable.isEmpty) }
+                    .buttonStyle(.plain)
+                    .instantTip(Self.tip(offers))
                 }
-                .font(PopupFont.caption2)
-                .foregroundStyle(resets.hold == nil ? Color.accentColor : Color.secondary)
             }
-            .buttonStyle(.plain)
-            .instantTip(Self.tip(resets))
         }
     }
 
-    static func tip(_ resets: AccountResets) -> String {
-        let count = "\(resets.available) of \(resets.total) \(resets.total == 1 ? "reset" : "resets") banked"
-        switch resets.hold?.reason {
-        case nil: return count + " — press to use one"
-        case "notAtLimit": return count + " — usable once the account hits a limit"
-        case "cooldown": return count + " — cooling down"
-        default: return count + " — not usable right now"
+    private func mark(_ offers: [ResetPick.Offer], usable: Bool) -> some View {
+        HStack(spacing: 1) {
+            Image(systemName: "ticket")
+            Text(String(offers.reduce(0) { $0 + $1.available }))
         }
+        .font(PopupFont.caption2)
+        .foregroundStyle(usable ? Color.accentColor : Color.secondary)
+    }
+
+    /// One line per kind ("1 of 1 Fable reset banked — press to use one").
+    static func tip(_ offers: [ResetPick.Offer]) -> String {
+        offers.map { offer in
+            let noun = offer.total == 1 ? "reset" : "resets"
+            let count = "\(offer.available) of \(offer.total) \(offer.title.map { "\($0) " } ?? "")\(noun) banked"
+            switch offer.hold?.reason {
+            case nil: return count + " — press to use one"
+            case "notAtLimit": return count + " — usable once the account hits a limit"
+            case "cooldown": return count + " — cooling down"
+            default: return count + " — not usable right now"
+            }
+        }.joined(separator: "\n")
     }
 }
 

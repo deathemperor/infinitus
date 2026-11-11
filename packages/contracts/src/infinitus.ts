@@ -125,6 +125,25 @@ export type InfinitusStatus = typeof InfinitusStatus.Type;
     left across the live grants, the grant the provider spends next and why it
     cannot be spent right now. Judged against the engine's clock when it
     listed, so nothing on a client ticks it. */
+const InfinitusAccountResetHold = Schema.Struct({
+  reason: Schema.Literals(["notAtLimit", "cooldown", "blocked"]),
+  /** When a cooldown lifts, ISO 8601. */
+  until: Schema.optionalKey(Schema.String),
+});
+
+/** One kind of banked reset (`weekly`, `fable`, …): Claude banks them apart
+    and `reset <fleet> <n> --kind <kind>` spends that kind. */
+export const InfinitusAccountResetKind = Schema.Struct({
+  kind: Schema.String,
+  available: Schema.Number,
+  total: Schema.Number,
+  nextGrantId: Schema.optionalKey(Schema.String),
+  label: Schema.optionalKey(Schema.String),
+  endsAt: Schema.optionalKey(Schema.String),
+  hold: Schema.optionalKey(InfinitusAccountResetHold),
+});
+export type InfinitusAccountResetKind = typeof InfinitusAccountResetKind.Type;
+
 export const InfinitusAccountResets = Schema.Struct({
   available: Schema.Number,
   total: Schema.Number,
@@ -133,13 +152,10 @@ export const InfinitusAccountResets = Schema.Struct({
   label: Schema.optionalKey(Schema.String),
   /** When that grant lapses, ISO 8601. */
   endsAt: Schema.optionalKey(Schema.String),
-  hold: Schema.optionalKey(
-    Schema.Struct({
-      reason: Schema.Literals(["notAtLimit", "cooldown", "blocked"]),
-      /** When a cooldown lifts, ISO 8601. */
-      until: Schema.optionalKey(Schema.String),
-    }),
-  ),
+  hold: Schema.optionalKey(InfinitusAccountResetHold),
+  /** The same bank split by what a reset refills; absent from an engine that
+      does not split it. */
+  kinds: Schema.optionalKey(Schema.Array(InfinitusAccountResetKind)),
 });
 export type InfinitusAccountResets = typeof InfinitusAccountResets.Type;
 

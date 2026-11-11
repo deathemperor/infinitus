@@ -95,7 +95,7 @@ final class AppModel: ObservableObject {
     /// The same staging for a banked limit reset (#1554): the ticket mark
     /// or menu item on any fleet's row sets it, the one alert commits it.
     var pendingResetFleet: FleetState? { registry.fleets.first { $0.pendingReset != nil } }
-    var pendingReset: Int? {
+    var pendingReset: ResetPick? {
         get { pendingResetFleet?.pendingReset }
         set {
             if let newValue { primary?.pendingReset = newValue }
@@ -1903,8 +1903,8 @@ final class AppModel: ObservableObject {
     }
     /// The confirm alert's Use reset (#1554): the fleet that staged it.
     func commitPendingReset() {
-        guard let fleet = pendingResetFleet, let number = fleet.pendingReset else { return }
-        fleet.redeemReset(number)
+        guard let fleet = pendingResetFleet, let pick = fleet.pendingReset else { return }
+        fleet.redeemReset(pick)
         pendingReset = nil
     }
     func rotate() { primary?.rotate() }
