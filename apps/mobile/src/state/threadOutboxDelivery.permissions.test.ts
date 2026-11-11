@@ -143,6 +143,7 @@ vi.mock("./use-thread-outbox", async () => {
   const { appAtomRegistry } = await import("./atom-registry");
   const editingQueuedMessageIdsAtom = Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive);
   return {
+<<<<<<< HEAD
     editingQueuedMessageIdsAtom,
     holdEditingQueuedMessage: (messageId: string) => {
       appAtomRegistry.set(editingQueuedMessageIdsAtom, {
@@ -154,6 +155,11 @@ vi.mock("./use-thread-outbox", async () => {
       const { [messageId]: _released, ...rest } = appAtomRegistry.get(editingQueuedMessageIdsAtom);
       appAtomRegistry.set(editingQueuedMessageIdsAtom, rest);
     },
+=======
+    editingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
+    dispatchingQueuedMessageIdAtom: Atom.make<MessageId | null>(null).pipe(Atom.keepAlive),
+    retryingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
+>>>>>>> upstream-sync-40c3682543-upstream-renamed
     threadOutboxShellStatusesAtom: Atom.make(new Map([["secondary", "live"]])),
   };
 });
