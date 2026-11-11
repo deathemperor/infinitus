@@ -307,7 +307,12 @@ function ResetCreditLine(props: {
     const result = await consume({ environmentId, input });
     setBusy(false);
     if (result._tag === "Success") {
-      setStatus(result.value.warning ?? OUTCOME_TEXT[result.value.outcome]);
+      setStatus(
+        result.value.warning ??
+          (kind === "fable" && result.value.outcome === "reset"
+            ? "Reset applied. What Fable used is back in your weekly limit."
+            : OUTCOME_TEXT[result.value.outcome]),
+      );
       return;
     }
     setStatus(
