@@ -20,6 +20,26 @@ export const ServerProviderUsageWindow = Schema.Struct({
 });
 export type ServerProviderUsageWindow = typeof ServerProviderUsageWindow.Type;
 
+const ResetCreditHold = Schema.Struct({
+  reason: Schema.Literals(["notAtLimit", "cooldown", "blocked"]),
+  until: Schema.optional(IsoDateTime),
+});
+
+/**
+ * One kind of banked reset, by what it refills: Claude banks `weekly` and
+ * `fable` resets (and `session`, `full`) apart, and each is redeemed on its
+ * own by passing its `nextCreditId`.
+ */
+export const ServerProviderResetCreditKind = Schema.Struct({
+  kind: TrimmedNonEmptyString,
+  availableCount: NonNegativeInt,
+  nextExpiresAt: Schema.optional(IsoDateTime),
+  nextCreditId: Schema.optional(TrimmedNonEmptyString),
+  label: Schema.optional(TrimmedNonEmptyString),
+  nextHold: Schema.optional(ResetCreditHold),
+});
+export type ServerProviderResetCreditKind = typeof ServerProviderResetCreditKind.Type;
+
 export const ServerProviderResetCredits = Schema.Struct({
   availableCount: NonNegativeInt,
   nextExpiresAt: Schema.optional(IsoDateTime),
@@ -32,12 +52,9 @@ export const ServerProviderResetCredits = Schema.Struct({
    * resets work only while a limit is hit and cool down between claims. Codex
    * never sets this. Clients keep the balance visible and hold the button.
    */
-  nextHold: Schema.optional(
-    Schema.Struct({
-      reason: Schema.Literals(["notAtLimit", "cooldown", "blocked"]),
-      until: Schema.optional(IsoDateTime),
-    }),
-  ),
+  nextHold: Schema.optional(ResetCreditHold),
+  /** The same credits split by what they refill; absent when the provider does not split them. */
+  kinds: Schema.optional(Schema.Array(ServerProviderResetCreditKind)),
 });
 export type ServerProviderResetCredits = typeof ServerProviderResetCredits.Type;
 
@@ -100,7 +117,11 @@ export type UsageLimitSourceConsumeResetCreditInput =
   typeof UsageLimitSourceConsumeResetCreditInput.Type;
 
 export const ProviderConsumeResetCreditInput = Schema.Union([
-  Schema.Struct({ instanceId: ProviderInstanceId }),
+  Schema.Struct({
+    instanceId: ProviderInstanceId,
+    /** One kind's `nextCreditId`; absent redeems the provider's next credit. */
+    creditId: Schema.optional(TrimmedNonEmptyString),
+  }),
   UsageLimitSourceConsumeResetCreditInput,
 ]);
 export type ProviderConsumeResetCreditInput = typeof ProviderConsumeResetCreditInput.Type;

@@ -25,6 +25,7 @@ import {
   resetsLine,
   rowBadges,
   rowMenuActions,
+  rowMenuChoice,
   removeConfirmation,
   switchConfirmation,
   windowTone,
@@ -106,7 +107,7 @@ export function AccountRow(props: {
   );
 
   const onAction = useCallback(
-    (action: AccountAction) => {
+    (action: AccountAction, kind?: string) => {
       if (action === "switch") {
         const copy = switchConfirmation(row, fleetTitle);
         Dialog.confirm({
@@ -118,12 +119,12 @@ export function AccountRow(props: {
         return;
       }
       if (action === "reset") {
-        const copy = resetConfirmation(row);
+        const copy = resetConfirmation(row, kind);
         Dialog.confirm({
           title: copy.title,
           message: copy.message,
           confirmText: "Use reset",
-          onConfirm: () => void perform("reset"),
+          onConfirm: () => void perform("reset", kind),
         });
         return;
       }
@@ -203,7 +204,10 @@ export function AccountRow(props: {
     <Menu
       title={row.label}
       actions={[...actions]}
-      onPressAction={({ nativeEvent }) => onAction(nativeEvent.event as AccountAction)}
+      onPressAction={({ nativeEvent }) => {
+        const choice = rowMenuChoice(nativeEvent.event);
+        onAction(choice.action, choice.kind);
+      }}
       accessibilityRole="button"
       accessibilityLabel={`${row.label} actions`}
     >

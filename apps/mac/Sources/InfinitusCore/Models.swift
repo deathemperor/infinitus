@@ -165,6 +165,47 @@ public struct AccountResets: Codable, Sendable, Equatable {
     /// When that grant lapses, RFC 3339.
     public let endsAt: String?
     public let hold: Hold?
+    /// The same bank split by what a reset refills (swapd's `kinds`):
+    /// Claude banks Fable and weekly resets apart, and each is spent on its
+    /// own. nil from an engine that does not split it.
+    public let kinds: [Kind]?
+
+    /// One kind of banked reset, counted, held and spent apart.
+    public struct Kind: Codable, Sendable, Equatable {
+        /// `session`, `weekly`, `fable`, `full`, or a kind this build does
+        /// not know yet.
+        public let kind: String
+        public let available: Int
+        public let total: Int
+        public let nextGrantId: String?
+        public let label: String?
+        public let endsAt: String?
+        public let hold: Hold?
+
+        public init(kind: String, available: Int, total: Int, nextGrantId: String? = nil,
+                    label: String? = nil, endsAt: String? = nil, hold: Hold? = nil) {
+            self.kind = kind
+            self.available = available
+            self.total = total
+            self.nextGrantId = nextGrantId
+            self.label = label
+            self.endsAt = endsAt
+            self.hold = hold
+        }
+
+        /// The kind as Claude's `/reset` names it ("Fable reset").
+        public var title: String { Self.title(kind) }
+
+        public static func title(_ kind: String) -> String {
+            switch kind {
+            case "session": return "5-hour"
+            case "weekly": return "Weekly"
+            case "fable": return "Fable"
+            case "full": return "Full"
+            default: return kind.prefix(1).uppercased() + kind.dropFirst()
+            }
+        }
+    }
 
     public struct Hold: Codable, Sendable, Equatable {
         /// `notAtLimit` (spends only at a limit), `cooldown` (one was spent
@@ -178,13 +219,46 @@ public struct AccountResets: Codable, Sendable, Equatable {
     }
 
     public init(available: Int, total: Int, nextGrantId: String? = nil, label: String? = nil,
-                endsAt: String? = nil, hold: Hold? = nil) {
+                endsAt: String? = nil, hold: Hold? = nil, kinds: [Kind]? = nil) {
         self.available = available
         self.total = total
         self.nextGrantId = nextGrantId
         self.label = label
         self.endsAt = endsAt
         self.hold = hold
+        self.kinds = kinds
+    }
+
+    /// What a row offers to spend: each kind with a reset left, or, from an
+    /// engine that does not split the bank, the bank itself as one unnamed
+    /// pick.
+    public var picks: [ResetPick.Offer] {
+        guard let kinds, !kinds.isEmpty else {
+            return available > 0 ? [.init(kind: nil, title: nil, available: available, total: total, hold: hold)] : []
+        }
+        return kinds.filter { $0.available > 0 }
+            .map { .init(kind: $0.kind, title: $0.title, available: $0.available, total: $0.total, hold: $0.hold) }
+    }
+}
+
+/// A banked reset a row staged: the account and, when the engine splits
+/// its bank, the kind to spend (nil spends the grant the provider names
+/// next).
+public struct ResetPick: Equatable, Sendable {
+    public let number: Int
+    public let kind: String?
+    public init(number: Int, kind: String? = nil) {
+        self.number = number
+        self.kind = kind
+    }
+
+    public struct Offer: Equatable, Sendable {
+        public let kind: String?
+        /// "Fable"; nil for the unsplit bank.
+        public let title: String?
+        public let available: Int
+        public let total: Int
+        public let hold: AccountResets.Hold?
     }
 }
 

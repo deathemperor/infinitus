@@ -194,9 +194,11 @@ public protocol AccountEngine: Sendable {
     /// Spend one of account n's banked limit resets as that account; the
     /// active account is untouched. Answers like the flag edits, with the
     /// fleet as it reads after the forced fetch that follows the claim.
-    /// Only with `.reset`.
+    /// Only with `.reset`. `kind` names one of `AccountResets.kinds` to
+    /// spend (a Fable reset beside a weekly one); nil spends the grant the
+    /// provider names next.
     @discardableResult
-    func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]?
+    func reset(fleet: Provider, number: Int, kind: String?) async throws -> [EngineFleet]?
     @discardableResult
     func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]?
     func remove(fleet: Provider, number: Int) async throws
@@ -256,7 +258,7 @@ public extension AccountEngine {
     func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? { throw EngineError.unsupported("prefer") }
     func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? { throw EngineError.unsupported("auto-ignite") }
     func ignite(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("ignite") }
-    func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]? { throw EngineError.unsupported("reset") }
+    func reset(fleet: Provider, number: Int, kind: String?) async throws -> [EngineFleet]? { throw EngineError.unsupported("reset") }
     func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]? { throw EngineError.unsupported("rename") }
     func remove(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("remove") }
     func addCurrent() async throws { throw EngineError.unsupported("addCurrent") }

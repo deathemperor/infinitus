@@ -41,6 +41,23 @@ export interface AccountResetsModel {
   readonly hold: "notAtLimit" | "cooldown" | "blocked" | null;
   /** When a cooldown lifts, ISO 8601. */
   readonly holdUntil: string | null;
+  /** The bank split by what a reset refills (Claude's Fable and weekly
+      resets), each spent on its own; empty from an engine that does not split it. */
+  readonly kinds: ReadonlyArray<AccountResetOffer>;
+}
+
+/** One reset a row can spend: a kind of the bank, or (`kind` null) the bank
+    as one, from an engine that does not split it. */
+export interface AccountResetOffer {
+  readonly kind: string | null;
+  /** "Fable"; null for the unsplit bank. */
+  readonly title: string | null;
+  readonly available: number;
+  readonly total: number;
+  readonly label: string | null;
+  readonly endsAt: string | null;
+  readonly hold: AccountResetsModel["hold"];
+  readonly holdUntil: string | null;
 }
 
 /** One usage window drawn as a bar. `countdown` is the engine's own
@@ -252,6 +269,18 @@ function fleetCanAdd(fleet: InfinitusFleet): boolean {
   return fleet.capabilities.some((capability) => ADD_CAPABILITIES.has(capability));
 }
 
+const RESET_KIND_TITLES: Readonly<Record<string, string>> = {
+  session: "5-hour",
+  weekly: "Weekly",
+  fable: "Fable",
+  full: "Full",
+};
+
+/** A banked reset's kind as Claude's `/reset` names it ("Fable"); an unknown kind capitalized. */
+export function resetKindTitle(kind: string): string {
+  return RESET_KIND_TITLES[kind] ?? kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
 function accountResets(account: InfinitusAccount): AccountResetsModel | null {
   const resets = account.resets;
   if (resets === undefined) return null;
@@ -262,11 +291,42 @@ function accountResets(account: InfinitusAccount): AccountResetsModel | null {
     endsAt: resets.endsAt ?? null,
     hold: resets.hold?.reason ?? null,
     holdUntil: resets.hold?.until ?? null,
+    kinds: (resets.kinds ?? []).map((kind) => ({
+      kind: kind.kind,
+      title: resetKindTitle(kind.kind),
+      available: kind.available,
+      total: kind.total,
+      label: kind.label ?? null,
+      endsAt: kind.endsAt ?? null,
+      hold: kind.hold?.reason ?? null,
+      holdUntil: kind.hold?.until ?? null,
+    })),
   };
 }
 
-/** Why the next reset waits, for the held button; null when it can be spent. */
-export function resetHoldText(resets: AccountResetsModel): string | null {
+/** The resets a row offers to spend: each kind with one left, or the unsplit
+    bank as one offer. */
+export function resetOffers(resets: AccountResetsModel): ReadonlyArray<AccountResetOffer> {
+  if (resets.kinds.length > 0) return resets.kinds.filter((kind) => kind.available > 0);
+  if (resets.available === 0) return [];
+  return [
+    {
+      kind: null,
+      title: null,
+      available: resets.available,
+      total: resets.total,
+      label: resets.label,
+      endsAt: resets.endsAt,
+      hold: resets.hold,
+      holdUntil: resets.holdUntil,
+    },
+  ];
+}
+
+/** Why a reset waits, for the held button; null when it can be spent. */
+export function resetHoldText(
+  resets: Pick<AccountResetsModel, "hold" | "holdUntil">,
+): string | null {
   switch (resets.hold) {
     case null:
       return null;
@@ -281,10 +341,33 @@ export function resetHoldText(resets: AccountResetsModel): string | null {
   }
 }
 
-/** "1 of 1 resets banked · until 22 Oct" — the row's one-line summary. */
+/** "1 of 1 resets banked · until 22 Oct" — the row's one-line summary; a
+    split bank counts each kind ("Weekly 1 of 1 · Fable 0 of 1 banked"). */
 export function resetsSummary(resets: AccountResetsModel): string {
+  if (resets.kinds.length > 0) {
+    const counts = resets.kinds.map((kind) => `${kind.title} ${kind.available} of ${kind.total}`);
+    return `${counts.join(" · ")} banked`;
+  }
   const count = `${resets.available} of ${resets.total} ${resets.total === 1 ? "reset" : "resets"} banked`;
   return resets.endsAt === null ? count : `${count} · until ${formatResetInstant(resets.endsAt)}`;
+}
+
+/** "Use Fable reset" — one offer's button; the unsplit bank's is "Use reset". */
+export function resetOfferAction(offer: AccountResetOffer): string {
+  return offer.title === null ? "Use reset" : `Use ${offer.title} reset`;
+}
+
+/** What spending `offer` does, for its confirmation. A Fable reset gives back
+    what Fable used of the week (Claude's wording); the others clear windows. */
+export function resetOfferEffect(offer: AccountResetOffer | null): string {
+  const tail = "The provider does not give it back.";
+  if (offer?.kind === "fable") {
+    return `This spends one of the account's banked Fable resets and returns what Fable used to its weekly limit. ${tail}`;
+  }
+  if (offer?.title) {
+    return `This spends one of the account's banked ${offer.title.toLowerCase()} resets. ${tail}`;
+  }
+  return `This spends one of the account's banked limit resets. ${tail}`;
 }
 
 /** A short day for an instant the engine sent; the raw string when it is
@@ -525,13 +608,14 @@ export function buildForecast(snapshot: InfinitusSnapshot): ForecastModel | null
 /**
  * The control-socket call a row's button makes. `prefer` is a toggle and takes
  * the side it is switching to; `remove` carries the `--yes` the socket refuses
- * it without (the row confirmed already); the others take the account alone.
+ * it without (the row confirmed already); `value` is rename's alias and
+ * reset's kind; the others take the account alone.
  */
 export function accountCommandArgs(
   fleetKey: string,
   row: AccountRowModel,
   action: AccountAction,
-  alias?: string,
+  value?: string,
 ): {
   command: string;
   args: ReadonlyArray<string>;
@@ -539,8 +623,11 @@ export function accountCommandArgs(
 } {
   const target = [fleetKey, String(row.number)];
   if (action === "rename") {
-    if (alias === undefined) throw new Error("rename needs an alias");
-    return { command: "rename", args: [...target, alias] };
+    if (value === undefined) throw new Error("rename needs an alias");
+    return { command: "rename", args: [...target, value] };
+  }
+  if (action === "reset" && value !== undefined) {
+    return { command: "reset", args: target, options: { kind: value } };
   }
   if (action === "prefer") {
     return { command: "prefer", args: [...target, row.preferred ? "off" : "on"] };

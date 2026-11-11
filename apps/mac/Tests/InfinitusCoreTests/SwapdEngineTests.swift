@@ -146,6 +146,11 @@ final class SwapdMappingTests: XCTestCase {
              "resets":{"available":1,"total":1,"nextGrantId":"launch","label":"Launch: one reset",
                        "endsAt":"2026-10-22T16:00:00Z","hold":{"reason":"notAtLimit"}}},
             {"slot":2,"email":"b@example.com","organizationName":"","organizationUuid":"","active":false,
+             "disabled":false,"preferred":false,"usageStatus":"ok","windows":[],
+             "resets":{"available":1,"total":2,"nextGrantId":"full-reset-2611","kinds":[
+               {"kind":"weekly","available":1,"total":1,"nextGrantId":"full-reset-2611"},
+               {"kind":"fable","available":0,"total":1}]}},
+            {"slot":3,"email":"c@example.com","organizationName":"","organizationUuid":"","active":false,
              "disabled":false,"preferred":false,"usageStatus":"ok","windows":[]}]}]}
         """)
         let fleets = SwapdMapping.fleets(from: list, now: now)
@@ -154,7 +159,16 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(resets.nextGrantId, "launch")
         XCTAssertEqual(resets.label, "Launch: one reset")
         XCTAssertEqual(resets.hold, AccountResets.Hold(reason: "notAtLimit"))
-        XCTAssertNil(fleets[0].accounts[1].resets)
+        // An engine that does not split the bank offers it as one pick.
+        XCTAssertEqual(resets.picks.map(\.kind), [nil])
+        XCTAssertEqual(resets.picks.first?.hold, AccountResets.Hold(reason: "notAtLimit"))
+        // Split by kind (Claude's Fable and weekly resets), a spent kind is
+        // not offered and the rest are offered by name.
+        let split = try XCTUnwrap(fleets[0].accounts[1].resets)
+        XCTAssertEqual(split.kinds?.map(\.kind), ["weekly", "fable"])
+        XCTAssertEqual(split.picks.map(\.kind), ["weekly"])
+        XCTAssertEqual(split.picks.first?.title, "Weekly")
+        XCTAssertNil(fleets[0].accounts[2].resets)
     }
 
 
@@ -537,8 +551,10 @@ final class SwapdEngineTests: XCTestCase {
 
     func testResetIsTheEnginesOwnVerb() async throws {
         let engine = try makeEngine()
-        try await engine.reset(fleet: .claude, number: 1)
-        XCTAssertEqual(try argv(), ["reset 1 --provider claude --json"])
+        try await engine.reset(fleet: .claude, number: 1, kind: nil)
+        try await engine.reset(fleet: .claude, number: 1, kind: "fable")
+        XCTAssertEqual(try argv(), ["reset 1 --provider claude --json",
+                                    "reset 1 --kind fable --provider claude --json"])
     }
 
     func testAutoIgniteIsTheEnginesOwnVerb() async throws {

@@ -37,7 +37,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the re-probe), `ProviderInstanceRegistry.test.ts` (upstream's redeem tests
   also answer the fork's profile request and match the usage URL's query),
   `packages/contracts/src/providerUsageLimits.ts`
-  (`ServerProviderResetCredits.label` / `nextHold`, additive), and the reset
+  (`ServerProviderResetCredits.label` / `nextHold` / `kinds`, and the instance
+  input's optional `creditId` that redeems one kind, additive), `ws.ts` and
+  `packages/provider-core/src/server/driver.ts` (pass that `creditId` to
+  `consumeResetCredit`), and the reset
   control's held state on `apps/web/src/components/usage/UsageLimits.tsx`
   (`resetHoldText`), `UsageLimitsPooled.tsx` and
   `apps/mobile/src/features/usage/UsageLimitsSection.tsx`.

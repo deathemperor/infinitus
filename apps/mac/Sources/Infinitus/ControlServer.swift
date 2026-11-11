@@ -426,13 +426,18 @@ final class ControlServer {
             let (fleet, n) = try target(r)
             guard fleet.capabilities.contains(.reset) else { throw Fail("\(fleet.id) banks no limit resets") }
             guard let account = fleet.accounts.first(where: { $0.number == n }) else { throw Fail("no account #\(n) in \(fleet.id)") }
-            guard let resets = account.resets, resets.available > 0 else {
-                throw Fail("no banked reset on account #\(n)")
+            let kind = r.options["kind"]
+            let bank: (available: Int, hold: AccountResets.Hold?)? = account.resets.flatMap { resets in
+                guard let kind else { return (resets.available, resets.hold) }
+                return resets.kinds?.first { $0.kind == kind }.map { ($0.available, $0.hold) }
             }
-            if let hold = resets.hold {
+            guard let bank, bank.available > 0 else {
+                throw Fail("no banked \(kind.map { "\($0) " } ?? "")reset on account #\(n)")
+            }
+            if let hold = bank.hold {
                 throw Fail("account #\(n)'s reset cannot be spent now (\(hold.reason))")
             }
-            await settle(try await fleet.engine.reset(fleet: fleet.provider, number: n), fleet)
+            await settle(try await fleet.engine.reset(fleet: fleet.provider, number: n, kind: kind), fleet)
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "crashes":

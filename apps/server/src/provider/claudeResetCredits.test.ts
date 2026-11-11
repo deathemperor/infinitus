@@ -158,6 +158,57 @@ describe("claudeResetCreditsToContract", () => {
     });
   });
 
+  it("splits the bank by what each reset refills, the CLI's way", () => {
+    // Claude's own answer: the Fable grant says `type: full`, the "full" one `type: weekly`.
+    const credits = claudeResetCreditsToContract(
+      {
+        eligible: true,
+        at_limit: false,
+        next_grant_id: "full-reset-2611",
+        grants: [
+          grant({
+            id: "full-reset-2611",
+            label: "One full limit reset (November 2026)",
+            ends_at: "2026-12-10T22:00:00Z",
+            clears: ["seven_day", "seven_day_overage_included"],
+            type: "weekly",
+            gives_back_weekly: false,
+          }),
+          grant({
+            id: "launch-2610-fable",
+            label: "New model launch: one Fable reset",
+            usable_now: false,
+            use_requires_limit: true,
+            clears: ["seven_day_overage_included"],
+            type: "full",
+            gives_back_weekly: true,
+            unavailable_reason: "needs_limit",
+          }),
+          grant({ id: "five", clears: ["five_hour"] }),
+        ],
+      },
+      NOW,
+    );
+    expect(credits?.availableCount).toBe(3);
+    expect(credits?.nextCreditId).toBe("full-reset-2611");
+    expect(credits?.kinds).toEqual([
+      { kind: "session", availableCount: 1, nextCreditId: "five" },
+      {
+        kind: "weekly",
+        availableCount: 1,
+        nextCreditId: "full-reset-2611",
+        nextExpiresAt: "2026-12-10T22:00:00.000Z",
+        label: "One full limit reset (November 2026)",
+      },
+      {
+        kind: "fable",
+        availableCount: 1,
+        label: "New model launch: one Fable reset",
+        nextHold: { reason: "notAtLimit" },
+      },
+    ]);
+  });
+
   it("offers nothing when the account is ineligible or the block is missing", () => {
     expect(
       claudeResetCreditsToContract({ eligible: false, grants: [grant({})] }, NOW),

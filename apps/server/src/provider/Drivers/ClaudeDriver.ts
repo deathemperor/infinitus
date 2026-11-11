@@ -351,13 +351,19 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
     const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = Effect.fn(
       "ClaudeDriver.consumeResetCredit",
     )(
-      function* () {
+      function* (creditId?: string) {
         const current = yield* snapshot.getSnapshot;
-        const grantId = current.usageLimits?.resetCredits?.nextCreditId;
+        const credits = current.usageLimits?.resetCredits;
+        // A named kind's credit only if it is still offered: a stale pick must not spend another kind.
+        const grantId =
+          creditId === undefined
+            ? credits?.nextCreditId
+            : credits?.kinds?.find((kind) => kind.nextCreditId === creditId)?.nextCreditId;
         if (!grantId || !current.version) return "noCredit" as const;
         const version = current.version;
+        // Keyed per grant too, so a retried request id is never sent for a different grant.
         return yield* resetCreditCoordinator.redeem(
-          login.configDir,
+          `${login.configDir}#${grantId}`,
           (requestId) => consumeClaudeResetCredit({ login, version, grantId, requestId }),
           isSettledClaudeResetCreditFailure,
         );

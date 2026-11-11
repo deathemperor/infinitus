@@ -16,6 +16,7 @@ import {
   resetConfirmation,
   resetsLine,
   rowMenuActions,
+  rowMenuChoice,
   removeConfirmation,
   switchConfirmation,
   windowTone,
@@ -191,7 +192,15 @@ describe("row presentation", () => {
   });
 
   it("offers a reset only while nothing holds it, and words the row's line (#1554)", () => {
-    const free = { available: 1, total: 1, label: null, endsAt: null, hold: null, holdUntil: null };
+    const free = {
+      available: 1,
+      total: 1,
+      label: null,
+      endsAt: null,
+      hold: null,
+      holdUntil: null,
+      kinds: [],
+    };
     expect(
       rowMenuActions({ ...row, resets: free, actions: ["reset"] }, { canPrompt: true }).map(
         (action) => action.id,
@@ -206,6 +215,43 @@ describe("row presentation", () => {
       "1 of 2 resets banked · Usable once the account hits a limit",
     );
     expect(resetConfirmation(row).title).toBe("Use a reset on death4?");
+  });
+
+  it("offers each kind of a split bank on its own, by name", () => {
+    const kind = (name: string, title: string, hold: "notAtLimit" | null) => ({
+      kind: name,
+      title,
+      available: 1,
+      total: 1,
+      label: null,
+      endsAt: null,
+      hold,
+      holdUntil: null,
+    });
+    const resets = {
+      available: 2,
+      total: 2,
+      label: null,
+      endsAt: null,
+      hold: null,
+      holdUntil: null,
+      kinds: [kind("weekly", "Weekly", null), kind("fable", "Fable", "notAtLimit")],
+    };
+    const split = { ...row, resets, actions: ["reset" as const] };
+    expect(rowMenuActions(split, { canPrompt: true }).map((action) => action.id)).toEqual([
+      "reset:weekly",
+    ]);
+    expect(rowMenuChoice("reset:weekly")).toEqual({ action: "reset", kind: "weekly" });
+    expect(rowMenuChoice("hold")).toEqual({ action: "hold", kind: undefined });
+    expect(resetsLine(resets)).toBe(
+      "Weekly 1 of 1 · Fable 1 of 1 banked · Fable: Usable once the account hits a limit",
+    );
+    const fable = { ...split, resets: { ...resets, kinds: [kind("fable", "Fable", null)] } };
+    expect(resetConfirmation(fable, "fable")).toEqual({
+      title: "Use a Fable reset on death4?",
+      message:
+        "This spends one of the account's banked Fable resets and returns what Fable used to its weekly limit. The provider does not give it back.",
+    });
   });
 
   it("orders badges active, next, held, starred, warm", () => {

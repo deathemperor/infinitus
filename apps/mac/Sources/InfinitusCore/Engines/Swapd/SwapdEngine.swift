@@ -114,8 +114,8 @@ public struct SwapdEngine: AccountEngine {
     /// `swapd reset <slot>`: the claim as that slot, then a forced fetch,
     /// so the board laid over the last list already shows the cleared
     /// windows.
-    public func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]? {
-        edited(try await cli.reset(provider: fleet, slot: number))
+    public func reset(fleet: Provider, number: Int, kind: String?) async throws -> [EngineFleet]? {
+        edited(try await cli.reset(provider: fleet, slot: number, kind: kind))
     }
     public func remove(fleet: Provider, number: Int) async throws {
         try await cli.removeAccount(provider: fleet, slot: number)
