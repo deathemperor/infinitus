@@ -351,6 +351,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
     const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = Effect.fn(
       "ClaudeDriver.consumeResetCredit",
     )(
+<<<<<<< HEAD
       function* (creditId?: string) {
         const current = yield* snapshot.getSnapshot;
         const credits = current.usageLimits?.resetCredits;
@@ -359,6 +360,17 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           creditId === undefined
             ? credits?.nextCreditId
             : credits?.kinds?.find((kind) => kind.nextCreditId === creditId)?.nextCreditId;
+=======
+      function* (creditId) {
+        const current = yield* snapshot.getSnapshot;
+        const credits = current.usageLimits?.resetCredits;
+        const grantId =
+          creditId === undefined
+            ? credits?.nextCreditId
+            : credits?.options?.some((option) => option.creditId === creditId)
+              ? creditId
+              : undefined;
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
         if (!grantId || !current.version) return "noCredit" as const;
         const version = current.version;
         // Keyed per grant too, so a retried request id is never sent for a different grant.

@@ -267,7 +267,12 @@ export function ServerUpdatesAction({
       if (desktopTargets.length > 0) {
         const confirmed =
           (await requestConfirmDialog(
+<<<<<<< HEAD
             `Update the ${PRODUCT_NAME} desktop apps on ${desktopTargets.map((target) => target.serverLabel).join(", ")}? They will close and relaunch on those machines.`,
+=======
+            `Update the T3 Code desktop apps on ${desktopTargets.map((target) => target.serverLabel).join(", ")}? They will close and relaunch on those machines.`,
+            { initialFocus: "confirm" },
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
           )) ?? true;
         if (!confirmed) return;
       }
@@ -378,7 +383,12 @@ export function ServerUpdateAction({
     if (isDesktopAppUpdate) {
       const confirmed =
         (await requestConfirmDialog(
+<<<<<<< HEAD
           `Update the ${PRODUCT_NAME} desktop app that runs the ${serverLabel}? It will close and relaunch on that machine.`,
+=======
+          `Update the T3 Code desktop app that runs the ${serverLabel}? It will close and relaunch on that machine.`,
+          { initialFocus: "confirm" },
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
         )) ?? true;
       if (!confirmed) {
         return;

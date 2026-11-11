@@ -37,12 +37,20 @@ import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopUpdatePolicy from "./DesktopUpdatePolicy.ts";
+<<<<<<< HEAD
 import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
 import {
   resolveDefaultDesktopUpdateChannel,
   resolveEffectiveDesktopUpdateChannel,
   resolveElectronUpdaterFeed,
 } from "./updateChannels.ts";
+=======
+import {
+  normalizeDesktopUpdateReleaseNotes,
+  releaseNotesOfOfferedVersion,
+} from "./releaseNotes.ts";
+import { desktopUpdateChannelOf } from "@infinitus/shared/cliRelease";
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
 import { compareSemverVersions } from "@infinitus/shared/semver";
 import {
   createInitialDesktopUpdateState,
@@ -77,6 +85,7 @@ const UpdateInfo = Schema.Struct({
   version: Schema.String,
   // Malformed notes must not block update-state decoding; normalizeDesktopUpdateReleaseNotes validates separately.
   releaseNotes: Schema.optional(Schema.Unknown),
+  releaseName: Schema.optional(Schema.NullOr(Schema.String)),
   releaseDate: Schema.optional(Schema.String),
 });
 
@@ -1047,7 +1056,7 @@ export const make = Effect.gen(function* () {
 
           const checkedAt = yield* currentIsoTimestamp;
           const { releaseNotes, omittedReleaseCount } = normalizeDesktopUpdateReleaseNotes(
-            info.releaseNotes,
+            releaseNotesOfOfferedVersion(info),
             info.version,
             state.channel,
             info.releaseDate,

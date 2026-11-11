@@ -112,10 +112,31 @@ archive of the version shown in the notice (see
 on the host. Only that exact version resolves the mismatch. An older service may
 need this local update once before it supports remote updates and rollback.
 
+<<<<<<< HEAD
 For a foreground server, stop it and start the matching version's `./t3` the
 same way you started the old one — add `serve` if you run without a browser,
 and keep options such as `--host` or `--tailscale-serve`. See
 [Running in the background](./background-service.md) for service management.
+=======
+```sh
+t3 update <client-version>
+```
+
+Replace `<client-version>` with the version shown in the notice. The command
+asks before restarting the background service; if you decline, run
+`t3 service restart` when you are ready. For a server you started by hand,
+stop it and start it again afterwards with your usual options such as `--host`
+or `--tailscale-serve`.
+
+A background service installed by an older release refuses **Update server**
+until you update it once on the host and let that update restart it. If you
+decline the restart, the service can stay down after a crash or reboot until you
+run `t3 service restart`.
+
+If you run the server with `npx` rather than an installed `t3`, there is
+nothing to update on the host: stop the server and relaunch it as
+`npx t3@<client-version>` with the same subcommand and options.
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
 
 ## If an update fails
 

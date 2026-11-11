@@ -20,6 +20,7 @@ export const ServerProviderUsageWindow = Schema.Struct({
 });
 export type ServerProviderUsageWindow = typeof ServerProviderUsageWindow.Type;
 
+<<<<<<< HEAD
 const ResetCreditHold = Schema.Struct({
   reason: Schema.Literals(["notAtLimit", "cooldown", "blocked"]),
   until: Schema.optional(IsoDateTime),
@@ -39,12 +40,24 @@ export const ServerProviderResetCreditKind = Schema.Struct({
   nextHold: Schema.optional(ResetCreditHold),
 });
 export type ServerProviderResetCreditKind = typeof ServerProviderResetCreditKind.Type;
+=======
+/** One kind of banked reset, such as Claude's weekly reset or its Fable-only reset. */
+export const ServerProviderResetCreditOption = Schema.Struct({
+  creditId: TrimmedNonEmptyString,
+  label: TrimmedNonEmptyString,
+  description: TrimmedNonEmptyString,
+  availableCount: NonNegativeInt,
+  expiresAt: Schema.optional(IsoDateTime),
+});
+export type ServerProviderResetCreditOption = typeof ServerProviderResetCreditOption.Type;
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
 
 export const ServerProviderResetCredits = Schema.Struct({
   availableCount: NonNegativeInt,
   nextExpiresAt: Schema.optional(IsoDateTime),
   /** Pins hub redemption to the displayed credit, including retries from another client. */
   nextCreditId: Schema.optional(TrimmedNonEmptyString),
+<<<<<<< HEAD
   /** The provider's own name for the offer, when it has one (Claude's "Opus 5.5 launch"). */
   label: Schema.optional(TrimmedNonEmptyString),
   /**
@@ -55,6 +68,10 @@ export const ServerProviderResetCredits = Schema.Struct({
   nextHold: Schema.optional(ResetCreditHold),
   /** The same credits split by what they refill; absent when the provider does not split them. */
   kinds: Schema.optional(Schema.Array(ServerProviderResetCreditKind)),
+=======
+  /** Present when resets differ in what they refill; redeem one by its `creditId`. */
+  options: Schema.optional(ForwardCompatibleArray(ServerProviderResetCreditOption)),
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
 });
 export type ServerProviderResetCredits = typeof ServerProviderResetCredits.Type;
 
@@ -119,7 +136,10 @@ export type UsageLimitSourceConsumeResetCreditInput =
 export const ProviderConsumeResetCreditInput = Schema.Union([
   Schema.Struct({
     instanceId: ProviderInstanceId,
+<<<<<<< HEAD
     /** One kind's `nextCreditId`; absent redeems the provider's next credit. */
+=======
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
     creditId: Schema.optional(TrimmedNonEmptyString),
   }),
   UsageLimitSourceConsumeResetCreditInput,

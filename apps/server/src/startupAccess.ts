@@ -3,8 +3,10 @@ import * as NodeOS from "node:os";
 
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
+  formatHostForUrl,
   isPrivateNetworkHost,
   isSharedAddressSpaceHost,
+  isWildcardHost,
 } from "@infinitus/shared/hostClassification";
 import { QrCode } from "@infinitus/shared/qrCode";
 import { buildPairingAppLink } from "@infinitus/shared/remote";
@@ -36,12 +38,6 @@ export const isLoopbackHost = (host: string | undefined): boolean => {
     host.startsWith("127.")
   );
 };
-
-export const isWildcardHost = (host: string | undefined): boolean =>
-  host === "0.0.0.0" || host === "::" || host === "[::]";
-
-export const formatHostForUrl = (host: string): string =>
-  host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
 
 /**
  * Container and VM networks (Docker, libvirt, VMware, VirtualBox, Hyper-V, and

@@ -11,12 +11,13 @@ import {
 import { useAtomValue } from "@effect/atom-react";
 import { normalizeProviderAccentColor } from "@infinitus/client-runtime/state/provider-instance-display";
 import {
-  formatDuration,
   formatResetsIn,
   type LimitPace,
   paceOf,
   paceRemainingPercent,
   remainingPercent,
+  type ResetCreditChoice,
+  resetCreditChoices,
 } from "@infinitus/shared/usageLimits";
 import { resetKindTitle } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
@@ -240,23 +241,29 @@ const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
 /** A Fable reset gives back what Fable used of the week; it clears no window. */
 const FABLE_RESET_TEXT = "Reset applied. What Fable used is back in your weekly limit.";
 
+<<<<<<< HEAD
 export function useResetCredit(
   environmentId: EnvironmentId,
   input: ProviderConsumeResetCreditInput,
   kind?: string,
 ) {
+=======
+export function useResetCredit(environmentId: EnvironmentId) {
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const consume = useAtomCommand(serverEnvironment.consumeResetCredit, { reportFailure: false });
+  // Kept after close so the dialog's text survives its exit animation.
+  const [choice, setChoice] = useState<ResetCreditChoice | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
   const redeem = async () => {
     setConfirming(false);
-    if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
+    if (!choice || !readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     setBusy(true);
     setStatus(null);
-    const result = await consume({ environmentId, input });
+    const result = await consume({ environmentId, input: choice.input });
     setBusy(false);
     if (result._tag === "Success") {
       setStatus(
@@ -274,7 +281,13 @@ export function useResetCredit(
     );
   };
 
-  return { canManageProviders, confirming, setConfirming, busy, status, redeem };
+  const confirm = (next: ResetCreditChoice) => {
+    if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
+    setChoice(next);
+    setConfirming(true);
+  };
+
+  return { canManageProviders, choice, confirming, setConfirming, confirm, busy, status, redeem };
 }
 
 /** Require confirmation because redemption spends credits. Mount outside popovers, which stack above
@@ -282,12 +295,14 @@ export function useResetCredit(
 export function ResetCreditDialog({
   open,
   onOpenChange,
+  choice,
   onConfirm,
   disabled = false,
   kind,
 }: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly choice: ResetCreditChoice | null;
   readonly onConfirm: () => void;
   readonly disabled?: boolean;
   /** The kind being redeemed; a Fable reset refills differently. */
@@ -297,10 +312,15 @@ export function ResetCreditDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPopup>
         <AlertDialogHeader>
+<<<<<<< HEAD
           <AlertDialogTitle>
             {kind ? `Use a ${resetKindTitle(kind)} reset?` : "Use a reset credit?"}
           </AlertDialogTitle>
           <AlertDialogDescription>{resetCreditEffect(kind)}</AlertDialogDescription>
+=======
+          <AlertDialogTitle>Use a reset credit?</AlertDialogTitle>
+          <AlertDialogDescription>{choice?.confirmDescription}</AlertDialogDescription>
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
@@ -313,6 +333,7 @@ export function ResetCreditDialog({
   );
 }
 
+<<<<<<< HEAD
 export function resetCreditsSummary(
   credits: ServerProviderResetCredits,
   now: number,
@@ -352,6 +373,8 @@ function resetHoldText(credits: ServerProviderResetCredits, now: number): string
  * Banked reset credits with the redeem button and its confirm, self-contained. A bank split by
  * kind (Claude's Fable and weekly resets) gets a line, and a button, per kind.
  */
+=======
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
 export function ResetCredits({
   environmentId,
   input,
@@ -363,6 +386,7 @@ export function ResetCredits({
   readonly credits: ServerProviderResetCredits;
   readonly now: number;
 }) {
+<<<<<<< HEAD
   if (!credits.kinds?.length) {
     return (
       <ResetCreditLine environmentId={environmentId} input={input} credits={credits} now={now} />
@@ -402,9 +426,14 @@ function ResetCreditLine({
     input,
     kind,
   );
+=======
+  const { canManageProviders, choice, confirming, setConfirming, confirm, busy, status, redeem } =
+    useResetCredit(environmentId);
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
   if (credits.availableCount === 0 && status === null) return null;
   const hold = resetHoldText(credits, now);
   return (
+<<<<<<< HEAD
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="tabular-nums">
         {kind ? `${resetKindTitle(kind)} · ` : ""}
@@ -423,6 +452,24 @@ function ResetCreditLine({
         </Button>
       ) : null}
       {hold ? <span>{hold}</span> : null}
+=======
+    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+      {resetCreditChoices(credits, input, now).map((choice) => (
+        <div key={choice.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="tabular-nums">{choice.summary}</span>
+          {choice.availableCount > 0 ? (
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={busy || !canManageProviders}
+              onClick={() => confirm(choice)}
+            >
+              {busy ? "Using…" : choice.actionLabel}
+            </Button>
+          ) : null}
+        </div>
+      ))}
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
       {status ? <span className="text-foreground">{status}</span> : null}
       {/* The provider's own name for the offer is a sentence; it gets its own line. */}
       {credits.label && credits.availableCount > 0 ? (
@@ -431,6 +478,7 @@ function ResetCreditLine({
       <ResetCreditDialog
         open={confirming}
         onOpenChange={setConfirming}
+        choice={choice}
         onConfirm={() => void redeem()}
         disabled={!canManageProviders}
         {...(kind ? { kind } : {})}

@@ -684,8 +684,13 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
       const before = yield* instance!.snapshot.refresh;
       expect(before.usageLimits?.windows[0]?.usedPercent).toBe(100);
       expect(before.usageLimits?.resetCredits?.nextCreditId).toBe("grant_a");
+<<<<<<< HEAD
       const outcome = yield* instance!.consumeResetCredit!(claim.creditId).pipe(Effect.result);
       return { outcome, claimed, after: yield* instance!.snapshot.getSnapshot };
+=======
+      const outcome = yield* instance!.consumeResetCredit!(undefined).pipe(Effect.result);
+      return { outcome, after: yield* instance!.snapshot.getSnapshot };
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
     }).pipe(
       // macOS logins live in the Keychain, where resets are never read.
       Effect.provideService(HostProcess.Platform, "linux"),

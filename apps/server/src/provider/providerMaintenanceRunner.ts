@@ -95,6 +95,18 @@ interface VerifiedProviderRefresh {
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 
+const OPENCODE_SERVER_RESTART_MESSAGE =
+  "OpenCode CLI updated. Restart the configured local OpenCode server to use the new version.";
+
+const needsOpenCodeServerRestart = (providers: ReadonlyArray<ServerProvider>) =>
+  providers.some(
+    (provider) =>
+      provider.driver === ProviderDriverKind.make("opencode") &&
+      provider.installedVersion != null &&
+      provider.version != null &&
+      provider.installedVersion !== provider.version,
+  );
+
 const runProviderMaintenanceCommandWithSpawner = Effect.fn("ProviderMaintenanceRunner.runCommand")(
   function* (input: {
     readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
@@ -528,7 +540,9 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                     status: "succeeded",
                     startedAt,
                     finishedAt: yield* nowIso,
-                    message: "Already up to date.",
+                    message: needsOpenCodeServerRestart(precheck.verifiedProviders)
+                      ? OPENCODE_SERVER_RESTART_MESSAGE
+                      : "Already up to date.",
                   }),
                 );
               }
@@ -600,8 +614,15 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                 message: couldNotVerify
                   ? `Update command completed, but ${PRODUCT_NAME} could not verify the provider version.`
                   : stillOutdated
+<<<<<<< HEAD
                     ? `Update command completed, but ${PRODUCT_NAME} still detects an outdated provider version.`
                     : "Provider updated.",
+=======
+                    ? "Update command completed, but T3 Code still detects an outdated provider version."
+                    : needsOpenCodeServerRestart(verifiedProviders)
+                      ? OPENCODE_SERVER_RESTART_MESSAGE
+                      : "Provider updated.",
+>>>>>>> upstream-sync-6700cf6f89-upstream-renamed
                 output: commandOutput(result),
               }),
             );

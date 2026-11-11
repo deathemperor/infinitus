@@ -33,7 +33,10 @@ import {
   type ProviderDriver,
   type ProviderInstance,
 } from "@infinitus/provider-core/server/driver";
-import { providerModelsFromSettings } from "@infinitus/provider-core/server/snapshotProbe";
+import {
+  providerModelsFromSettings,
+  providerProbeEnvironment,
+} from "@infinitus/provider-core/server/snapshotProbe";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "@infinitus/provider-core/server/maintenanceResolver";
 import {
   haveProviderSnapshotSettingsChanged,
@@ -415,7 +418,7 @@ export const checkAcpRegistryProviderStatus = Effect.fn("AcpRegistryDriver.check
         instanceId: input.instanceId,
         settings: input.settings,
         cwd: input.cwd,
-        environment: input.environment,
+        environment: providerProbeEnvironment(input.environment),
       }),
     );
     return Result.isFailure(probed)
