@@ -289,7 +289,10 @@ elif cmd == "reset" and slot_arg() is not None:
     key = str(n)
     if "kinds" in bank:
         # Unnamed spends the kind of the grant the provider names next.
-        kind = kind_flag or next(k["kind"] for k in bank["kinds"] if k.get("nextGrantId") == bank["nextGrantId"])
+        # Unnamed falls to the first kind still holding one once the named
+        # next grant's kind is spent.
+        kind = kind_flag or next((k["kind"] for k in bank["kinds"] if k.get("nextGrantId") == bank.get("nextGrantId")),
+                                 next((k["kind"] for k in bank["kinds"] if k["available"] > 0), bank["kinds"][0]["kind"]))
         found = next((k for k in bank["kinds"] if k["kind"] == kind), None)
         if found is None:
             err("invalid-input", f"slot {n} has no banked {kind} reset")

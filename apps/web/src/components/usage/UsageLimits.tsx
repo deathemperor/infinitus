@@ -237,10 +237,13 @@ const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
   noCredit: "No reset credit left.",
   alreadyRedeemed: "That credit was already redeemed.",
 };
+/** A Fable reset gives back what Fable used of the week; it clears no window. */
+const FABLE_RESET_TEXT = "Reset applied. What Fable used is back in your weekly limit.";
 
 export function useResetCredit(
   environmentId: EnvironmentId,
   input: ProviderConsumeResetCreditInput,
+  kind?: string,
 ) {
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const consume = useAtomCommand(serverEnvironment.consumeResetCredit, { reportFailure: false });
@@ -256,7 +259,12 @@ export function useResetCredit(
     const result = await consume({ environmentId, input });
     setBusy(false);
     if (result._tag === "Success") {
-      setStatus(result.value.warning ?? OUTCOME_TEXT[result.value.outcome]);
+      setStatus(
+        result.value.warning ??
+          (kind === "fable" && result.value.outcome === "reset"
+            ? FABLE_RESET_TEXT
+            : OUTCOME_TEXT[result.value.outcome]),
+      );
       return;
     }
     setStatus(
@@ -392,6 +400,7 @@ function ResetCreditLine({
   const { canManageProviders, confirming, setConfirming, busy, status, redeem } = useResetCredit(
     environmentId,
     input,
+    kind,
   );
   if (credits.availableCount === 0 && status === null) return null;
   const hold = resetHoldText(credits, now);

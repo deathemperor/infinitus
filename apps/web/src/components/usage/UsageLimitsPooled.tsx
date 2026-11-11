@@ -209,7 +209,7 @@ function SegmentPopover({
               className="ms-auto"
               onClick={onRedeem}
             >
-              {redeem.busy ? "Using…" : `Use ${nextKindTitle(credits)}reset`}
+              {redeem.busy ? "Using…" : `Use ${nextKindTitle(nextKind(credits))}reset`}
             </Button>
           </span>
         </div>
@@ -305,7 +305,8 @@ function RedeemableSegment({
 }: Omit<Parameters<typeof SegmentTriggers>[0], "redeem"> & {
   readonly redeemAt: NonNullable<LimitAccount["redeem"]>;
 }) {
-  const redeem = useResetCredit(redeemAt.environmentId, redeemAt.input);
+  const kind = nextKind(props.account.limits.resetCredits);
+  const redeem = useResetCredit(redeemAt.environmentId, redeemAt.input, kind);
   return (
     <>
       <SegmentTriggers redeem={redeem} {...props} />
@@ -314,6 +315,7 @@ function RedeemableSegment({
         onOpenChange={redeem.setConfirming}
         onConfirm={() => void redeem.redeem()}
         disabled={!redeem.canManageProviders}
+        {...(kind ? { kind } : {})}
       />
       {/* The popover closed before the confirm, so progress and the outcome need a home outside it. */}
       {redeem.busy || redeem.status ? (
@@ -695,8 +697,14 @@ function LimitNotices({ notices }: { readonly notices: readonly string[] }) {
   );
 }
 
-/** "Fable " when the bank is split by kind: this button redeems the provider's next credit. */
-function nextKindTitle(credits: ServerProviderResetCredits): string {
-  const kind = credits.kinds?.find((candidate) => candidate.nextCreditId === credits.nextCreditId);
-  return kind ? `${resetKindTitle(kind.kind)} ` : "";
+/** The kind of the provider's next credit, which the pooled button redeems; undefined when unsplit. */
+function nextKind(credits: ServerProviderResetCredits | undefined): string | undefined {
+  const next = credits?.nextCreditId;
+  if (next === undefined) return undefined;
+  return credits?.kinds?.find((candidate) => candidate.nextCreditId === next)?.kind;
+}
+
+/** "Fable " for a split bank's next credit, nothing otherwise. */
+function nextKindTitle(kind: string | undefined): string {
+  return kind ? `${resetKindTitle(kind)} ` : "";
 }

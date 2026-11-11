@@ -156,8 +156,9 @@ export function rowMenuChoice(id: string): {
   readonly action: AccountAction;
   readonly kind: string | undefined;
 } {
-  const [action, kind] = id.split(":", 2);
-  return { action: action as AccountAction, kind };
+  const separator = id.indexOf(":");
+  if (separator === -1) return { action: id as AccountAction, kind: undefined };
+  return { action: id.slice(0, separator) as AccountAction, kind: id.slice(separator + 1) };
 }
 
 const ACTION_SYMBOL: Record<AccountAction, string> = {

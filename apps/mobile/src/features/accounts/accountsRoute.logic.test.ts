@@ -242,6 +242,7 @@ describe("row presentation", () => {
       "reset:weekly",
     ]);
     expect(rowMenuChoice("reset:weekly")).toEqual({ action: "reset", kind: "weekly" });
+    expect(rowMenuChoice("reset:a:b")).toEqual({ action: "reset", kind: "a:b" });
     expect(rowMenuChoice("hold")).toEqual({ action: "hold", kind: undefined });
     expect(resetsLine(resets)).toBe(
       "Weekly 1 of 1 · Fable 1 of 1 banked · Fable: Usable once the account hits a limit",
