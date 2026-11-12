@@ -8,6 +8,7 @@ import {
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { formatHostForUrl, isWildcardHost } from "@infinitus/shared/hostClassification";
 import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
 import { buildPairingAppLink } from "@infinitus/shared/remote";
 import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
@@ -41,9 +42,7 @@ import {
 } from "../serverRuntimeState.ts";
 import {
   buildPairingUrl,
-  formatHostForUrl,
   isLoopbackHost,
-  isWildcardHost,
   renderTerminalQrCode,
   resolveHeadlessConnectionString,
 } from "../startupAccess.ts";

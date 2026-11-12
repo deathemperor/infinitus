@@ -16,7 +16,11 @@ import { Route as PairRouteImport } from './routes/pair'
 import { Route as GuestRouteImport } from './routes/guest'
 import { Route as ConnectAgentRouteImport } from './routes/connect-agent'
 import { Route as ConnectRouteImport } from './routes/connect'
+<<<<<<< HEAD
 import { Route as AccountsRouteImport } from './routes/accounts'
+=======
+import { Route as ApproveAgentRouteImport } from './routes/approve-agent'
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
 import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
 import { Route as SettingsTeamRouteImport } from './routes/settings.team'
@@ -98,9 +102,15 @@ const ConnectRoute = ConnectRouteImport.update({
   path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+<<<<<<< HEAD
 const AccountsRoute = AccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
+=======
+const ApproveAgentRoute = ApproveAgentRouteImport.update({
+  id: '/approve-agent',
+  path: '/approve-agent',
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatRoute = ChatRouteImport.update({
@@ -336,7 +346,11 @@ const ChatEnvironmentIdThreadIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
+<<<<<<< HEAD
   '/accounts': typeof AccountsRoute
+=======
+  '/approve-agent': typeof ApproveAgentRoute
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
   '/connect': typeof ConnectRoute
   '/connect-agent': typeof ConnectAgentRoute
   '/guest': typeof GuestRoute
@@ -389,7 +403,11 @@ export interface FileRoutesByFullPath {
   '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
 }
 export interface FileRoutesByTo {
+<<<<<<< HEAD
   '/accounts': typeof AccountsRoute
+=======
+  '/approve-agent': typeof ApproveAgentRoute
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
   '/connect': typeof ConnectRoute
   '/connect-agent': typeof ConnectAgentRoute
   '/guest': typeof GuestRoute
@@ -445,7 +463,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_chat': typeof ChatRouteWithChildren
+<<<<<<< HEAD
   '/accounts': typeof AccountsRoute
+=======
+  '/approve-agent': typeof ApproveAgentRoute
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
   '/connect': typeof ConnectRoute
   '/connect-agent': typeof ConnectAgentRoute
   '/guest': typeof GuestRoute
@@ -502,7 +524,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+<<<<<<< HEAD
     | '/accounts'
+=======
+    | '/approve-agent'
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
     | '/connect'
     | '/connect-agent'
     | '/guest'
@@ -555,7 +581,11 @@ export interface FileRouteTypes {
     | '/threads/$environmentId/$threadId'
   fileRoutesByTo: FileRoutesByTo
   to:
+<<<<<<< HEAD
     | '/accounts'
+=======
+    | '/approve-agent'
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
     | '/connect'
     | '/connect-agent'
     | '/guest'
@@ -610,7 +640,11 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_chat'
+<<<<<<< HEAD
     | '/accounts'
+=======
+    | '/approve-agent'
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
     | '/connect'
     | '/connect-agent'
     | '/guest'
@@ -666,7 +700,11 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
+<<<<<<< HEAD
   AccountsRoute: typeof AccountsRoute
+=======
+  ApproveAgentRoute: typeof ApproveAgentRoute
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
   ConnectRoute: typeof ConnectRoute
   ConnectAgentRoute: typeof ConnectAgentRoute
   GuestRoute: typeof GuestRoute
@@ -737,11 +775,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+<<<<<<< HEAD
     '/accounts': {
       id: '/accounts'
       path: '/accounts'
       fullPath: '/accounts'
       preLoaderRoute: typeof AccountsRouteImport
+=======
+    '/approve-agent': {
+      id: '/approve-agent'
+      path: '/approve-agent'
+      fullPath: '/approve-agent'
+      preLoaderRoute: typeof ApproveAgentRouteImport
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
       parentRoute: typeof rootRouteImport
     }
     '/_chat': {
@@ -1150,7 +1196,11 @@ const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
+<<<<<<< HEAD
   AccountsRoute: AccountsRoute,
+=======
+  ApproveAgentRoute: ApproveAgentRoute,
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
   ConnectRoute: ConnectRoute,
   ConnectAgentRoute: ConnectAgentRoute,
   GuestRoute: GuestRoute,

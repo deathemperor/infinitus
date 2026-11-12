@@ -30,7 +30,12 @@ export interface ProviderDriverMetadata {
 }
 
 export type ProviderWorkspaceSnapshot = ServerProvider &
-  Pick<ServerProviderWorkspaceSnapshot, "slashCommandsPending" | "optionDescriptors">;
+  Pick<ServerProviderWorkspaceSnapshot, "slashCommandsPending" | "optionDescriptors"> & {
+    /** Set only when the directory's catalog differs from the machine snapshot's. */
+    readonly workspaceModels?: ServerProviderWorkspaceSnapshot["models"];
+    /** The directory's catalog could not be read, so keep the models found before. */
+    readonly workspaceModelsPending?: boolean;
+  };
 
 export interface ProviderInstance {
   readonly instanceId: ProviderInstanceId;
@@ -45,9 +50,14 @@ export interface ProviderInstance {
   ) => Effect.Effect<ProviderWorkspaceSnapshot, ProviderDriverError>;
   readonly refreshModels?: () => Effect.Effect<void, ProviderDriverError>;
   readonly invalidateCaches?: Effect.Effect<void>;
+<<<<<<< HEAD
   /** `creditId` is one of `resetCredits.kinds`' credits; absent redeems the next one. */
   readonly consumeResetCredit?: (
     creditId?: string,
+=======
+  readonly consumeResetCredit?: (
+    creditId: string | undefined,
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
   ) => Effect.Effect<ProviderConsumeResetCreditOutcome, ProviderDriverError>;
   readonly orchestrationAdapter: ProviderAdapter.ProviderAdapterV2["Service"];
   readonly textGeneration: ProviderTextGeneration;

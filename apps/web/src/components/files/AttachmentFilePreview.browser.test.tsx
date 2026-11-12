@@ -78,6 +78,7 @@ import { decodeImagePreview } from "./decodeImagePreview";
 import type { BinaryWorkerResult } from "./binaryPreviewProtocol";
 import type { TextPreviewResult } from "./largeTextProtocol";
 import type { ReactElement } from "react";
+import type { OfficeWorkerResult } from "./officePreviewProtocol";
 
 // Real worker imports and WASM initialization can exceed waitFor's default second
 // when the full browser project runs concurrently on CI.
@@ -481,7 +482,6 @@ describe("bounded binary previews", () => {
     }
   });
 });
-import { OFFICE_PREVIEW_MAX_COLUMNS, type OfficeWorkerResult } from "./officePreviewProtocol";
 
 describe("large text preview recovery", () => {
   it("retains the workspace viewer across URL renewals and reloads revisions and manual refreshes", async () => {
@@ -920,6 +920,7 @@ describe("large text preview recovery", () => {
     await vi.waitFor(() => expect(load).toHaveBeenCalledWith(0));
   });
 });
+<<<<<<< HEAD
 it.each(["<w:body/>", "<w:body></w:body>"])(
   "opens an empty Word document with %s",
   async (body) => {
@@ -1874,6 +1875,8 @@ it.skip.each([60, 100])("prepares all %i pages of a table-heavy Word report", as
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 });
 
+=======
+>>>>>>> upstream-sync-2de337003d-upstream-renamed
 describe("standalone Mermaid previews", () => {
   it.each([
     'A@{ "img": "//attacker.invalid/pixel.png" }',
@@ -2221,24 +2224,17 @@ it.each([
       target.startsWith("/") ? target.slice(1) : `xl/${target}`,
       `<worksheet><sheetData><row r="${row}"><c r="A${row}" t="inlineStr"><is><t>worksheet value</t></is></c></row></sheetData></worksheet>`,
     );
-    const file = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
-    const src = URL.createObjectURL(file);
-    try {
-      await using screen = await render(
-        <div style={{ display: "flex", height: 400, width: 600 }}>
-          <OfficeFilePreview name="custom.xlsx" src={src} kind="xlsx" sizeBytes={file.size} />
-        </div>,
+    const bytes = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+    const { prepareOffice } = await import("./officeArchive");
+    if (row > 250000) {
+      await expect(prepareOffice(bytes, "xlsx")).rejects.toThrow(
+        "This workbook exceeds the preview limit",
       );
-      await vi.waitFor(
-        () =>
-          expect(screen.container.textContent).toContain(
-            row > 250000 ? "This workbook exceeds the preview limit" : "worksheet value",
-          ),
-        { timeout: 10_000 },
-      );
-    } finally {
-      URL.revokeObjectURL(src);
+      return;
     }
+    const prepared = await prepareOffice(bytes, "xlsx");
+    const bounded = await JSZip.loadAsync(prepared.bytes);
+    expect(await bounded.file(`xl/${target}`)!.async("string")).toContain("worksheet value");
   },
 );
 
@@ -2767,7 +2763,7 @@ it.skip.each(["rtf", "epub", "ods"] as const)(
           expect(screen.container.textContent).toContain("North");
           expect(screen.container.textContent).toContain("150");
           expect(screen.container.textContent).not.toContain("private note");
-          expect(screen.container.textContent).toContain("1 rows · 2 columns");
+          expect(screen.container.textContent).toContain("1 row · 2 columns");
           expect(screen.container.textContent).not.toContain("Limited to 500");
         } else {
           const frame = screen.container.querySelector("iframe");
