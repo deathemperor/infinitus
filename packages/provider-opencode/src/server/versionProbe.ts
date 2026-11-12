@@ -56,7 +56,7 @@ function classifyOpenCodeProbeResponse(
   return probed(Option.getOrUndefined(version));
 }
 
-const probeOpenCodeBinary = Effect.fn("probeOpenCodeBinary")(function* (
+export const probeOpenCodeBinary = Effect.fn("probeOpenCodeBinary")(function* (
   binaryPath: string,
   environment: NodeJS.ProcessEnv | undefined,
 ) {
@@ -186,5 +186,6 @@ export const makeOpenCodeRuntimeProbe = <E>(probe: Effect.Effect<ProbedOpenCode,
       get: Cache.get(cache, undefined),
       refresh: Cache.refresh(cache, undefined),
       lastSuccess: Cache.getSuccess(cache, undefined),
+      record: (probed: ProbedOpenCode) => Cache.set(cache, undefined, probed),
     }),
   );

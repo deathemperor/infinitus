@@ -206,10 +206,11 @@ export const make = Effect.gen(function* () {
     launcherManaged: launcher.managed,
   });
   const serverInstallation = serverSelfUpdate === null ? yield* resolveServerInstallation : null;
-  // Desktop and server ship together; a control fd guarantees requestDesktopUpdate support.
-
+  // The desktop reports whether it can install updates; requests travel over its control fd.
   const desktopAppUpdate =
-    serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
+    serverSelfUpdate === "desktop-managed" &&
+    serverConfig.desktopAppUpdate === true &&
+    serverConfig.desktopTelemetryControlFd !== undefined;
 
   // Computed from the same pure resolver the client layer uses rather than by
   // pulling `InfinitusControlClient` in: the descriptor is built where no
@@ -308,6 +309,7 @@ export const make = Effect.gen(function* () {
       mcpModeLimitHeader: true,
       linkFence: true,
       mcpApprovalCodes: true,
+      mcpHostedApproval: true,
     },
     ...(lanBaseUrls.length === 0 ? {} : { lanHttpBaseUrls: lanBaseUrls }),
   };

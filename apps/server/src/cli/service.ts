@@ -155,7 +155,11 @@ function formatServiceStatus(
   protection?: ServiceProtection.ServiceProtectionState,
 ): string {
   if (!status.supported) {
+<<<<<<< HEAD
     return `${PRODUCT_NAME} service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd`;
+=======
+    return "T3 Code service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd, Windows with Task Scheduler";
+>>>>>>> upstream-sync-591188471a-upstream-renamed
   }
   if (!status.installed) {
     return `${PRODUCT_NAME} service\n  Status: not installed\n  Next: Run \`infinitus service install\`.`;

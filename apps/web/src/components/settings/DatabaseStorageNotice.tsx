@@ -164,7 +164,11 @@ function ReclaimRow({
       title={`${amount} on ${label}`}
       description={
         status.reclaimFailure === undefined
+<<<<<<< HEAD
           ? `Restarts ${PRODUCT_NAME} there. It is offline for about ${minutes} min.`
+=======
+          ? `Restarts T3 Code there. It will be offline for about ${minutes} min.`
+>>>>>>> upstream-sync-591188471a-upstream-renamed
           : `The last attempt failed: ${status.reclaimFailure}`
       }
       control={
@@ -185,7 +189,11 @@ function ReclaimRow({
                   Reclaim {amount} on {label}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
+<<<<<<< HEAD
                   {PRODUCT_NAME} on {label} stops, rebuilds its database, and starts again. It is
+=======
+                  T3 Code on {label} stops, rebuilds its database, and starts again. It will be
+>>>>>>> upstream-sync-591188471a-upstream-renamed
                   offline for about {minutes} min. Running agents stop when it restarts.
                 </AlertDialogDescription>
               </AlertDialogHeader>

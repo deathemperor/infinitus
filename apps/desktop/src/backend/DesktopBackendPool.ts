@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as SubscriptionRef from "effect/SubscriptionRef";
@@ -15,6 +16,8 @@ import { ChildProcessSpawner } from "effect/process";
 
 import * as DesktopBackendConfiguration from "./DesktopBackendConfiguration.ts";
 import * as DesktopBackendManager from "./DesktopBackendManager.ts";
+import * as DesktopHomeOwner from "./DesktopHomeOwner.ts";
+import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
@@ -113,6 +116,9 @@ export const layer = Layer.effect(
     // Parent instance scopes to the pool so shutdown runs stop finalizers before the OS kills backends.
     const layerScope = yield* Scope.Scope;
     const factoryContext = yield* Effect.context<BackendInstanceFactoryRequirements>();
+    const homeOwnerContext = yield* Effect.context<
+      FileSystem.FileSystem | Path.Path | DesktopEnvironment.DesktopEnvironment
+    >();
 
     // Persist fatal Windows fallbacks; transient transport failures must preserve the user's WSL preference.
     const handlePrimaryPreflightFailure = Effect.fn("desktop.backendPool.primaryPreflightFailed")(
@@ -175,12 +181,25 @@ export const layer = Layer.effect(
       onShutdown: () => desktopWindow.handleBackendNotReady,
       onPreflightFailed: handlePrimaryPreflightFailure,
       onStateDirOwned: () =>
+<<<<<<< HEAD
         electronDialog
           .showErrorBox(
             `This ${PRODUCT_NAME} home is unavailable`,
             `Another ${PRODUCT_NAME} server, such as the background service, is using this data directory, or an older background service is set up for it. Stop that server or try \`infinitus update\`. If the older launcher cannot update, run \`infinitus service uninstall\` and optionally reinstall with \`infinitus service install\` from a current CLI. Reinstall from infinitus.run if \`infinitus\` is missing or outdated, and pass \`--base-dir\` with the service's ${PRODUCT_NAME} home to each command. Then reopen ${PRODUCT_NAME}. You can also set a separate T3CODE_HOME and pair with the running server.`,
           )
           .pipe(Effect.andThen(electronApp.quit)),
+=======
+        DesktopHomeOwner.readLiveHomeOwner().pipe(
+          Effect.flatMap((owner) =>
+            electronDialog.showErrorBox(
+              "This T3 home is unavailable",
+              DesktopHomeOwner.homeOwnedMessage(owner),
+            ),
+          ),
+          Effect.provideContext(homeOwnerContext),
+          Effect.andThen(electronApp.quit),
+        ),
+>>>>>>> upstream-sync-591188471a-upstream-renamed
     });
 
     const instancesRef = yield* SynchronizedRef.make<

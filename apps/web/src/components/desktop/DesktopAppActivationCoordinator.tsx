@@ -1,7 +1,7 @@
-import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type { DesktopAppActivationRequest } from "@infinitus/contracts";
 import { useEffect, useEffectEvent, useRef } from "react";
 
+<<<<<<< HEAD
 import { handleDesktopAppActivationRequest } from "../../desktopAppActivation";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import {
@@ -17,26 +17,18 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { reportProjectFailure } from "../../hooks/useProjectGroupUpdate";
+=======
+import { useOpenLocalWorkspace } from "../../hooks/useOpenLocalWorkspace";
+>>>>>>> upstream-sync-591188471a-upstream-renamed
 
 export function DesktopAppActivationCoordinator() {
-  const primaryEnvironment = usePrimaryEnvironment();
-  const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
-  const updateProject = useOrchestrationCommand(projectEnvironment.update, {
-    label: "project unarchive",
-  });
-  const openThread = useNewThreadHandler();
+  const openLocalWorkspace = useOpenLocalWorkspace();
   const queueRef = useRef(Promise.resolve());
   const activation = window.desktopBridge?.appActivation;
-  const shellHasSnapshot = useEnvironmentShellHasSnapshot(
-    primaryEnvironment?.environmentId ?? null,
-  );
-  const ready =
-    activation !== undefined &&
-    primaryEnvironment?.connection.phase === "connected" &&
-    primaryEnvironment.serverConfig !== null &&
-    shellHasSnapshot;
+  const ready = activation !== undefined && openLocalWorkspace.ready;
 
   const processRequest = useEffectEvent(async (request: DesktopAppActivationRequest) =>
+<<<<<<< HEAD
     handleDesktopAppActivationRequest(request, {
       getTarget: () => {
         if (
@@ -94,6 +86,9 @@ export function DesktopAppActivationCoordinator() {
         return openThread(projectRef);
       },
     }),
+=======
+    openLocalWorkspace.open(request),
+>>>>>>> upstream-sync-591188471a-upstream-renamed
   );
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to desktop activation requests over the bridge and marks the renderer ready

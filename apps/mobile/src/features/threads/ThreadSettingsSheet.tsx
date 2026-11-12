@@ -5,7 +5,7 @@ import {
 import * as Dialog from "../../components/ui/Dialog";
 import { createV5StackNavigator as createNativeStackNavigator } from "../../native/createV5StackNavigator";
 import { useSheetStackOptions } from "../layout/nested-stacks";
-import { DEFAULT_SERVER_SETTINGS } from "@infinitus/contracts";
+import { DEFAULT_SERVER_SETTINGS, ProviderInstanceId } from "@infinitus/contracts";
 import {
   modelPreferencesMigrationPatch,
   resolveModelPreferences,
@@ -14,7 +14,6 @@ import type {
   EnvironmentId,
   ModelSelection,
   ProjectId,
-  ProviderInstanceId,
   ProviderOptionDescriptor,
   ProviderOptionSelection,
   RuntimeMode,
@@ -22,12 +21,11 @@ import type {
   ThreadId,
 } from "@infinitus/contracts";
 import type { LegendListRenderItemProps } from "@legendapp/list/react-native";
-import { RegistryContext, useAtomValue } from "@effect/atom-react";
+import { RegistryContext, useAtomMount, useAtomValue } from "@effect/atom-react";
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import {
   getProviderOptionCurrentLabel,
   getProviderOptionCurrentValue,
-  getProviderOptionDescriptors,
 } from "@infinitus/shared/model";
 import {
   useNavigation,
@@ -66,6 +64,7 @@ import { useReduceMotionEnabled } from "../../lib/appState";
 import {
   buildModelOptions,
   groupByProvider,
+  serverConfigForCwd,
   type ModelOption,
   type ProviderGroup,
 } from "../../lib/modelOptions";
@@ -91,6 +90,8 @@ import { useQuietThreadStructure } from "../../state/use-thread-detail";
 import { activeComposerDraftKey, useQueuedRunEdit } from "../../state/queued-run-edit";
 import { selectThreadModel } from "../../state/thread-model-selection";
 import { useThreadSelection } from "../../state/use-thread-selection";
+import { useSelectedThreadWorktree } from "../../state/use-selected-thread-worktree";
+import { providerWorkspaceSnapshotRefresh } from "../../state/provider-workspace-snapshot-refresh";
 import { threadAllowsProviderSwitch } from "../../state/thread-provider-switching";
 import { environmentServerConfigsAtom, serverEnvironment } from "../../state/server";
 import { mobilePreferencesAtom } from "../../state/preferences";
@@ -259,8 +260,12 @@ type ThreadSettingsSubmenuPage =
 type ThreadSettingsSessionProps = {
   readonly environmentId: EnvironmentId | null;
   readonly projectId: ProjectId | null;
+<<<<<<< HEAD
   // Fork (#834): set by the existing-thread host, so the sheet can read the thread.
   readonly threadId?: ThreadId;
+=======
+  readonly cwd: string | null;
+>>>>>>> upstream-sync-591188471a-upstream-renamed
   readonly providerInstanceId?: ProviderInstanceId;
   readonly lockedProviderInstanceId?: ProviderInstanceId;
   readonly providerGroups: ReadonlyArray<ProviderGroup>;
@@ -317,6 +322,8 @@ type ThreadSettingsSessionValue = {
   readonly setSearchQuery: (query: string) => void;
   readonly setShowLegacy: (showLegacy: boolean) => void;
   readonly toggleProvider: (providerKey: string) => void;
+  /** The provider whose catalog for this folder the picker keeps fresh. */
+  readonly workspaceScan: { readonly instanceId: ProviderInstanceId; readonly cwd: string } | null;
 };
 
 const ThreadSettingsSessionContext = createContext<ThreadSettingsSessionValue | null>(null);
@@ -343,7 +350,7 @@ function ThreadSettingsSessionProvider(
     manageHidden && config
       ? groupByProvider(
           buildModelOptions(
-            config,
+            serverConfigForCwd(config, props.cwd),
             props.selectedModel,
             props.lockedProviderInstanceId,
             props.projectId,
@@ -491,12 +498,10 @@ function ThreadSettingsSessionProvider(
     pendingModel ? option.key === pendingModel.key : isApplied(option);
 
   const displayedDescriptors = pendingModel
-    ? pendingModel.capabilities
-      ? getProviderOptionDescriptors({
-          caps: pendingModel.capabilities,
-          selections: pendingModel.selection.options,
-        })
-      : []
+    ? resolveProviderOptionDescriptors({
+        capabilities: pendingModel.capabilities,
+        selections: pendingModel.selection.options,
+      })
     : props.optionDescriptors;
   const promptTraits = getPromptControlledTraits(displayedDescriptors, displayedPrompt);
   const displayedModel =
@@ -596,9 +601,22 @@ function ThreadSettingsSessionProvider(
     );
   };
 
+  const environmentId = props.environmentId;
+  // Like the web picker's open tab: scanning every provider would spawn a probe per provider.
+  const scannedInstanceId =
+    providerFilter !== null && providerFilter !== FAVORITES_PROVIDER_FILTER
+      ? ProviderInstanceId.make(providerFilter)
+      : props.providerInstanceId;
+  const workspaceScan =
+    props.cwd && scannedInstanceId ? { instanceId: scannedInstanceId, cwd: props.cwd } : null;
+
   const value = {
+<<<<<<< HEAD
     environmentId: props.environmentId,
     threadId: props.threadId,
+=======
+    environmentId,
+>>>>>>> upstream-sync-591188471a-upstream-renamed
     providerInstanceId: props.providerInstanceId,
     providerGroups,
     manageHidden,
@@ -630,13 +648,32 @@ function ThreadSettingsSessionProvider(
     setShowLegacy: setShowLegacyToggle,
     toggleProvider,
     toggleFavorite,
+    workspaceScan,
   } satisfies ThreadSettingsSessionValue;
 
   return (
     <ThreadSettingsSessionContext.Provider value={value}>
+      {environmentId && workspaceScan ? (
+        <ProviderWorkspaceSnapshotScan
+          key={workspaceScan.instanceId}
+          environmentId={environmentId}
+          instanceId={workspaceScan.instanceId}
+          cwd={workspaceScan.cwd}
+        />
+      ) : null}
       {props.children}
     </ThreadSettingsSessionContext.Provider>
   );
+}
+
+/** A project's own provider config can add models only its workspace scan lists. */
+function ProviderWorkspaceSnapshotScan(props: {
+  readonly environmentId: EnvironmentId;
+  readonly instanceId: ProviderInstanceId;
+  readonly cwd: string;
+}) {
+  useAtomMount(providerWorkspaceSnapshotRefresh(props));
+  return null;
 }
 
 function useThreadSettingsSession() {
@@ -945,11 +982,25 @@ function ThreadSettingsMainContent(props: {
   const refreshProviders = () => {
     if (!session.environmentId || isRefreshingProviders) return;
     setIsRefreshingProviders(true);
-    void refreshProviderCatalog(session.environmentId).then((result) => {
-      setIsRefreshingProviders(false);
-      const error = providerCatalogRefreshError(result);
-      if (error) Dialog.alert("Could not refresh models", error);
-    });
+    const environmentId = session.environmentId;
+    const workspaceScan = session.workspaceScan;
+    void refreshProviderCatalog(environmentId)
+      .then(async (result) => {
+        // A project's own models are read per folder, so the machine refresh alone keeps them stale.
+        // A failed folder read keeps its previous models and retries, so only the machine result alerts.
+        if (result._tag === "Success" && workspaceScan) {
+          await refreshProvidersCommand({
+            environmentId,
+            input: { ...workspaceScan, fresh: true },
+          });
+        }
+        return result;
+      })
+      .then((result) => {
+        setIsRefreshingProviders(false);
+        const error = providerCatalogRefreshError(result);
+        if (error) Dialog.alert("Could not refresh models", error);
+      });
   };
   const [listLoaded, setListLoaded] = useState(false);
   // Android can drop the first frame of a reduced-motion fade, leaving rows invisible.
@@ -1331,6 +1382,7 @@ export function ExistingThreadSettingsRouteScreen({
   // Reads the same environmentId/threadId params as the Thread route beneath it.
   const { selectedThread, selectedThreadDetailRef, selectedEnvironmentRuntime } =
     useThreadSelection();
+  const { selectedThreadCwd } = useSelectedThreadWorktree();
   // Streamed text would otherwise re-render the whole model picker on every delta.
   const structure = useQuietThreadStructure(selectedThreadDetailRef);
   const reportedModelSelection = useThreadReportedModelSelection(selectedThreadDetailRef);
@@ -1345,7 +1397,10 @@ export function ExistingThreadSettingsRouteScreen({
     return <View className="flex-1 bg-sheet" />;
   }
 
-  const serverConfig = selectedEnvironmentRuntime?.serverConfig ?? null;
+  const serverConfig = serverConfigForCwd(
+    selectedEnvironmentRuntime?.serverConfig ?? null,
+    selectedThreadCwd,
+  );
   const modelSelection = draftSettings.modelSelection ?? selectedThread.modelSelection;
   const lockedProviderInstanceId = threadAllowsProviderSwitch({
     thread: selectedThread,
@@ -1372,8 +1427,12 @@ export function ExistingThreadSettingsRouteScreen({
     <ThreadSettingsPickerScreen
       environmentId={selectedThread.environmentId}
       projectId={selectedThread.projectId}
+<<<<<<< HEAD
       // Fork (#834): the thread's usage rows in the settings sheet.
       threadId={selectedThread.id}
+=======
+      cwd={selectedThreadCwd}
+>>>>>>> upstream-sync-591188471a-upstream-renamed
       providerInstanceId={modelSelection.instanceId}
       {...(lockedProviderInstanceId ? { lockedProviderInstanceId } : {})}
       providerGroups={groupByProvider(modelOptions)}
@@ -1411,6 +1470,7 @@ export function NewTaskThreadSettingsRouteScreen() {
     <ThreadSettingsPickerScreen
       environmentId={flow.selectedEnvironmentId}
       projectId={flow.selectedProject?.id ?? null}
+      cwd={flow.workspaceCwd}
       {...(flow.selectedModel ? { providerInstanceId: flow.selectedModel.instanceId } : {})}
       providerGroups={flow.providerGroups}
       selectedModel={flow.selectedModel}

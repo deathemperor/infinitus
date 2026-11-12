@@ -5,10 +5,12 @@ import type {
   ProjectId,
   WorktreeSubmodules,
 } from "@infinitus/contracts";
+import type { ThreadStructureRuntime } from "@infinitus/client-runtime/state/shell";
 import * as Schema from "effect/Schema";
 import { sanitizeNewRefName } from "@infinitus/shared/git";
 import { workspaceRelativeFilePath } from "@infinitus/shared/path";
 import { toSortableTimestamp } from "@infinitus/client-runtime/state/thread-sort";
+import { deriveCanInterruptRunningThread } from "../session-logic";
 export { deriveLocalBranchNameFromRemoteRef, sanitizeNewRefName } from "@infinitus/shared/git";
 
 export interface EnvironmentOption {
@@ -107,7 +109,7 @@ export function resolveLockedWorkspaceLabel(
   activeWorktreePath: string | null,
   effectiveEnvMode: EnvMode,
 ): string {
-  if (activeWorktreePath) return "Worktree";
+  if (activeWorktreePath) return activeWorktreePath.split(/[\\/]/).findLast(Boolean) ?? "Worktree";
   return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : "Local checkout";
 }
 
@@ -279,6 +281,17 @@ export function resolveBranchSelectionTarget(input: {
     nextWorktreePath,
     reuseExistingWorktree: false,
   };
+}
+
+export function isWorktreeChangeBlocked(input: {
+  runtime: ThreadStructureRuntime | null;
+  currentWorktreePath: string | null;
+  nextWorktreePath: string | null;
+}): boolean {
+  return (
+    input.nextWorktreePath !== input.currentWorktreePath &&
+    deriveCanInterruptRunningThread(true, input.runtime)
+  );
 }
 
 export function shouldIncludeBranchPickerItem(input: {

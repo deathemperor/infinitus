@@ -24,9 +24,56 @@ One command installs the server as a self-contained executable — no Node.js:
 curl -fsSL https://infinitus.run/install.sh | sh
 ```
 
+<<<<<<< HEAD
 It takes the newest release's `infinitus-<version>-linux-<arch>.tar.gz` (releases cut
 after 0.5.0-alpha.11 attach them, with `SHA256SUMS`), verifies it, unpacks it
 under `~/.infinitus/runtime` and links `infinitus` into `~/.local/bin`. Then run:
+=======
+On Windows, in PowerShell:
+
+```powershell
+irm https://t3.codes/install.ps1 | iex
+```
+
+This installs the `t3` binary to `~/.local/bin`. If that folder is not on your
+`PATH` yet, the installer says so and, for zsh, bash on Linux, and fish, prints
+a command to add it. On Windows, `t3` works in the same PowerShell window right
+away; add the folder to your `PATH` for new windows. If a `t3` that the
+installer or the desktop app did not create is already there, it leaves that
+one alone and stops. Set `T3CODE_CHANNEL=nightly` to install the nightly train, or
+`T3CODE_VERSION` to pin an exact version.
+
+| Task                                  | Command                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| Start the server and open the web app | `t3`                                                                    |
+| Start the server without a browser    | `t3 serve`                                                              |
+| Use it from your other devices        | `t3 up` ([details](./remote-access.md))                                 |
+| Keep it running in the background     | `t3 service install` ([details](./background-service.md))               |
+| Move to the newest release            | `t3 update`                                                             |
+| Reclaim database space                | `t3 doctor` ([details](./background-service.md#reclaim-database-space)) |
+| Remove it again                       | `t3 uninstall`                                                          |
+
+Run `t3 help` or `t3 --help` for the full reference. To start in a new working
+directory, use an explicit path such as `t3 ./my-project`. A bare directory name
+is accepted only if it already exists.
+
+If `t3` or `t3 start` reports an already running server, connect to that server
+instead. Stop it before starting a replacement, or use a different `--base-dir`
+for an independent server.
+
+To try Infinitus once without installing it, run `npx t3@latest` instead (needs
+Node.js for `npx`). It offers to install the `t3` command first. If you say no,
+it asks again at the next minor release, and `npx t3 install` installs it later.
+`npx t3` always runs the version npm picked, even when a `t3` is installed. On
+the nightly train, run your installed `t3` (for example `t3 connect`), not
+`npx t3`, which runs the latest stable release.
+
+### Intel Macs
+
+There is no `t3` executable for Intel Macs (the desktop app is available). To
+run a server there, build it from source with `vp`, which provides the Node version it needs
+([Install vp](../operations/development.md#first-checkout)):
+>>>>>>> upstream-sync-591188471a-upstream-renamed
 
 ```bash
 infinitus
@@ -73,9 +120,74 @@ cd infinitus && vp i && vp run build:desktop
 node apps/server/dist/bin.mjs
 ```
 
+<<<<<<< HEAD
 A server run this way is a plain Node program: the background service does not
 apply, so update it with `git pull` and a rebuild, and start it however you run
 other Node processes.
+=======
+`t3 update` and the background service do not apply to a server run this way;
+update it with `git pull` and a rebuild.
+
+## Desktop app
+
+Download a release from [GitHub Releases](https://github.com/pingdotgg/t3code/releases),
+or use a package manager:
+
+| Platform           | Install                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| Windows            | `winget install T3Tools.T3Code`                              |
+| Windows (Scoop)    | `scoop install extras/t3code`                                |
+| macOS              | `brew install --cask t3-code`                                |
+| Debian, Ubuntu     | `sudo apt install ./T3-Code-*.deb`                           |
+| Arch Linux         | `yay -S t3code-bin`                                          |
+| Arch Linux nightly | `yay -S t3code-nightly-bin`                                  |
+| Nix                | `nix profile add github:NixOS/nixpkgs/nixos-unstable#t3code` |
+
+### Linux
+
+AppImage and `.deb` downloads are available for x86_64 and ARM64. Check your
+architecture with `uname -m`: for `x86_64`, choose a file ending in
+`x86_64.AppImage` or `amd64.deb`; for `aarch64`, choose `arm64.AppImage` or
+`arm64.deb`.
+
+To launch an AppImage, open a terminal in its download folder. Replace
+`T3-Code.AppImage` below with the exact filename you downloaded:
+
+```bash
+chmod +x ./Infinitus-Code.AppImage
+./Infinitus-Code.AppImage
+```
+
+The `.deb` updates itself like the other desktop builds. It asks for your
+password to install each update. If your desktop has no password prompt, the
+update fails. Download the new `.deb` and install it the same way.
+
+The AUR packages currently support x86_64 only; on ARM64, use the AppImage.
+Update AUR installs with your AUR helper, such as `yay -Syu`, instead of the
+in-app updater.
+
+### Nix (nixpkgs)
+
+Infinitus is maintained in [nixpkgs](https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/by-name/t3/t3code).
+The command above installs from `nixos-unstable` and requires Nix 2.30 or later with
+`nix-command` and `flakes` enabled. Launch the desktop app with `t3code-desktop`;
+the package also includes the `t3` command.
+
+On NixOS, you can instead add the package to your system configuration, using
+a nixpkgs revision that includes `t3code`:
+
+```nix
+environment.systemPackages = [ pkgs.t3code ];
+```
+
+Apply the change with `sudo nixos-rebuild switch`. For Home Manager, add
+`pkgs.t3code` to `home.packages` and run `home-manager switch`.
+
+Update a profile installation with `nix profile upgrade t3code`. For NixOS or
+Home Manager, update your configuration's nixpkgs input or channel and rebuild.
+Nix manages both the desktop app and the bundled
+`t3` command; use Nix to update them instead of the in-app updater or `t3 update`.
+>>>>>>> upstream-sync-591188471a-upstream-renamed
 
 ### The `t3` command
 
@@ -100,6 +212,13 @@ update can take longer.
 `infinitus app` opens a new thread for the current directory in a running desktop
 app. It needs a `infinitus` on the Mac, and no macOS server archive is published yet,
 so this is not available on Infinitus for now.
+
+### Drop a folder on the sidebar
+
+Drag one or more folders from Finder, Explorer, or your file manager onto the
+sidebar. Each one opens as a project on this computer, the same as `t3 app`.
+Files dropped on a thread still attach to that thread. Browsers do not share
+folder paths, so in the web app use **Add project** instead.
 
 ## Mobile app
 
@@ -156,10 +275,13 @@ on the environment's machine. An unlisted version is unverified.
 When a provider CLI is behind its latest release, its provider card shows the
 available version. **Update now** runs the installer that owns the CLI
 (Homebrew, mise, or a global npm, pnpm, Yarn, Bun, Volta, or Vite+ install), or
-the CLI's own update command when Infinitus cannot tell. Infinitus runs `mise upgrade`
+the CLI's own update command when Infinitus cannot tell. Claude, Codex, and
+OpenCode installs Infinitus cannot identify stay manual: update them through the
+installer you used. Infinitus runs `mise upgrade`
 only for a tool your mise config requests as `latest` when the provider's binary
 path is a mise shim or under the tool's `installs/<tool>/latest` link; update a
 pinned version, or a path into one version's directory, through mise yourself.
+Update a CLI installed with Nix through Nix.
 Cursor and Antigravity update with Infinitus. Homebrew and Chocolatey installs
 compare against the version their package manager offers, which can trail the
 npm release; update Claude installed with Chocolatey through Chocolatey.
@@ -179,6 +301,11 @@ For provider-specific setup and accounts, see [Codex](./providers-codex.md),
 - [Working with threads](./thread-sidebar.md): start tasks and organize parallel work.
 - [Permission modes](./permission-modes.md): choose when agents ask before acting.
 - [Remote access](./remote-access.md): connect from another device.
+<<<<<<< HEAD
 - [Running in the background](./background-service.md): keep a Linux or macOS host available.
 - [Updating](./updating.md): update the app and connected servers.
+=======
+- [Running in the background](./background-service.md): keep a host available.
+- [Updating Infinitus](./updating.md): update the app and connected servers.
+>>>>>>> upstream-sync-591188471a-upstream-renamed
 - [Managed policy](./managed-policy.md): configure Infinitus for everyone on a machine.
