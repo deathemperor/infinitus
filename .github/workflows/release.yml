@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-24.04
 =======
     if: github.repository == 'pingdotgg/t3code' && (github.event_name != 'schedule' || vars.PAUSE_NIGHTLY != 'true')
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream-sync-2d8a843e6b-upstream-renamed
     timeout-minutes: 5
     outputs:
@@ -1059,7 +1059,7 @@ jobs:
     name: Check the update feed
     needs: [preflight, release]
     if: ${{ !cancelled() && github.repository == 'pingdotgg/t3code' && ((github.event_name == 'schedule' && vars.PAUSE_NIGHTLY != 'true') || needs.preflight.outputs.release_channel == 'nightly') }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
