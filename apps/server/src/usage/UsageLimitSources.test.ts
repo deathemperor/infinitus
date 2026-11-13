@@ -91,7 +91,6 @@ it.effect("keeps malformed source URLs encodable for config subscribers", () =>
       ),
       NodeCrypto.layer,
     ]),
-    Effect.scoped,
   ),
 );
 
@@ -158,6 +157,5 @@ it.effect("reads a management key from its secret provider", () => {
       ),
       NodeCrypto.layer,
     ]),
-    Effect.scoped,
   );
 });

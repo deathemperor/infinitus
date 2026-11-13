@@ -11,7 +11,8 @@ import {
   type ServerProviderUsageWindow,
 } from "@infinitus/contracts";
 import {
-  formatDuration,
+  type ResetCreditChoice,
+  resetCreditChoices,
   formatResetsIn,
   limitsNotice,
   paceOf,
@@ -286,6 +287,7 @@ function ResetCreditLine(props: {
   const [status, setStatus] = useState<string | null>(null);
   if (dense && credits.availableCount === 0 && status === null) return null;
 
+<<<<<<< HEAD
   const expiresIn = credits.nextExpiresAt
     ? formatDuration(Date.parse(credits.nextExpiresAt) - now)
     : null;
@@ -301,10 +303,13 @@ function ResetCreditLine(props: {
   const hold = resetHoldText(credits, now);
 
   const redeem = async () => {
+=======
+  const redeem = async (choice: ResetCreditChoice) => {
+>>>>>>> upstream-sync-08544ba3e5-upstream-renamed
     if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     setBusy(true);
     setStatus(null);
-    const result = await consume({ environmentId, input });
+    const result = await consume({ environmentId, input: choice.input });
     setBusy(false);
     if (result._tag === "Success") {
       setStatus(
@@ -322,8 +327,9 @@ function ResetCreditLine(props: {
     );
   };
 
-  const confirm = () => {
+  const confirm = (choice: ResetCreditChoice) => {
     if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
+<<<<<<< HEAD
     Dialog.alert(
       kind ? `Use a ${resetKindTitle(kind)} reset?` : "Use a reset credit?",
       kind === "fable"
@@ -364,6 +370,44 @@ function ResetCreditLine(props: {
         </Pressable>
       ) : null}
       {hold ? <Text className="text-xs text-foreground-tertiary">{hold}</Text> : null}
+=======
+    Dialog.alert("Use a reset credit?", choice.confirmDescription, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Use credit", onPress: () => void redeem(choice) },
+    ]);
+  };
+
+  return (
+    <View className="gap-1">
+      {resetCreditChoices(credits, input, now).map((choice) => (
+        <View key={choice.key} className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+          <Text className="text-xs tabular-nums text-foreground-tertiary">{choice.summary}</Text>
+          {choice.availableCount > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy || !canManageProviders }}
+              disabled={busy || !canManageProviders}
+              onPress={() => confirm(choice)}
+              className={
+                dense
+                  ? "rounded-full bg-subtle-strong px-2.5 py-1 disabled:opacity-[0.45]"
+                  : "min-h-[44px] justify-center rounded-full bg-subtle-strong px-3 py-1.5 disabled:opacity-[0.45]"
+              }
+            >
+              <Text
+                className={
+                  dense
+                    ? "text-xs font-infinitus-medium text-foreground"
+                    : "text-sm font-infinitus-medium text-foreground"
+                }
+              >
+                {busy ? "Using…" : choice.actionLabel}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ))}
+>>>>>>> upstream-sync-08544ba3e5-upstream-renamed
       {!canManageProviders ? (
         <Text className="text-xs text-foreground-tertiary">
           This connection cannot manage provider accounts.

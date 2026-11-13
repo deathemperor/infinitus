@@ -1,4 +1,4 @@
-import { EnvironmentId } from "@infinitus/contracts";
+import { EnvironmentId, type ExecutionEnvironmentDescriptor } from "@infinitus/contracts";
 import { RelayEnvironmentEndpointFailure } from "@infinitus/contracts/relay";
 import * as Schema from "effect/Schema";
 
@@ -154,6 +154,8 @@ export interface PreparedConnection {
   readonly socketUrl: string;
   readonly httpAuthorization: PreparedHttpAuthorization | null;
   readonly target: ConnectionTarget;
+  /** What the server said about itself while this connection was prepared. */
+  readonly descriptor?: ExecutionEnvironmentDescriptor;
 }
 
 export type SupervisorConnectionPhase =

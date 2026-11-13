@@ -1,13 +1,36 @@
+<<<<<<< HEAD
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 import type { LinkableMachine } from "@infinitus/client-runtime/link-request";
+=======
+import {
+  ANOTHER_ADDRESS,
+  type LinkableMachine,
+  linkDestination,
+} from "@infinitus/client-runtime/link-request";
+>>>>>>> upstream-sync-08544ba3e5-upstream-renamed
 import { useId } from "react";
 
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Badge } from "../ui/badge";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 
-/** The machine choice for linking by an address typed in. */
-export const ANOTHER_ADDRESS = "another-address";
+/**
+ * Shown wherever a link goes to an address this app does not already have for a
+ * machine, with where that address leads.
+ */
+export function LinkAddressWarning({ address }: { readonly address: string }) {
+  return (
+    <Alert variant="warning">
+      <AlertTitle>Check this address</AlertTitle>
+      <AlertDescription>
+        This app cannot confirm it is one of your machines. The pairing code you paste is sent
+        there.
+        <span className="block break-all">{linkDestination(address)}</span>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 /** Whether a machine is linked already, or how this app knows it when not connected to it. */
 export function LinkMachineBadge({ machine }: { readonly machine: LinkableMachine }) {

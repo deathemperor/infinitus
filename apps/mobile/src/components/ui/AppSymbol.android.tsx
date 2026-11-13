@@ -67,6 +67,7 @@ import IconFileText from "@tabler/icons-react-native/IconFileText";
 import IconFileDiff from "@tabler/icons-react-native/IconFileDiff";
 import IconFilter from "@tabler/icons-react-native/IconFilter";
 import IconFilterFilled from "@tabler/icons-react-native/IconFilterFilled";
+import IconFlask from "@tabler/icons-react-native/IconFlask";
 import IconFolder from "@tabler/icons-react-native/IconFolder";
 import IconFolderOpen from "@tabler/icons-react-native/IconFolderOpen";
 import IconHeadphones from "@tabler/icons-react-native/IconHeadphones";
@@ -93,6 +94,7 @@ import IconListNumbers from "@tabler/icons-react-native/IconListNumbers";
 import IconMenu2 from "@tabler/icons-react-native/IconMenu2";
 import IconMessageCircleQuestion from "@tabler/icons-react-native/IconMessageCircleQuestion";
 import IconMessage from "@tabler/icons-react-native/IconMessage";
+import IconMessageDots from "@tabler/icons-react-native/IconMessageDots";
 import IconMessagePlus from "@tabler/icons-react-native/IconMessagePlus";
 import IconMinus from "@tabler/icons-react-native/IconMinus";
 import IconMoon from "@tabler/icons-react-native/IconMoon";
@@ -109,11 +111,11 @@ import IconPlayerStopFilled from "@tabler/icons-react-native/IconPlayerStopFille
 import IconPlus from "@tabler/icons-react-native/IconPlus";
 import IconQrcode from "@tabler/icons-react-native/IconQrcode";
 import IconRefresh from "@tabler/icons-react-native/IconRefresh";
+import IconRobot from "@tabler/icons-react-native/IconRobot";
 import IconSearch from "@tabler/icons-react-native/IconSearch";
 import IconShare from "@tabler/icons-react-native/IconShare";
 import IconServer from "@tabler/icons-react-native/IconServer";
 import IconSettings from "@tabler/icons-react-native/IconSettings";
-import IconSparkles from "@tabler/icons-react-native/IconSparkles";
 import IconStack2 from "@tabler/icons-react-native/IconStack2";
 import IconStar from "@tabler/icons-react-native/IconStar";
 import IconStarFilled from "@tabler/icons-react-native/IconStarFilled";
@@ -217,6 +219,7 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "exclamationmark.circle": IconAlertCircle,
   eye: IconEye,
   "eye.slash": IconEyeOff,
+  flask: IconFlask,
   folder: IconFolder,
   "folder.badge.plus": IconFolderPlus,
   "folder.fill": IconFolder,
@@ -283,8 +286,9 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "exclamationmark.shield": IconShieldQuestion,
   "bubble.left.and.bubble.right": IconMessage,
   "bubble.left": IconMessage,
-  sparkles: IconSparkles,
   "plus.bubble": IconMessagePlus,
+  "ellipsis.bubble": IconMessageDots,
+  robot: IconRobot,
   "text.word.spacing": IconLetterSpacing,
   "textformat.size": IconTypography,
   "textformat.size.larger": IconTextIncrease,
@@ -294,24 +298,38 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   trash: IconTrash,
   wifi: IconWifi,
   "wifi.slash": IconWifiOff,
+  "wrench.and.screwdriver": IconTool,
   xmark: IconX,
   "xmark.circle.fill": IconCircleXFilled,
 } satisfies Partial<
   Record<
-    SFSymbol | "git.pull-request.closed" | "git.pull-request.draft" | "git.commit" | "file.diff",
+    | SFSymbol
+    | "git.pull-request.closed"
+    | "git.pull-request.draft"
+    | "git.commit"
+    | "file.diff"
+    | "robot",
     Icon
   >
 >;
 const SF_ICON_LOOKUP: Partial<
   Record<
-    SFSymbol | "git.pull-request.closed" | "git.pull-request.draft" | "git.commit" | "file.diff",
+    | SFSymbol
+    | "git.pull-request.closed"
+    | "git.pull-request.draft"
+    | "git.commit"
+    | "file.diff"
+    | "robot",
     Icon
   >
 > = ANDROID_ICON_BY_SF_SYMBOL;
 
 const ANDROID_ICON_BY_MATERIAL_NAME = {
+<<<<<<< HEAD
   push_pin: IconPin,
   auto_awesome: IconSparkles,
+=======
+>>>>>>> upstream-sync-08544ba3e5-upstream-renamed
   bolt: IconBolt,
   build: IconTool,
   chat: IconMessage,

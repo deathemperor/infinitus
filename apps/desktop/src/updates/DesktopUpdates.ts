@@ -1,5 +1,7 @@
 import {
   DESKTOP_UPDATE_RESTART_MARKER_FILE,
+  DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
+  DESKTOP_UPDATE_IN_PROGRESS_TTL_MS,
   DesktopUpdateChannelSchema,
   type DesktopRuntimeInfo,
   type DesktopUpdateActionResult,
@@ -36,13 +38,22 @@ import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
+import * as DesktopSshEnvironment from "../ssh/DesktopSshEnvironment.ts";
 import * as DesktopUpdatePolicy from "./DesktopUpdatePolicy.ts";
+<<<<<<< HEAD
 import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
 import {
   resolveDefaultDesktopUpdateChannel,
   resolveEffectiveDesktopUpdateChannel,
   resolveElectronUpdaterFeed,
 } from "./updateChannels.ts";
+=======
+import {
+  normalizeDesktopUpdateReleaseNotes,
+  releaseNotesOfOfferedVersion,
+} from "./releaseNotes.ts";
+import { desktopUpdateChannelOf } from "@infinitus/shared/cliRelease";
+>>>>>>> upstream-sync-08544ba3e5-upstream-renamed
 import { compareSemverVersions } from "@infinitus/shared/semver";
 import {
   createInitialDesktopUpdateState,
@@ -61,7 +72,7 @@ import {
 const CHANNEL_CHANGE_RETRY_DELAY = Duration.seconds(1);
 const CHANNEL_CHANGE_RETRIES = 30;
 const AUTO_UPDATE_STARTUP_DELAY = "15 seconds";
-const AUTO_UPDATE_POLL_INTERVAL = "4 minutes";
+const AUTO_UPDATE_POLL_INTERVAL = "4 hours";
 const PREPARED_INSTALL_CHECK_WAIT = Duration.seconds(90);
 
 type UpdateAction = "check" | "download" | "install" | "install-recovery" | "channel";
@@ -77,6 +88,7 @@ const UpdateInfo = Schema.Struct({
   version: Schema.String,
   // Malformed notes must not block update-state decoding; normalizeDesktopUpdateReleaseNotes validates separately.
   releaseNotes: Schema.optional(Schema.Unknown),
+  releaseName: Schema.optional(Schema.NullOr(Schema.String)),
   releaseDate: Schema.optional(Schema.String),
 });
 
@@ -401,6 +413,7 @@ function isArm64HostRunningIntelBuild(runtimeInfo: DesktopRuntimeInfo): boolean 
 export const make = Effect.gen(function* () {
   const config = yield* DesktopConfig.DesktopConfig;
   const pool = yield* DesktopBackendPool.DesktopBackendPool;
+  const sshEnvironment = yield* DesktopSshEnvironment.DesktopSshEnvironment;
   const desktopState = yield* DesktopState.DesktopState;
   const electronUpdater = yield* ElectronUpdater.ElectronUpdater;
   const electronWindow = yield* ElectronWindow.ElectronWindow;
@@ -695,12 +708,13 @@ export const make = Effect.gen(function* () {
       Effect.catchTags({
         ElectronUpdaterDownloadUpdateError: Effect.fn("desktop.updates.handleDownloadFailure")(
           function* (error) {
+            const cause = describeUpdateErrorCause(error.cause);
             yield* updateState((current) =>
-              reduceDesktopUpdateStateOnDownloadFailure(current, error.message),
+              reduceDesktopUpdateStateOnDownloadFailure(current, `${error.message} ${cause}`),
             );
             yield* logUpdaterError(error.message, {
               errorTag: error._tag,
-              cause: describeUpdateErrorCause(error.cause),
+              cause,
               channel: error.channel,
             });
             return { accepted: true, completed: false };
@@ -746,6 +760,34 @@ export const make = Effect.gen(function* () {
         logUpdaterWarning("Could not write the update restart marker.", { errorTag: error._tag }),
       ),
     );
+
+  const updateInProgressMarkerPath = environment.path.join(
+    updateRestartMarkerDir,
+    DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
+  );
+  const encodeUpdateMarker = Schema.encodeEffect(
+    Schema.fromJsonString(Schema.Struct({ startedAt: Schema.Number, expiresAt: Schema.Number })),
+  );
+  const updateInProgressTempPath = `${updateInProgressMarkerPath}.tmp`;
+  const writeUpdateInProgressMarker = Effect.gen(function* () {
+    const startedAt = DateTime.toEpochMillis(yield* DateTime.now);
+    const contents = yield* encodeUpdateMarker({
+      startedAt,
+      expiresAt: startedAt + DESKTOP_UPDATE_IN_PROGRESS_TTL_MS,
+    });
+    yield* fileSystem.writeFileString(updateInProgressTempPath, contents);
+    yield* fileSystem.rename(updateInProgressTempPath, updateInProgressMarkerPath);
+  }).pipe(
+    Effect.ensuring(
+      fileSystem.remove(updateInProgressTempPath, { force: true }).pipe(Effect.ignore),
+    ),
+    Effect.catch((error) =>
+      logUpdaterWarning("Could not write the update-in-progress marker.", { errorTag: error._tag }),
+    ),
+  );
+  const removeUpdateInProgressMarker = fileSystem
+    .remove(updateInProgressMarkerPath, { force: true })
+    .pipe(Effect.ignore);
 
   // Failed or interrupted installs leave no replacement backend; later quits must release the tunnel.
   const removeUpdateRestartMarker = fileSystem
@@ -802,6 +844,7 @@ export const make = Effect.gen(function* () {
       Ref.set(desktopState.quitting, false),
       Ref.set(installRunningBackendsRef, []),
       removeUpdateRestartMarker,
+      removeUpdateInProgressMarker,
       removeInstallRecord,
     ],
     { discard: true },
@@ -819,6 +862,7 @@ export const make = Effect.gen(function* () {
 
     yield* Ref.set(desktopState.quitting, false);
     yield* removeUpdateRestartMarker;
+    yield* removeUpdateInProgressMarker;
     yield* removeInstallRecord;
     yield* Effect.gen(function* () {
       const runningInstances = yield* Ref.getAndSet(installRunningBackendsRef, []);
@@ -894,19 +938,26 @@ export const make = Effect.gen(function* () {
 
         return yield* Effect.gen(function* () {
           yield* writeUpdateRestartMarker;
+          yield* writeUpdateInProgressMarker;
           const { downloadedVersion } = yield* Ref.get(updateStateRef);
           if (downloadedVersion !== null) yield* writeInstallRecord(downloadedVersion);
-          // Stop pooled backends before quitAndInstall can outrun their scope finalizers.
+          // Stop pooled backends and SSH tunnels before quitAndInstall can outrun their scope finalizers.
           const instances = yield* pool.list;
           // stop clears desiredRunning, so retain the recovery set beforehand.
           const runningInstances = yield* Effect.filter(instances, (instance) =>
             instance.snapshot.pipe(Effect.map((snapshot) => snapshot.desiredRunning)),
           );
           yield* Ref.set(installRunningBackendsRef, runningInstances);
-          yield* Effect.forEach(
-            instances,
-            (instance) =>
-              instance.stop({ timeout: DesktopBackendManager.BACKEND_QUIT_STOP_TIMEOUT }),
+          yield* Effect.all(
+            [
+              Effect.forEach(
+                instances,
+                (instance) =>
+                  instance.stop({ timeout: DesktopBackendManager.BACKEND_QUIT_STOP_TIMEOUT }),
+                { concurrency: "unbounded" },
+              ),
+              sshEnvironment.closeAllTunnels,
+            ],
             { concurrency: "unbounded" },
           );
           yield* electronUpdater.quitAndInstall({
@@ -1047,7 +1098,7 @@ export const make = Effect.gen(function* () {
 
           const checkedAt = yield* currentIsoTimestamp;
           const { releaseNotes, omittedReleaseCount } = normalizeDesktopUpdateReleaseNotes(
-            info.releaseNotes,
+            releaseNotesOfOfferedVersion(info),
             info.version,
             state.channel,
             info.releaseDate,
@@ -1265,6 +1316,8 @@ export const make = Effect.gen(function* () {
         settings.updateChannel,
       );
       const disabledReason = yield* resolveDisabledReason;
+      // A blocked nightly channel still lets the user switch back to stable, so it stays updatable.
+      yield* Ref.set(desktopState.canInstallUpdates, Option.isNone(disabledReason));
       yield* setState(
         yield* baseUpdateState(
           channel,
@@ -1341,7 +1394,10 @@ export const make = Effect.gen(function* () {
       }
 
       return yield* Effect.gen(function* () {
-        yield* Ref.set(releaseFloorRef, Option.fromNullishOr(options?.minimumVersion));
+        const previousFloor = yield* Ref.getAndSet(
+          releaseFloorRef,
+          Option.fromNullishOr(options?.minimumVersion),
+        );
         const state = yield* Ref.get(updateStateRef);
         const retained = state.downloadedVersion ?? state.availableVersion;
         // A build from another track re-checks, so retrying a track switch finds an older release.
@@ -1354,13 +1410,12 @@ export const make = Effect.gen(function* () {
           return state;
         }
 
-        yield* desktopSettings
-          .setUpdateChannel(nextChannel)
-          .pipe(
-            Effect.mapError(
-              (cause) => new DesktopUpdateChannelPersistenceError({ channel: nextChannel, cause }),
-            ),
-          );
+        yield* desktopSettings.setUpdateChannel(nextChannel).pipe(
+          Effect.onError(() => Ref.set(releaseFloorRef, previousFloor)),
+          Effect.mapError(
+            (cause) => new DesktopUpdateChannelPersistenceError({ channel: nextChannel, cause }),
+          ),
+        );
 
         const disabledReason = yield* resolveDisabledReason;
         yield* setState(yield* baseUpdateState(nextChannel, disabledReason));
