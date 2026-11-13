@@ -33,6 +33,7 @@ import {
   pinnedRuntimeVersionsDir,
   prunePinnedRuntimes,
   recordPinnedRuntimeLauncher,
+  resolveLauncherPath,
   windowsShimTarget,
 } from "../cloud/pinnedRuntime.ts";
 import { compareExactServiceVersions, isExactServiceVersion } from "../cloud/serviceProtocol.ts";
@@ -201,6 +202,7 @@ export const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function
   return Option.some(input.launchedAs);
 });
 
+<<<<<<< HEAD
 /** Node preserves argv0's spelling; resolve bare names on PATH to find the launcher symlink. */
 export const resolveLauncherPath = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -224,6 +226,9 @@ export const resolveLauncherPath = Effect.gen(function* () {
 });
 
 /** Windows executables see their own path, so find the installer shim by matching infinitus.cmd targets on PATH. */
+=======
+/** Windows executables see their own path, so find the installer shim by matching t3.cmd targets on PATH. */
+>>>>>>> upstream-sync-2d8a843e6b-upstream-renamed
 export const findWindowsShim = Effect.fn("cli.update.find_windows_shim")(function* (
   executablePath: string,
 ) {
@@ -603,7 +608,7 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   }
   if (servicePlan?.handedOff === true) {
     yield* Console.log(
-      `  Background service switching to ${targetVersion} from a separate systemd unit, since this session runs inside it and disconnects when it restarts. Result: ${servicePlan.logPath}`,
+      `  Background service switching to ${targetVersion} outside this session, since this session runs inside it and disconnects when it restarts. Result: ${servicePlan.logPath}`,
     );
   } else if (servicePlan !== undefined && restartService) {
     yield* Console.log(`  Background service restarted on ${targetVersion}`);

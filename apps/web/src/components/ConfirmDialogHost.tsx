@@ -9,6 +9,7 @@ import {
 import {
   AlertDialog,
   AlertDialogClose,
+  AlertDialogAction,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
@@ -59,6 +60,7 @@ export function ConfirmDialogHost() {
 
   const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message);
   const confirmVariant = state.status === "idle" ? "default" : state.variant;
+  const focusConfirm = state.status !== "idle" && state.initialFocus === "confirm";
   const onCancel = () => respondToConfirmDialog(false);
   const onConfirm = () => respondToConfirmDialog(true);
   // Enter confirms: the popup's initial focus lands on Confirm instead of the
@@ -86,9 +88,19 @@ export function ConfirmDialogHost() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+<<<<<<< HEAD
           <Button ref={confirmRef} variant={confirmVariant} onClick={onConfirm}>
             Confirm
           </Button>
+=======
+          {focusConfirm && confirmVariant === "default" ? (
+            <AlertDialogAction onClick={onConfirm}>Confirm</AlertDialogAction>
+          ) : (
+            <Button variant={confirmVariant} onClick={onConfirm}>
+              Confirm
+            </Button>
+          )}
+>>>>>>> upstream-sync-2d8a843e6b-upstream-renamed
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

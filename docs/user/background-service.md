@@ -1,5 +1,6 @@
 # Running the server in the background
 
+<<<<<<< HEAD
 A Linux machine can run the Infinitus server as a service for your user, so it
 stays available to your phone, a browser or the desktop app without a terminal
 kept open.
@@ -27,6 +28,10 @@ inside is the server, run as `./infinitus` below.
 
 If the machine is an SSH remote of your desktop app, skip all of this: the
 desktop puts the matching server on it by itself.
+=======
+On Linux, macOS, and Windows, Infinitus can run as a service for your user so you
+do not need to keep a terminal open.
+>>>>>>> upstream-sync-2d8a843e6b-upstream-renamed
 
 ## Manage the service
 
@@ -112,11 +117,12 @@ yet (the install script says so and stops), so there is nothing to install
 them from. Keep the desktop app running on
 the Mac instead; it hosts remote clients the same way.
 
-Windows background services are not supported. To keep a Windows host available
-through Infinitus Connect, leave the desktop app running with its local environment
-enabled, or keep `t3 serve` running in a terminal. Minimize the desktop app rather
-than closing its last window, which stops its local server. Linking Infinitus Connect
-does not configure automatic startup at Windows sign-in.
+Windows starts the service when you log in and stops it when you sign out. It
+runs without a window as the `t3code-<domain>-<user name>` task in Task Scheduler, and Task
+Scheduler starts it again within a minute if it exits. Lock the screen instead
+of signing out, and keep the PC awake, for unattended remote access. Installing
+over SSH while nobody is signed in at the PC can fail at the final start step;
+the service is still installed and will start at the next sign-in.
 
 `infinitus up` installs the service when you set up Infinitus Connect, but the two are managed
 separately. Signing out of Infinitus Connect does not stop or uninstall the service.
@@ -167,8 +173,19 @@ and keep that session open.
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `linger-unavailable`                    | Run `loginctl show-user "$(id -un)" --property=Linger` and check that systemd-logind is available.                             |
 | `user-manager-unavailable`              | Run `systemctl --user status` in a login session for the service user; check your distribution's systemd user-session support. |
+<<<<<<< HEAD
 | `service-disabled` or `service-stopped` | Read the log and `systemctl --user status t3code.service`, then use the repair command printed by the server.                  |
 | `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `infinitus service restart`.                     |
+=======
+| `service-disabled` or `service-stopped` | Read the log and, on Linux, `systemctl --user status t3code.service`, then use the repair command printed by Infinitus.        |
+| `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `t3 service restart`.                            |
+
+On macOS, check **System Settings → General → Login Items** if the service no
+longer starts at login. If agent work cannot access Desktop, Documents, or
+Downloads, it may need Full Disk Access for the `t3` executable listed in
+`ProgramArguments` in
+`~/Library/LaunchAgents/com.t3tools.t3code.service.plist`.
+>>>>>>> upstream-sync-2d8a843e6b-upstream-renamed
 
 For failures after signing in to Infinitus Connect, see
 [connection troubleshooting](./t3-connect-troubleshooting.md).
@@ -195,14 +212,19 @@ pass `--fix` to run the recommended ones without a prompt (for scripts), or
 `--dry-run` to only report. An installed background service for the same data
 directory is stopped for the repair and started again afterwards, also when
 the repair fails. Quit a server you started by hand, or the desktop app, first:
-the repair refuses to touch a database that is in use. Use `--base-dir` for a
-different data directory.
+the repair refuses to touch a database that is in use, and names the server
+process that holds it when it can tell. While the repair runs, a server started
+for the same data directory, for example by a desktop app connecting over SSH,
+is refused until the repair ends. Use `--base-dir` for a different data
+directory.
 
-The repair can take several minutes on a large database. It rebuilds the
-database through a temporary copy, so it needs free space of about twice the
-data still in use (the database size minus the reclaimable space): once in the
-system temporary directory (on Linux and macOS, `TMPDIR`, or `/var/tmp` when it
-is not set) and once next to the database for its write-ahead log.
+The repair's time grows with the size of the whole database, not only the
+space it reclaims, and can exceed an hour on a large database or a slow disk;
+`t3 doctor` shows each step as it runs. It rebuilds the database through a
+temporary copy, so it needs free space of about twice the data still in use
+(the database size minus the reclaimable space): once in the system temporary
+directory (on Linux and macOS, `TMPDIR`, or `/var/tmp` when it is not set) and
+once next to the database for its write-ahead log.
 
 If you upgraded from a version before 0.1.0, its database (`state.sqlite`) is
 still kept next to the current one so you can roll back. `infinitus doctor` offers to
