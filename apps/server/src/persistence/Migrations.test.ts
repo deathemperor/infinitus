@@ -155,7 +155,7 @@ describe("runMigrations", () => {
   it.effect("keeps the migrations that finished before a later one failed", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* runMigrations({ toMigrationInclusive: 81 });
+      yield* runMigrations({ toMigrationInclusive: 91 });
       yield* sql`CREATE TABLE orchestration_v2_projection_turn_item_counts (thread_id TEXT)`;
 
       const exit = yield* Effect.exit(runMigrations());
@@ -163,7 +163,7 @@ describe("runMigrations", () => {
       assert.isTrue(Exit.isFailure(exit));
       assert.deepStrictEqual(
         yield* history,
-        migrationManifest.filter(([id]) => id <= 84),
+        migrationManifest.filter(([id]) => id <= 94),
       );
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
@@ -171,12 +171,12 @@ describe("runMigrations", () => {
   it.effect("reapplies peer link migrations whose ledger rows are missing", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* runMigrations({ toMigrationInclusive: 72 });
-      yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id BETWEEN 70 AND 72`;
+      yield* runMigrations({ toMigrationInclusive: 82 });
+      yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id BETWEEN 80 AND 82`;
 
       assert.deepStrictEqual(
         yield* runMigrations(),
-        migrationManifest.filter(([id]) => id >= 70),
+        migrationManifest.filter(([id]) => id >= 80),
       );
       assert.deepStrictEqual(yield* history, migrationManifest);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),

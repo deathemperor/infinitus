@@ -553,6 +553,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   no longer type-checks.
 - `packages/ssh/src/launcherTestHarness.ts` — the staged archive runtime's
   executable is `infinitus`, the name the fork's runner checks.
+- `apps/server/src/serviceLauncher.ts` — `runtimePaths` starts the pinned
+  runtime's `infinitus` executable, the name `cloud/pinnedRuntime.ts` installs
+  (#1396's archive also carries a `t3` link for older installs).
 - `apps/desktop/src/electron/ElectronProtocol.ts` — the production and
   development schemes come from `@infinitus/shared/desktopIdentity`; everything
   else (CSP, renderer origin, Clerk renderer, the Linux handler) follows
