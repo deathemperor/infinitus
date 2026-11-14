@@ -33,6 +33,7 @@ import {
   refusedAccount,
   RESUME_COOLDOWN_MS,
   resumeTarget,
+  runsOnClaude,
   toWireStop,
   type LimitStop,
   type ResumeTarget,
@@ -122,6 +123,13 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           proxyInstanceLabel(current.providerInstances, shell.modelSelection),
         ),
         Effect.orElseSucceed(() => null),
+      );
+
+    const onClaude = (shell: Pick<OrchestrationV2ThreadShell, "modelSelection">) =>
+      settings.getSettings.pipe(
+        Effect.map((current) => current.providerInstances),
+        Effect.orElseSucceed(() => ({})),
+        Effect.map((instances) => runsOnClaude(instances, shell.modelSelection)),
       );
 
     const remember = <K, V>(map: Map<K, V>, limit: number, key: K, value: V) => {
@@ -269,7 +277,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
             const shell = yield* shellOf(threadId);
             if (shell === null) return;
             const refusal = refusals.get(threadId) ?? null;
-            const failed = failedStopFromShell(shell, yield* nowMillis, refusal);
+            const failed = (yield* onClaude(shell))
+              ? failedStopFromShell(shell, yield* nowMillis, refusal)
+              : null;
             if (failed === null || failed.runId !== run.id) {
               // A run that failed for another reason moves the thread on:
               // the stop's own parked turn ended off the limit, or a later
@@ -480,7 +490,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       const now = yield* nowMillis;
       for (const shell of snapshot.threads) {
         const failed = failedStopFromShell(shell, now, null);
-        if (failed === null) continue;
+        if (failed === null || !(yield* onClaude(shell))) continue;
         const proxy = yield* proxyFor(shell);
         // The account the stop was on is not persisted; the next probe's
         // reading of the window decides, as it does for a stop with no name.

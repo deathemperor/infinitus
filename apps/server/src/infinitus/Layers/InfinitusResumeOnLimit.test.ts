@@ -82,7 +82,7 @@ const shell = (
     latestRunCompletedAt: null,
     archivedAt: null,
     settledOverride: null,
-    modelSelection: { instanceId: "claude", model: "opus" },
+    modelSelection: { instanceId: "claudeAgent", model: "opus" },
     ...overrides,
   }) as unknown as OrchestrationV2ThreadShell;
 
@@ -544,6 +544,31 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
         ]);
         yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
         expect(yield* h.reports).toEqual([]);
+        expect(yield* h.commands).toEqual([]);
+      }),
+  );
+
+  effectIt.effect(
+    "another provider's usage limit is not a stop: no swapd account is blamed or resumed on",
+    () =>
+      Effect.gen(function* () {
+        const codexFailed = {
+          status: "failed",
+          activeRunId: null,
+          lastErrorClass: "usage_limit",
+          usageLimitResetAt: HIEP1_WEEKLY,
+          modelSelection: { instanceId: "codex", model: "gpt-6-astra" },
+        } as const;
+        const h = yield* makeHarness({
+          shells: [shell(two, codexFailed as never)],
+          snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 1 } } })),
+        });
+        expect(yield* h.stopped).toEqual([]);
+        yield* h.setShell(shell(one, codexFailed as never));
+        yield* h.emit(runUpdated(one, runOne, "failed"));
+        expect(yield* h.stopped).toEqual([]);
+        expect(yield* h.reports).toEqual([]);
+        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
         expect(yield* h.commands).toEqual([]);
       }),
   );
