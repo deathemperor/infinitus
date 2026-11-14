@@ -4,7 +4,13 @@ import { page, userEvent } from "vite-plus/test/browser";
 import { act, render } from "../../../test/render";
 import { SidebarProvider } from "../ui/sidebar";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
+import { INFINITUS_NAV_PATHS } from "./infinitus/settingsSearchItems";
 import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS } from "./settingsSearch";
+
+// Fork: no environment here has the Infinitus capability, so its group is hidden.
+const VISIBLE_NAV_GROUPS = SETTINGS_NAV_GROUPS.filter(
+  (group) => group.paths !== INFINITUS_NAV_PATHS,
+);
 
 vi.mock("./useAvailableSettingsSearchItems", () => ({
   useAvailableSettingsSearchItems: () => [
@@ -76,7 +82,7 @@ it("moves Tab through every settings section", async () => {
   await using _screen = await renderNav();
   await userEvent.click(page.getByRole("combobox", { name: "Search settings" }));
 
-  const sections = SETTINGS_NAV_GROUPS.flatMap((group) => group.paths).map(
+  const sections = VISIBLE_NAV_GROUPS.flatMap((group) => group.paths).map(
     (to) => SETTINGS_SECTION_LABELS[to],
   );
   const tabbed: string[] = [];
@@ -103,7 +109,7 @@ it.each([1280, 390])("names each group by a heading outside it at %ipx wide", as
     );
   }
   const groups = page.getByRole("group").elements();
-  expect(groups).toHaveLength(SETTINGS_NAV_GROUPS.length);
+  expect(groups).toHaveLength(VISIBLE_NAV_GROUPS.length);
   for (const group of groups) {
     const first = group.querySelector("[data-settings-section]")?.textContent;
     const heading = document.getElementById(group.getAttribute("aria-labelledby") ?? "");
