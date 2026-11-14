@@ -121,7 +121,10 @@ const UsageResponse = Schema.Struct({
 const Config = Schema.Struct({
   oauthAccount: Schema.optional(
     Schema.NullOr(
-      Schema.Struct({ organizationUuid: Schema.optional(Schema.NullOr(Schema.String)) }),
+      Schema.Struct({
+        organizationUuid: Schema.optional(Schema.NullOr(Schema.String)),
+        accountUuid: Schema.optional(Schema.Unknown),
+      }),
     ),
   ),
 });
@@ -406,6 +409,18 @@ export const claudeAccountConfigPath = Effect.fn("claudeAccountConfigPath")(func
     ? path.join(configDir, ".claude.json")
     : path.join(yield* HostProcess.HomeDirectory, ".claude.json");
 });
+
+/** The CLI's `oauthAccount` record from `.claude.json`, or nothing when it is missing or unreadable. */
+export const readClaudeOauthAccount = Effect.fn("readClaudeOauthAccount")(
+  function* (accountConfigPath: string) {
+    const fs = yield* FileSystem.FileSystem;
+    const text = yield* fs.readFileString(accountConfigPath);
+    return Option.getOrUndefined(
+      Option.flatMap(decodeConfig(text), (config) => Option.fromNullishOr(config.oauthAccount)),
+    );
+  },
+  Effect.orElseSucceed(() => undefined),
+);
 
 /**
  * The organization the account record says the login is signed in to; one

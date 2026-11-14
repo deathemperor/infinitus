@@ -21,6 +21,7 @@ import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderTurnStart from "./ProviderTurnStartService.ts";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
+import * as TurnItemPositionStore from "./TurnItemPositionStore.ts";
 import * as TurnStartGate from "./TurnStartGate.ts";
 
 const threadId = ThreadId.make("thread-turn-start-gate");
@@ -67,6 +68,7 @@ describe("TurnStartGate (#720, #1627)", () => {
             Path.layer,
             Layer.mock(ServerConfig.ServerConfig)({} as never),
             Layer.mock(ServerSettings.ServerSettingsService)({}),
+            Layer.mock(TurnItemPositionStore.TurnItemPositionStoreV2)({}),
           ),
         ),
       );

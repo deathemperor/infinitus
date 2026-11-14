@@ -43,7 +43,11 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `consumeResetCredit`), and the reset
   control's held state on `apps/web/src/components/usage/UsageLimits.tsx`
   (`resetHoldText`), `UsageLimitsPooled.tsx` and
-  `apps/mobile/src/features/usage/UsageLimitsSection.tsx`.
+  `apps/mobile/src/features/usage/UsageLimitsSection.tsx`. Upstream's own
+  per-kind redeem (#34106: `ServerProviderResetCreditOption` / `options`,
+  `resetCreditChoices` in `@infinitus/shared/usageLimits`) is merged in but
+  unused: the fork's server never emits `options`, and those three UI files
+  keep the fork's `kinds` rendering.
 - Update idle gate (#829, back on orchestrator v2 in #1627):
   `packages/contracts/src/server.ts` (`ServerRunningTurn`,
   `ServerUpdateRunningTurnsPolicy`, `runningTurns?` on `ServerSelfUpdateInput`
@@ -541,6 +545,17 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   plain `PRODUCT_NAME` (no stage suffix) and keeps upstream's `(Dev)` and
   `(Nightly)` for a dev run and an upstream nightly (#823 layer 3); a fork
   nightly's stage label is `Nightly`, its title plain (#1042).
+- `apps/desktop/src/app/DesktopHomeOwner.ts` — `homeOwnedMessage` names
+  `PRODUCT_NAME` and the `infinitus` commands.
+- `apps/mobile/src/features/settings/components/SettingsRow.tsx` — a row's
+  page opens through `CommonActions.navigate`: with the fork's two Settings
+  pages the target union passes 25 members, past which `navigation.navigate`
+  no longer type-checks.
+- `packages/ssh/src/launcherTestHarness.ts` — the staged archive runtime's
+  executable is `infinitus`, the name the fork's runner checks.
+- `apps/server/src/serviceLauncher.ts` — `runtimePaths` starts the pinned
+  runtime's `infinitus` executable, the name `cloud/pinnedRuntime.ts` installs
+  (#1396's archive also carries a `t3` link for older installs).
 - `apps/desktop/src/electron/ElectronProtocol.ts` — the production and
   development schemes come from `@infinitus/shared/desktopIdentity`; everything
   else (CSP, renderer origin, Clerk renderer, the Linux handler) follows
@@ -554,6 +569,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
   `stageDesktopDmgBackground` rasterizes a per-channel SVG, so the `infinitus`
   channel has artwork of its own (#601, #732; the file is in `fork-only-files.md`).
+  The versionless AppImage name reads `resolveDesktopUpdateChannel`:
+  `Infinitus-<arch>` on the `infinitus` track, `Infinitus-Nightly-<arch>` otherwise.
 - `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`, `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon project in place of upstream's PlanetScale database (#1322, #1366); `infra/relay/package.json` and `pnpm-workspace.yaml` carry `@alchemy.run/neon` in place of `@alchemy.run/planetscale`. Rules and traps: `docs/internals/release-and-updates.md`.
 - `docs/operations/connect-setup.md` — the "Sign in with Apple (phone)" section: the Apple Services ID, key and Clerk connection App Review's guideline 4.8 requires next to Google (#10, 2026-09-22).
 - `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
@@ -582,11 +599,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `null`. `FcmDeliveries.ts` — the queue job's optional `alert`
   (`FcmAlertData`): a ready-made alert with a null state, sent over the card
   the consumer computes anyway and never acknowledged as a card delivery.
-  `ApnsDeliveries.ts` and `AgentActivityPublisher.ts` — `sendForTarget`
-  takes the `publishedThread` (#1636): the no-card alert push used to ring for
-  the aggregate's top row, so a waiting thread rang again on every other
-  thread's publish; it rings for the published thread's own state now, as
-  Android's `androidAlertForState` always did.
+  The fork's `publishedThread` fix (#1636) left with the sync that brought
+  upstream's own (#15015): the no-card alert push rings for the published
+  state passed to `sendForTarget`.
 - `scripts/build-cli-archive.ts` — one call before the stage is copied:
   `applyWebBrandAssets(resolveWebAssetBrandForPackageVersion(version),
   "apps/server/dist/client")`, so a runtime unpacked from the archive serves
@@ -638,6 +653,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `DesktopKeepAwakeSettings` after the background-activity row (#1075), the
   Threads panel `InfinitusResumeOnLimitSetting` after the auto-resume row
   (#648), and the restore / dirty-label lists carry `desktopKeepAwake`.
+  Upstream's server-side `keepAwakeWhileAgentsWork` row (#34128) sits in the
+  same panel beside it; the two toggles are independent.
 - Worktree limit (#269 H, re-ported onto orchestrator v2 under #1627):
   `packages/contracts/src/settings.ts` carries `worktreeMaxCount` (default
   25, 0 lifts it) on `ServerSettings` and its patch;
@@ -801,7 +818,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — `MessageAttachmentImage`: a haptic on press, and the thumbnail's URL handed to the preview as `cachedUrl` (`previewUrlReuse.logic.ts`). The trash beside a queued reply's pencil (`confirmDeletePendingMessage.ts`, #1501); both hide on `sendingMessageId`, the prop that replaced `dispatchingMessageId` here and in `ThreadDetailScreen.tsx` / `ThreadRouteScreen.tsx`, fed by `use-thread-composer-state.ts`'s `sendingQueuedMessageId`.
 - `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` root route at `new/share/thread`, from `infinitusNewTaskScreens` in `features/infinitus/stackScreens.ts`), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`. The row is in the project picker, which a share reaches from its draft's project chip; choosing a thread drops the draft and the pickers above it (`isShareFlowRoute`).
 - `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`presentPendingIncomingShare` calls `features/sharing/discardDismissedShare.ts`; its `isShareSheetPresented: isShareFlowRoute(…)`, since the draft's pickers are root routes now and reading only a top draft would discard the share as soon as the project picker opened), and its module-level `discardShare`, `useIncomingShare()` still exposing `consumeShare` for `ShareToThreadRouteScreen`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
-- `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/features/threads/ThreadComposer.tsx` (the `/` menu's project snippets, `useProjectPromptSnippets`, #270 G, which the draft renders through `ThreadScreenBinding`), `apps/mobile/src/state/threadOutboxDelivery.ts` — `pinCreatedThread` after a delivered creation (`pinAtCreation.logic` + `pinThread.logic`, through the service's `runDeliveryCommand`); `threadOutboxDelivery*.test.ts` and `composer-attachment-uploads.test.ts` mock `./preferences`. The delivery's dispatch bookkeeping moved to the fork's `queued-message-dispatch.ts` (#1501): `beginDispatchingQueuedMessage` hands back the abort signal that rides through `prepareQueuedMessageAttachments` into `prepareTurnAttachments`, and `markDispatchingQueuedMessageSending` right before each `startTurn` publishes the `sending` phase (or abandons an aborted attempt). `use-thread-outbox.ts` lost `dispatchingQueuedMessageIdAtom` to that module; `edit-pending-thread-message.ts` (+ test) guards with `reclaimQueuedMessageFromDispatch`; `thread-task-permissions.test.ts` and both delivery tests follow the atom.
+- `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/features/threads/ThreadComposer.tsx` (the `/` menu's project snippets, `useProjectPromptSnippets`, #270 G, which the draft renders through `ThreadScreenBinding`), `apps/mobile/src/state/threadOutboxDelivery.ts` — `pinCreatedThread` after a delivered creation (`pinAtCreation.logic` + `pinThread.logic`, through the service's `runDeliveryCommand`); `threadOutboxDelivery*.test.ts` and `composer-attachment-uploads.test.ts` mock `./preferences`. The delivery's dispatch bookkeeping moved to the fork's `queued-message-dispatch.ts` (#1501): `beginDispatchingQueuedMessage` hands back the abort signal that rides through `prepareQueuedMessageAttachments` into `prepareTurnAttachments`, and `markDispatchingQueuedMessageSending` right before each `startTurn` publishes the `sending` phase (or abandons an aborted attempt). Upstream's retry marker (`retryingQueuedMessageIdsAtom`) is cleared by the delivery's `startDispatchAttempt` wrapper around it. `use-thread-outbox.ts` lost `dispatchingQueuedMessageIdAtom` to that module; `edit-pending-thread-message.ts` (+ test) guards with `reclaimQueuedMessageFromDispatch`; `thread-task-permissions.test.ts` and both delivery tests follow the atom.
 - `apps/mobile/src/lib/composerImages.ts` — `pickComposerMedia` decides pass-through with the fork's `lib/image-passthrough.ts` (#1500, #1502): a still over 2 MB takes upstream's bounded-JPEG path (`renderPhotoAsJpeg`, exported for the share sheet) instead of passing through up to the 10 MB provider cap. A 7.7 MB screenshot could not finish uploading over the relay before it cut the request (2026-09-19).
 - `apps/mobile/src/features/sharing/incoming-share-model.ts` (+ test), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`renderImageAsJpeg` in the file reader) — a shared image takes the same gate (#1502): the reader's optional `renderImageAsJpeg` renders a large still to a bounded JPEG; without it the model keeps upstream's pass-through up to the provider cap, which is what its upstream tests exercise.
 - `apps/mobile/src/lib/attachmentUpload.ts` (+ test) — `uploadFileBytes` aborts and fails a transfer after `ATTACHMENT_UPLOAD_TIMEOUT_MS`: the relay cut a 7.7 MB image at two minutes, iOS's background session kept replaying it, and the one-at-a-time outbox held every queued reply behind it (2026-09-19). The session stays `background` on purpose, so an upload survives a locked phone. Offered upstream as well; drop this bullet once their copy carries it.
