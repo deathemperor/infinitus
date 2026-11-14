@@ -308,6 +308,9 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       yield* Effect.yieldNow;
       expect(committed).toEqual(["token-1"]);
       yield* Fiber.interrupt(fiber);
+    }),
+  );
+
   it.effect.each([
     { asset: "checksums", status: 504 },
     { asset: "archive", status: 503 },

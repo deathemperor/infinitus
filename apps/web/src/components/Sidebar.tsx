@@ -2928,7 +2928,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   useNextAttentionKey({
     orderedThreads,
     routeThreadKey,
-    routeTerminalOpen,
+    routeThreadRef,
     keybindings,
     navigateToThread,
   });

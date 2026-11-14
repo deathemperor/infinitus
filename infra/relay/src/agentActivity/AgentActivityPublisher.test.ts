@@ -371,7 +371,12 @@ describe("AgentActivityPublisher", () => {
           makeEnvironmentLinks({
             listDeliveryUsersForEnvironment: () =>
               Effect.succeed([
-                { userId: "dev:julius", notificationsEnabled, liveActivitiesEnabled },
+                {
+                  userId: "dev:julius",
+                  environmentLabel: "dev box",
+                  notificationsEnabled,
+                  liveActivitiesEnabled,
+                },
               ]),
           }),
         ),

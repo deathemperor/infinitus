@@ -465,9 +465,11 @@ describe("ApnsDeliveries", () => {
         ...aggregate.activities[0]!,
         phase: "waiting_for_input" as const,
         status: "Input",
+        headline: "Input",
       };
       const workingRow = {
         ...aggregate.activities[0]!,
+        headline: "Running",
         threadId: "thread-2" as RelayAgentActivityState["threadId"],
         threadTitle: "Other thread",
         deepLink: "/other",

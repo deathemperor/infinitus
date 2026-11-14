@@ -172,7 +172,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
       ...(isSecretsFeatureEnabled ? (["/settings/secrets"] as const) : []),
     ],
   },
-  { heading: null, paths: INFINITUS_NAV_PATHS },
+  { heading: PRODUCT_NAME, headingHidden: true, paths: INFINITUS_NAV_PATHS },
   {
     heading: msg("More"),
     headingHidden: true,

@@ -306,11 +306,11 @@ function ProjectDetail({
     setIsOrganizing(false);
   };
 
-  // Prompt snippets (#270 G, fork): the representative first, then the
+  // Prompt snippets (#270 G, fork): the file-picker project first, then the
   // other checkouts; a save writes each one.
   const promptSnippetTargets = [
-    representative,
-    ...group.memberProjects.filter((member) => member !== representative),
+    filePickerProject,
+    ...group.memberProjects.filter((member) => member !== filePickerProject),
   ].map((member) => {
     const environment = environmentById.get(member.environmentId);
     return {

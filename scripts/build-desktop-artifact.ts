@@ -3060,7 +3060,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     if (buildConfig.publish) {
       buildConfig.appImage = {
         artifactName:
-          updateChannel === "nightly" ? "T3-Code-Nightly-${arch}.${ext}" : "T3-Code-${arch}.${ext}",
+          resolveDesktopUpdateChannel(version) === "infinitus"
+            ? "Infinitus-${arch}.${ext}"
+            : "Infinitus-Nightly-${arch}.${ext}",
       };
     }
     buildConfig.deb = {

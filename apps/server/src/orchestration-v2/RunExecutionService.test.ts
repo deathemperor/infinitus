@@ -4449,6 +4449,7 @@ it.effect("finalizes the run when the provider finishes under another turn id", 
             writeIfRunCurrent: () => Effect.succeed({ committed: true, storedEvents: [] }),
           }),
           IdAllocator.layer,
+          ThreadCommandExecutor.layer,
           Layer.mock(ProviderEventIngestor.ProviderEventIngestorV2)({
             ingestNormalized: () => Effect.succeed([]),
           }),
