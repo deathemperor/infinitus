@@ -47,7 +47,6 @@ import {
   PATCH_RENDER_PREFIX_ARGS,
   splitNullSeparatedGitStdoutPaths,
 } from "./GitVcsDriverCore.ts";
-import { resolveCheckpointDiffPathspec } from "./checkpointDiffPathspec.ts";
 import * as CheckoutCloner from "./CheckoutCloner.ts";
 import * as VcsDriver from "./VcsDriver.ts";
 import * as VcsProcess from "./VcsProcess.ts";
@@ -1949,24 +1948,6 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         }
       }
 
-      // Fork (#1403): keep only the paths the thread still changes against
-      // its base, so a rebase inside the turn is not attributed to it.
-      const pathspec = yield* resolveCheckpointDiffPathspec(execute, {
-        cwd: input.cwd,
-        fromRevision,
-        toRevision: input.toCheckpointRef,
-      });
-      // The caller's file filter narrows that further; both are repository-relative.
-      const filePaths =
-        input.filePaths === undefined
-          ? pathspec
-          : pathspec === null
-            ? input.filePaths
-            : input.filePaths.filter((file) => pathspec.includes(file));
-      if (filePaths !== null && filePaths.length === 0) {
-        return "";
-      }
-
       const result = yield* execute({
         operation,
         cwd: input.cwd,
@@ -1987,7 +1968,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           `${fromRevision}^{commit}`,
           `${input.toCheckpointRef}^{commit}`,
           // Paths are repository-relative, while cwd can be a subdirectory.
-          ...(filePaths ? ["--", ...filePaths.map((file) => `:(top,literal)${file}`)] : []),
+          ...(input.filePaths
+            ? ["--", ...input.filePaths.map((file) => `:(top,literal)${file}`)]
+            : []),
         ],
         allowNonZeroExit: true,
         maxOutputBytes: input.maxOutputBytes ?? VcsDriver.CHECKPOINT_DIFF_MAX_OUTPUT_BYTES,

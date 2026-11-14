@@ -198,10 +198,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   than one remote. The fork's sync loop keeps `upstream = pingdotgg/t3code`,
   so without it every infinitus checkout that syncs was read as upstream and
   the pull requests page listed upstream's PRs.
-- `apps/server/src/vcs/GitVcsDriver.ts` — `checkpoints.diffCheckpoints`
-  restricts its diff to the pathspec from `checkpointDiffPathspec.ts` (#1403):
-  one call before the command, intersected with upstream's `input.filePaths`
-  and passed in upstream's `:(top,literal)<path>` form; `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
+- `apps/server/src/vcs/GitVcsDriver.ts` — `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
   the checkpoint author and committer names are `PRODUCT_NAME`.
 - `packages/contracts/src/providerRuntime.ts` — the optional
   `TurnTokenUsage.cacheTtlSeconds` (#1557), which `ClaudeTurnTokenUsage.ts`
@@ -294,7 +291,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
   legacy/V2 boundary ids are the fork's, as are the `toMigrationInclusive` ids in
   `Migrations/079_ThreadMessageSearch.test.ts`. Upstream's `reconcileV2PreviewMigration` is not carried: no
-  fork database recorded its preview numbers, and 53 and 54 are taken here.
+  fork database recorded its preview numbers, and 53 and 54 are taken here. Nor is `scripts/migrate-dev-db.ts`'s peer-links preview repair (its 68–70), for the same reason.
 - `apps/server/src/usage/UsageService.ts` — `readStats` (#659, the Stats
   page's fold over the transcript and repository scanners in
   `apps/server/src/stats/`), the `UsageAttribution` hook (#779), and
