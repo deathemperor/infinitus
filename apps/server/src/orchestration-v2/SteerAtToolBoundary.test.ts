@@ -4,16 +4,20 @@ import {
   MessageId,
   ProjectId,
   ProviderDriverKind,
+  EventId,
   ProviderInstanceId,
+  ProviderTurnId,
   ThreadId,
   type OrchestrationV2Command,
 } from "@infinitus/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
+import * as EventSink from "./EventSink.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -103,7 +107,38 @@ it.layer(layerTest)("steer at the tool boundary (#1318, #1627)", (it) => {
         yield* createThread;
         yield* send("first", {});
         yield* send("queued", { dispatchMode: { type: "queue_after_active" } });
-        const active = (yield* projectionOf).runs.find((run) => run.status === "starting")!;
+        const starting = (yield* projectionOf).runs.find((run) => run.status === "starting")!;
+        // A run still before its turn takes upstream's steer-when-ready; this one is in a turn.
+        const now = yield* DateTime.now;
+        yield* (yield* EventSink.EventSinkV2).write({
+          events: [
+            {
+              id: EventId.make("setup:run-running"),
+              type: "run.updated",
+              threadId,
+              occurredAt: now,
+              payload: { ...starting, status: "running" },
+            },
+            {
+              id: EventId.make("setup:turn-running"),
+              type: "provider-turn.updated",
+              threadId,
+              occurredAt: now,
+              payload: {
+                id: ProviderTurnId.make("provider-turn:steer-at-tool-boundary"),
+                providerThreadId: starting.providerThreadId!,
+                nodeId: starting.rootNodeId!,
+                runAttemptId: starting.activeAttemptId,
+                nativeTurnRef: null,
+                ordinal: 1,
+                status: "running",
+                startedAt: now,
+                completedAt: null,
+              },
+            },
+          ],
+        });
+        const active = (yield* projectionOf).runs.find((run) => run.status === "running")!;
         yield* send("steer-by-intent", {
           deliveryIntent: "steer",
           context: { version: 1, records: [] },
@@ -188,7 +223,7 @@ it.layer(layerTest)("steer at the tool boundary (#1318, #1627)", (it) => {
             commandId: CommandId.make("command:system:tool-boundary-steer:late"),
             threadId,
             queuedRunId: steer.id,
-            targetRunId: after.runs.find((run) => run.status === "starting")!.id,
+            targetRunId: after.runs.find((run) => run.status === "running")!.id,
           })
           .pipe(Effect.flip);
         assert.strictEqual(refused._tag, "OrchestratorDispatchError");

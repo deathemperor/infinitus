@@ -7152,20 +7152,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         }
       }
     }
-    // Fork (#1318, #1627): the composer's steer mode (`deliveryIntent: "steer"`) queues the message
-    // with `sendAt: "tool_boundary"`; `InfinitusToolBoundarySteer` promotes it when the turn's next
-    // tool call finishes, else the idle drain takes it as an ordinary row. A targeted
-    // `steer_active`, `auto`, mailbox deliveries and restarts keep upstream's immediate delivery.
-    let sendAt: OrchestrationV2Run["sendAt"];
-    if (
-      command.deliveryIntent === "steer" &&
-      dispatchMode.type === "steer_active" &&
-      delegatedCompletion === undefined &&
-      command.notification === undefined
-    ) {
-      dispatchMode = { type: "queue_after_active" };
-      sendAt = "tool_boundary";
-    }
     const notification =
       command.manualContinuationOfRunId === undefined
         ? command.notification
@@ -7259,6 +7245,20 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         steerWhenReadyRunId = target.id;
         dispatchMode = { type: "queue_after_active" };
       }
+    }
+    // Fork (#1318, #1627): a composer steer into a live turn queues with `sendAt: "tool_boundary"`;
+    // `InfinitusToolBoundarySteer` promotes it at the turn's next tool result, else the idle drain
+    // takes it. A run not yet in a turn keeps upstream's steer-when-ready above; `auto`, mailbox
+    // deliveries and restarts keep upstream's immediate delivery.
+    let sendAt: OrchestrationV2Run["sendAt"];
+    if (
+      command.deliveryIntent === "steer" &&
+      dispatchMode.type === "steer_active" &&
+      delegatedCompletion === undefined &&
+      command.notification === undefined
+    ) {
+      dispatchMode = { type: "queue_after_active" };
+      sendAt = "tool_boundary";
     }
     if (dispatchMode.type === "steer_active" || dispatchMode.type === "restart_active") {
       yield* ensureGoalCommandSupported(command, command, modelSelection.instanceId);

@@ -61,9 +61,10 @@ export function ConfirmDialogHost() {
   const confirmVariant = state.status === "idle" ? "default" : state.variant;
   const onCancel = () => respondToConfirmDialog(false);
   const onConfirm = () => respondToConfirmDialog(true);
-  // Enter confirms: the popup's initial focus lands on Confirm instead of the
-  // popup itself, where a keypress went nowhere. Escape still cancels.
+  // Fork (#826): Enter confirms, so initial focus lands on Confirm, except for a
+  // destructive confirmation, which keeps upstream's Cancel. Escape still cancels.
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const focusConfirm = confirmVariant !== "destructive";
 
   return (
     <AlertDialog
@@ -75,7 +76,7 @@ export function ConfirmDialogHost() {
         if (!open) completeConfirmDialogClose();
       }}
     >
-      <AlertDialogPopup initialFocus={confirmRef}>
+      <AlertDialogPopup {...(focusConfirm ? { initialFocus: confirmRef } : {})}>
         <AlertDialogHeader>
           <AlertDialogTitle>{copy.title}</AlertDialogTitle>
           {copy.description ? (

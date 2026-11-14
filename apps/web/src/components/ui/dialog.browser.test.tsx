@@ -17,7 +17,8 @@ import {
 
 describe("dialog initial focus", () => {
   it.each([
-    { label: "generic", options: undefined, focused: "Cancel", confirmed: false },
+    // Fork (#826): Enter confirms an ordinary confirmation.
+    { label: "generic", options: undefined, focused: "Confirm", confirmed: true },
     {
       label: "destructive opt-in",
       options: { variant: "destructive", initialFocus: "confirm" },

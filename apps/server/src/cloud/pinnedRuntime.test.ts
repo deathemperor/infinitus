@@ -673,12 +673,15 @@ it.layer(NodeServices.layer)("prunePinnedRuntimes", (it) => {
       const { baseDir, versionsDir } = yield* setup(["1.0.0", "1.1.0"]);
       const binDir = path.join(baseDir, "bin");
       yield* fs.makeDirectory(binDir);
-      yield* fs.symlink(path.join(versionsDir, "1.1.0", "t3"), path.join(binDir, "t3"));
+      yield* fs.symlink(
+        path.join(versionsDir, "1.1.0", "infinitus"),
+        path.join(binDir, "infinitus"),
+      );
       const ownDir = path.join(versionsDir, "1.0.0");
       if (recorded) {
         yield* fs.writeFileString(
           path.join(baseDir, "runtime", "launchers"),
-          `${path.join(ownDir, "t3")}\n`,
+          `${path.join(ownDir, "infinitus")}\n`,
         );
       }
 
@@ -720,10 +723,13 @@ it.layer(NodeServices.layer)("prunePinnedRuntimes", (it) => {
         // The installer accepts any bin directory, including one under the versions directory.
         const binDir = path.join(versionsDir, "bin");
         yield* fs.makeDirectory(binDir);
-        yield* fs.symlink(path.join(versionsDir, "1.0.0", "t3"), path.join(binDir, "t3"));
+        yield* fs.symlink(
+          path.join(versionsDir, "1.0.0", "infinitus"),
+          path.join(binDir, "infinitus"),
+        );
         yield* fs.writeFileString(
           path.join(baseDir, "runtime", "launchers"),
-          `${path.join(binDir, "t3")}\n`,
+          `${path.join(binDir, "infinitus")}\n`,
         );
       } else {
         const linkedDir = path.join(via === "linked dir" ? baseDir : versionsDir, "current");

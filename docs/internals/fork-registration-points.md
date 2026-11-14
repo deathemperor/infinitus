@@ -545,6 +545,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   plain `PRODUCT_NAME` (no stage suffix) and keeps upstream's `(Dev)` and
   `(Nightly)` for a dev run and an upstream nightly (#823 layer 3); a fork
   nightly's stage label is `Nightly`, its title plain (#1042).
+- `apps/web/src/components/ConfirmDialogHost.tsx` — Enter confirms (#826):
+  initial focus lands on Confirm unless the confirmation is destructive, which
+  keeps upstream's Cancel; upstream's `initialFocus` option is otherwise unused.
+  `components/ui/dialog.browser.test.tsx`'s generic row expects Confirm.
 - `apps/desktop/src/app/DesktopHomeOwner.ts` — `homeOwnedMessage` names
   `PRODUCT_NAME` and the `infinitus` commands.
 - `apps/mobile/src/features/settings/components/SettingsRow.tsx` — a row's
@@ -958,7 +962,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   provide the passthrough. `Orchestrator.ts` (`message.dispatch`): a
   `deliveryIntent: "steer"` that resolves to `steer_active` and is not a
   mailbox delivery becomes `queue_after_active` with `sendAt: "tool_boundary"`
-  on the queued run; a targeted `steer_active` and `auto` stay upstream's.
+  on the queued run; a targeted `steer_active` and `auto` stay upstream's. The
+  block runs after upstream's steer-when-ready step, so a steer into a run not
+  yet in a turn (preparing, starting) waits for the turn and goes in as upstream's.
   `packages/contracts/src/orchestrationV2.ts` — `OrchestrationV2Run.sendAt`
   (optional, additive). Clients: `apps/web/src/components/chat/QueuedRunsControl.tsx`
   (the "at next step" tag), `ComposerPrimaryActions.tsx` (the running-turn
