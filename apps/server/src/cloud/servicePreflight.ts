@@ -1,13 +1,19 @@
 import packageJson from "../../package.json" with { type: "json" };
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { BUILD_MIGRATION_HEAD, recordedMigrations } from "../persistence/databaseMigrationHead.ts";
-import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
+import { skippedV2Migrations } from "../persistence/Migrations.ts";
+import {
+  isSupportedLauncherProtocol,
+  SERVICE_LAUNCHER_PROTOCOL,
+  type SupportedLauncherProtocol,
+} from "./serviceProtocol.ts";
 
 export type ServicePreflightResult =
   | {
       readonly status: "ready";
       readonly version: string;
-      readonly launcherProtocol: typeof SERVICE_LAUNCHER_PROTOCOL;
+      /** The launcher protocol the server named; it accepts no other in reply. */
+      readonly launcherProtocol: SupportedLauncherProtocol;
     }
   | {
       readonly status: "blocked";
@@ -21,7 +27,8 @@ export function runServicePreflight(input: {
   readonly version?: string;
 }): ServicePreflightResult {
   const version = input.version ?? packageJson.version;
-  if (input.launcherProtocol !== SERVICE_LAUNCHER_PROTOCOL) {
+  const { launcherProtocol } = input;
+  if (!isSupportedLauncherProtocol(launcherProtocol)) {
     return {
       status: "blocked",
       version,
@@ -29,7 +36,7 @@ export function runServicePreflight(input: {
       // reinstall itself and report success, so name the exact install and the path check. The
       // installer is not pinned to `version`: that is the server package's, not the release's.
       reason: [
-        `The installed service launcher speaks protocol ${input.launcherProtocol}, but infinitus ${version} requires protocol ${SERVICE_LAUNCHER_PROTOCOL}.`,
+        `The installed service launcher speaks protocol ${launcherProtocol}, but infinitus ${version} requires protocol ${SERVICE_LAUNCHER_PROTOCOL}.`,
         "On the server machine, install the current CLI: `curl -fsSL https://infinitus.run/install.sh | sh`.",
         `Check that \`infinitus --version\` prints ${version} and that \`which -a infinitus\` lists no older infinitus (such as an npm or nvm install) first, then run \`~/.local/bin/infinitus service install\` (the installer's default path).`,
         `Updating the ${PRODUCT_NAME} desktop app does not update this CLI, and \`infinitus service update\` only repairs the service with whichever CLI runs it.`,
@@ -37,14 +44,17 @@ export function runServicePreflight(input: {
     };
   }
 
-  const newer = newerRecordedMigrations(input.databasePath);
-  if (newer === null) {
+  const recorded = recordedMigrations(input.databasePath);
+  if (recorded === null) {
     return {
       status: "blocked",
       version,
       reason: `Could not read this database to confirm t3@${version} supports it.`,
     };
   }
+  const newer = recorded
+    .filter(({ id }) => id > BUILD_MIGRATION_HEAD)
+    .map(({ id, name }) => `${id}_${name}`);
   if (newer.length > 0) {
     return {
       status: "blocked",
@@ -53,33 +63,33 @@ export function runServicePreflight(input: {
     };
   }
 
-  return { status: "ready", version, launcherProtocol: SERVICE_LAUNCHER_PROTOCOL };
+  // Upstream's V2 preview reconciliation is not carried (INFINITUS.md), so startup checks the history as recorded.
+  const incompatible = skippedV2Migrations(recorded);
+  if (incompatible.length > 0) {
+    return {
+      status: "blocked",
+      version,
+      reason: `This database has incompatible migration history: ${incompatible.join(", ")}. Start the build that wrote it, or report this migration history so an upgrade path can be added.`,
+    };
+  }
+
+  return { status: "ready", version, launcherProtocol };
 }
 
-/** Migrations a newer build recorded, or null when the database exists but cannot be read.
- * Startup already handles renamed ids this build knows. */
-function newerRecordedMigrations(databasePath: string): ReadonlyArray<string> | null {
-  const recorded = recordedMigrations(databasePath);
-  return recorded === null
-    ? null
-    : recorded.filter(({ id }) => id > BUILD_MIGRATION_HEAD).map(({ id, name }) => `${id}_${name}`);
-}
-
-export function decodeServicePreflightResult(value: unknown): ServicePreflightResult | undefined {
+export function decodeServicePreflightResult(
+  value: unknown,
+  launcherProtocol: SupportedLauncherProtocol,
+): ServicePreflightResult | undefined {
   if (typeof value !== "object" || value === null) {
     return undefined;
   }
   const record = value as Record<string, unknown>;
   if (
     record.status === "ready" &&
-    record.launcherProtocol === SERVICE_LAUNCHER_PROTOCOL &&
+    record.launcherProtocol === launcherProtocol &&
     typeof record.version === "string"
   ) {
-    return {
-      status: "ready",
-      version: record.version,
-      launcherProtocol: SERVICE_LAUNCHER_PROTOCOL,
-    };
+    return { status: "ready", version: record.version, launcherProtocol };
   }
   if (
     record.status === "blocked" &&

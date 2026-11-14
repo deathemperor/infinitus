@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { BellIcon, CpuIcon, GaugeIcon, InfinityIcon, SparklesIcon, UsersIcon } from "lucide-react";
+import { BellIcon, CpuIcon, FilmIcon, GaugeIcon, InfinityIcon, UsersIcon } from "lucide-react";
 
 import { useEnvironments } from "~/state/environments";
 import type { SettingsPath } from "../settingsSearch";
@@ -7,7 +7,7 @@ import type { SettingsPath } from "../settingsSearch";
 /** The pages that only exist where a connected server drives an Infinitus app, with their nav icons. */
 export const INFINITUS_SECTION_ICONS = {
   "/settings/menu-bar": InfinityIcon,
-  "/settings/animations": SparklesIcon,
+  "/settings/animations": FilmIcon,
   "/settings/priority": GaugeIcon,
   "/settings/team": UsersIcon,
   "/settings/notifications": BellIcon,

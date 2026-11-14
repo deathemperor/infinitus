@@ -5,9 +5,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useEffect } from "react";
 
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
-import { isElectron } from "../../env";
 import { resolveShortcutCommand } from "../../keybindings";
-import { isTerminalFocused } from "../../lib/terminalFocus";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { isModelPickerOpen } from "../../modelPickerVisibility";
 import { infinitusLimitStopsAtom } from "../../state/infinitus";
@@ -17,6 +15,7 @@ import {
   hasUnseenCompletion,
   resolveSidebarThreadStatus,
   resolveThreadLastVisitedAt,
+  threadShortcutContext,
 } from "../Sidebar.logic";
 import { onNextAttentionThreadRequest } from "./nextAttentionBus";
 import { resolveAttentionRank, resolveNextAttentionThreadId } from "./sidebarNeedsAttention.logic";
@@ -30,12 +29,11 @@ import { resolveAttentionRank, resolveNextAttentionThreadId } from "./sidebarNee
 export function useNextAttentionKey(input: {
   readonly orderedThreads: ReadonlyArray<SidebarThreadSummary>;
   readonly routeThreadKey: string | null;
-  readonly routeTerminalOpen: boolean;
+  readonly routeThreadRef: ScopedThreadRef | null;
   readonly keybindings: ResolvedKeybindingsConfig;
   readonly navigateToThread: (threadRef: ScopedThreadRef) => void;
 }): void {
-  const { keybindings, navigateToThread, orderedThreads, routeTerminalOpen, routeThreadKey } =
-    input;
+  const { keybindings, navigateToThread, orderedThreads, routeThreadKey, routeThreadRef } = input;
   const limitStops = useAtomValue(infinitusLimitStopsAtom);
   // One identity for the keydown listener and the bus subscription; a press
   // reads the list as rendered at that moment.
@@ -74,13 +72,7 @@ export function useNextAttentionKey(input: {
       }
       const command = resolveShortcutCommand(event, keybindings, {
         platform: navigator.platform,
-        context: {
-          terminalFocus: isTerminalFocused(),
-          terminalOpen: routeTerminalOpen,
-          modelPickerOpen: isModelPickerOpen(),
-          isWeb: !isElectron,
-          isDesktop: isElectron,
-        },
+        context: threadShortcutContext(routeThreadRef),
       });
       if (command !== "thread.nextAttention") return;
       event.preventDefault();
@@ -89,7 +81,7 @@ export function useNextAttentionKey(input: {
     };
     window.addEventListener("keydown", onWindowKeyDown);
     return () => window.removeEventListener("keydown", onWindowKeyDown);
-  }, [jumpToNextAttentionThread, keybindings, routeTerminalOpen]);
+  }, [jumpToNextAttentionThread, keybindings, routeThreadRef]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to next-attention requests from outside the sidebar while mounted
   useEffect(

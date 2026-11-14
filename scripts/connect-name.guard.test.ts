@@ -20,6 +20,10 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   ["apps/server/src/triage/triagePrompt.ts", "T3 Code"],
   // An HTTP header name agents send, not prose.
   ["apps/server/src/mcp/McpHttpServer.ts", "T3-Mode-Limit"],
+  // A git commit trailer key existing checkpoints carry, not prose.
+  ["apps/server/src/vcs/GitVcsDriver.ts", "T3-Head-Moved-At"],
+  // A PowerShell type namespace the keep-awake helper declares, never shown.
+  ["apps/server/src/background/KeepAwake.ts", "-Namespace T3 "],
   // Recorded provider fixtures and replay assertions: upstream's transcripts, never shown.
   // The restart note is replayed verbatim against one of them, so it keeps upstream's words.
   ["apps/server/src/orchestration-v2/RestartBackgroundNote.ts", "T3"],

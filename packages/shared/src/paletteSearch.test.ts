@@ -335,6 +335,18 @@ describe("scoreThreadSearch beyond Latin text and titles", () => {
       ranges: [{ start: 0, end: 7 }],
     });
     expect(scoreThreadSearch("trim", subject, NOW)?.explain?.()).toBeUndefined();
+    // Nor is it in the flat infinitus-<hex> form used when an `infinitus` branch blocks nested refs.
+    const flat = thread("Add search", { branch: "infinitus-abcd1234" });
+    expect(scoreThreadSearch("infinitus", flat, NOW)).toBeNull();
+    expect(scoreThreadSearch("infinitus connect", flat, NOW)).toBeNull();
+    expect(scoreThreadSearch("abcd1234", flat, NOW)).not.toBeNull();
+    for (const query of [
+      "infinitus-abcd",
+      "infinitus-abcd1234 connect",
+      "connect infinitus-abcd1234",
+    ]) {
+      expect(scoreThreadSearch(query, { ...flat, projectTitle: "connect" }, NOW)).not.toBeNull();
+    }
   });
 
   it("reads letters and numbers typed together, without forgiving typos in numbers", () => {

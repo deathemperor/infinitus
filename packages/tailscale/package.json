@@ -13,6 +13,7 @@
     "test": "vp test run --config ../../vite.config.ts --dir ."
   },
   "dependencies": {
+    "@infinitus/contracts": "workspace:*",
     "@infinitus/shared": "workspace:*",
     "effect": "catalog:"
   },

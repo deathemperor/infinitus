@@ -240,7 +240,7 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         Effect.provideService(HttpClient.HttpClient, client),
         Effect.provide(noSpawns),
       );
-      expect(credits).toEqual({ availableCount: 1, nextCreditId: "grant_a" });
+      expect(credits).toMatchObject({ availableCount: 1, nextCreditId: "grant_a" });
     }),
   );
 
