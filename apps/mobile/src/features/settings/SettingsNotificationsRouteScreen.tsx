@@ -34,6 +34,7 @@ import {
 import { setLiveActivityUpdatesEnabled } from "../agent-awareness/liveActivityPreferences";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import {
+  agentAwarenessNotificationsReady,
   getAgentAwarenessRegistrationStatus,
   refreshAgentAwarenessRegistration,
   subscribeAgentAwarenessRegistrationStatus,
@@ -109,6 +110,14 @@ function useDeviceRegistered(): boolean {
   return status === "registered";
 }
 
+function useNotificationsReady(): boolean {
+  return useSyncExternalStore(
+    subscribeAgentAwarenessRegistrationStatus,
+    agentAwarenessNotificationsReady,
+    () => false,
+  );
+}
+
 export function SettingsNotificationsRouteScreen() {
   if (!hasCloudPublicConfig()) {
     return (
@@ -161,6 +170,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     setLiveActivityOverride({ status, basis: liveActivityBasis });
   const liveActivityWriteInFlight = useRef(false);
   const deviceRegistered = useDeviceRegistered();
+  const notificationsReady = useNotificationsReady();
   const liveActivitiesPreferenceEnabled = AsyncResult.isSuccess(preferencesResult)
     ? preferencesResult.value.liveActivitiesEnabled !== false
     : true;
@@ -193,9 +203,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     }
     if (result.value.type === "granted") {
       setNotificationStatus("enabled");
-      if (getAgentAwarenessRegistrationStatus() === "registered") {
-        Dialog.alert("Notifications enabled", "Agent notifications are enabled for this device.");
-      } else {
+      if (!agentAwarenessNotificationsReady()) {
         Dialog.alert(
           "Couldn't finish enabling notifications",
           `Notification access was granted, but this device could not be registered with ${CONNECT_NAME}. Notifications will start once registration succeeds.`,
@@ -435,7 +443,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
             }
             subtitle={agentAwarenessSubtitle}
             value={
-              agentAwarenessPushAvailable && notificationStatus === "enabled" && deviceRegistered
+              agentAwarenessPushAvailable && notificationStatus === "enabled" && notificationsReady
             }
             onValueChange={handleDeviceNotificationsChange}
           />

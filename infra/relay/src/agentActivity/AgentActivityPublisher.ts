@@ -64,33 +64,25 @@ const make = Effect.gen(function* () {
     readonly publishedThread: ApnsDeliveries.PublishedThreadRef;
     readonly nowMs: number;
   }) {
-    const activeStates = input.deliveryUser.liveActivitiesEnabled
-      ? yield* rows.listForUser({ userId: input.deliveryUser.userId })
-      : [];
-    const liveActivityAggregate = input.deliveryUser.liveActivitiesEnabled
-      ? makeAggregateState({
-          activeStates,
-          terminalState: input.state && isTerminalPhase(input.state) ? input.state : null,
-          nowMs: input.nowMs,
-        })
-      : null;
-    const notificationOnlyAggregate =
-      input.deliveryUser.notificationsEnabled &&
-      !input.deliveryUser.liveActivitiesEnabled &&
-      input.state !== null
+    const targets = yield* liveActivities.listTargets({ userId: input.deliveryUser.userId });
+    // Only iOS targets with a running Live Activity read the aggregate, and few users have one,
+    // so skip the per-user activity query otherwise.
+    const liveActivityAggregate =
+      input.deliveryUser.liveActivitiesEnabled &&
+      targets.some((target) => target.platform !== "android" && target.activity_push_token)
         ? makeAggregateState({
-            activeStates: isTerminalPhase(input.state) ? [] : [input.state],
-            terminalState: isTerminalPhase(input.state) ? input.state : null,
+            activeStates: yield* rows.listForUser({ userId: input.deliveryUser.userId }),
+            terminalState: input.state && isTerminalPhase(input.state) ? input.state : null,
             nowMs: input.nowMs,
           })
         : null;
-    const targets = yield* liveActivities.listTargets({ userId: input.deliveryUser.userId });
-    const deliveriesByTarget = yield* Effect.forEach(
+    return yield* Effect.forEach(
       targets,
       Effect.fnUntraced(function* (target) {
         if (target.platform === "android") {
-          return [yield* fcmDeliveries.enqueue({ target, state: input.state })];
+          return yield* fcmDeliveries.enqueue({ target, state: input.state });
         }
+<<<<<<< HEAD
         return yield* Effect.all(
           [
             apnsDeliveries.sendForTarget({
@@ -108,10 +100,17 @@ const make = Effect.gen(function* () {
           ],
           { concurrency: 2 },
         );
+=======
+        return yield* apnsDeliveries.sendForTarget({
+          target,
+          aggregate: liveActivityAggregate,
+          state: input.deliveryUser.notificationsEnabled ? input.state : null,
+          nowMs: input.nowMs,
+        });
+>>>>>>> upstream-sync-82479522cb-upstream-renamed
       }),
       { concurrency: 4 },
     );
-    return deliveriesByTarget.flat();
   });
 
   return AgentActivityPublisher.of({

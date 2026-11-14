@@ -10,7 +10,7 @@ import {
 import * as Cause from "effect/Cause";
 import { AsyncResult, type Atom } from "effect/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import type { QueuedThreadMessage } from "./thread-outbox-model";
+import { threadOutboxRetryDelayMs, type QueuedThreadMessage } from "./thread-outbox-model";
 
 const state = vi.hoisted(() => ({
   draftText: "Keep this draft separate",
@@ -42,7 +42,7 @@ const state = vi.hoisted(() => ({
   },
   config: {
     shellThreadFamilies: false,
-    providers: [{ instanceId: "codex", driver: "codex" }],
+    providers: [{ instanceId: "codex", driver: "codex", models: [] }],
     environment: { capabilities: {} },
   },
 }));
@@ -143,6 +143,7 @@ vi.mock("./use-thread-outbox", async () => {
   const { appAtomRegistry } = await import("./atom-registry");
   const editingQueuedMessageIdsAtom = Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive);
   return {
+<<<<<<< HEAD
     editingQueuedMessageIdsAtom,
     holdEditingQueuedMessage: (messageId: string) => {
       appAtomRegistry.set(editingQueuedMessageIdsAtom, {
@@ -154,6 +155,11 @@ vi.mock("./use-thread-outbox", async () => {
       const { [messageId]: _released, ...rest } = appAtomRegistry.get(editingQueuedMessageIdsAtom);
       appAtomRegistry.set(editingQueuedMessageIdsAtom, rest);
     },
+=======
+    editingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
+    dispatchingQueuedMessageIdAtom: Atom.make<MessageId | null>(null).pipe(Atom.keepAlive),
+    retryingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
+>>>>>>> upstream-sync-82479522cb-upstream-renamed
     threadOutboxShellStatusesAtom: Atom.make(new Map([["secondary", "live"]])),
   };
 });
@@ -521,6 +527,7 @@ describe("queued task operation access", () => {
   );
 });
 
+<<<<<<< HEAD
 // Infinitus (fork, #1501): deleting a reply mid-upload abandons that attempt, and the
 // released slot moves the delivery on to the next queued message by itself.
 describe("deleting a queued reply while it uploads", () => {
@@ -605,6 +612,106 @@ describe("deleting a queued reply while it uploads", () => {
     expect(state.start.mock.calls[0]?.[0]).toMatchObject({
       input: { message: { messageId: next.messageId } },
     });
+=======
+describe("queued task whose launch reply is lost", () => {
+  const queuedTask = (creation: Partial<NonNullable<QueuedThreadMessage["creation"]>> = {}) =>
+    message({
+      threadId: ThreadId.make("new-thread"),
+      text: "My dictated idea",
+      modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+      creation: {
+        projectId: ProjectId.make("project"),
+        projectCwd: "/repo",
+        workspaceMode: "local",
+        branch: null,
+        worktreePath: null,
+        ...creation,
+      },
+    });
+
+  /** The server creates the thread, but the launch reply is lost; the thread then shows up. */
+  async function loseLaunchReply(queued: QueuedThreadMessage, edit?: string): Promise<void> {
+    setOperateGrant("secondary", true);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    state.cleanups.push(() => vi.useRealTimers());
+    await state.manager.enqueue(queued);
+    state.start.mockImplementationOnce(async () => {
+      if (edit !== undefined) await state.manager.update({ ...queued, text: edit });
+      return AsyncResult.failure(Cause.fail(new Error("Socket is not connected")));
+    });
+    await runDrain();
+    expect(remaining()).toHaveLength(1);
+    appAtomRegistry.set(state.threadShells, [state.thread, { ...state.thread, id: "new-thread" }]);
+  }
+
+  async function fireRetry(): Promise<void> {
+    const settled = Promise.withResolvers<void>();
+    const release = appAtomRegistry.subscribe(dispatchingQueuedMessageIdAtom, (id) => {
+      if (id === null) settled.resolve();
+    });
+    vi.advanceTimersByTime(threadOutboxRetryDelayMs(1));
+    await settled.promise.finally(release);
+  }
+
+  it("resends an unedited launch instead of handing its text back", async () => {
+    await loseLaunchReply(queuedTask());
+    await fireRetry();
+
+    expect(state.draftText).toBe("Keep this draft separate");
+    // The resend reuses the launch's command and message ids, so the server replays it.
+    const [first, resent] = state.start.mock.calls.map(([call]) => call.input);
+    expect(state.start).toHaveBeenCalledTimes(2);
+    expect(resent.commandId).toBe(first.commandId);
+    expect(resent.message.messageId).toBe(first.message.messageId);
+    expect(remaining()).toEqual([]);
+  });
+
+  it("hands back a task edited while its launch was in flight", async () => {
+    await loseLaunchReply(queuedTask(), "Edited idea");
+    await fireRetry();
+
+    expect(state.draftText).toBe("Keep this draft separate\nEdited idea");
+    expect(state.start).toHaveBeenCalledOnce();
+    expect(remaining()).toEqual([]);
+  });
+
+  it("holds the resend while operation access is missing", async () => {
+    await loseLaunchReply(queuedTask());
+    setOperateGrant("secondary", false);
+    vi.advanceTimersByTime(threadOutboxRetryDelayMs(1));
+    expect(appAtomRegistry.get(dispatchingQueuedMessageIdAtom)).toBeNull();
+    expect(state.start).toHaveBeenCalledOnce();
+    expect(remaining()).toHaveLength(1);
+
+    setOperateGrant("secondary", true);
+    await runDrain();
+    expect(state.start).toHaveBeenCalledTimes(2);
+    expect(state.draftText).toBe("Keep this draft separate");
+    expect(remaining()).toEqual([]);
+  });
+
+  it("resends a pull request task in its launched worktree without checking out again", async () => {
+    state.checkout.mockResolvedValueOnce(
+      AsyncResult.success({
+        branch: "pr-123",
+        worktreePath: "/repo/.t3/worktrees/pr-123",
+        isOnPullRequestHead: true,
+      }),
+    );
+    await loseLaunchReply(
+      queuedTask({
+        workspaceMode: "worktree",
+        branch: "fork/feature",
+        pullRequestReference: "https://github.com/acme/repo/pull/123",
+      }),
+    );
+    await fireRetry();
+
+    expect(state.checkout).toHaveBeenCalledOnce();
+    const [first, resent] = state.start.mock.calls.map(([call]) => call.input);
+    expect(resent.bootstrap.createThread.worktreePath).toBe("/repo/.t3/worktrees/pr-123");
+    expect(resent.bootstrap).toEqual(first.bootstrap);
+>>>>>>> upstream-sync-82479522cb-upstream-renamed
     expect(remaining()).toEqual([]);
   });
 });

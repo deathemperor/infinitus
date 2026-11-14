@@ -78,6 +78,8 @@ Fix:
 1. Make sure the host is awake and online.
 2. On the host, run `infinitus connect status`.
 3. If the check fails only on the host, check the host's DNS, VPN, or proxy.
+   If it says the host's network has an old cached answer, wait: it usually
+   clears within about 30 minutes.
 
 ## This device can't reach Infinitus Connect
 
@@ -116,6 +118,10 @@ an active link between your account and the host.
 - **This device is still loading its Infinitus Connect sign-in.** Wait a moment;
   Infinitus retries on its own. If it keeps waiting, reload or restart Infinitus on
   this device.
+- **The host is waiting for you to approve this device.** The host requires
+  approval for new devices. Approve the code this device shows from a device
+  that is already connected, or run `t3 auth connect-device approve <code>` on
+  the host. See [Approve new devices](./remote-access.md#approve-new-devices).
 - **Your account reached its tunnel limit.** Remove an environment you do not
   use from your Infinitus account's Infinitus Connect page, or
   [link a paid T3 Chat account](./remote-access.md#more-machines-with-t3-chat)
@@ -134,6 +140,7 @@ This app needs a newer Infinitus on the host. Update Infinitus on the host. See
 
 ## Infinitus Connect returned an error
 
+<<<<<<< HEAD
 | Error                                                     | Fix                                                                                                                                                              |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid T3 Chat account, then restart Infinitus on the host.                                                                 |
@@ -141,6 +148,15 @@ This app needs a newer Infinitus on the host. Update Infinitus on the host. See
 | Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                                               |
 | HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                                                    |
 | HTTP 408, 429, or 5xx                                     | Wait a few minutes. Infinitus retries temporary failures on its own.                                                                                             |
+=======
+| Error                                                     | Fix                                                                                                                                                                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid T3 Chat account, then restart Infinitus on the host.                                                                                                       |
+| `auth_invalid` or `invalid_bearer`                        | Run `t3 connect login`. If credentials were revoked, run `t3 connect logout`, then `t3 connect` again. Restart the server after signing in.                                                            |
+| Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                                                                                     |
+| HTTP 403 without a recognized error                       | If the host requires approval for new devices, update Infinitus on this device and approve it. Otherwise check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report. |
+| HTTP 408, 429, or 5xx                                     | Wait a few minutes. Infinitus retries temporary failures on its own.                                                                                                                                   |
+>>>>>>> upstream-sync-82479522cb-upstream-renamed
 
 After you fix a permanent rejection, restart the host's server with
 `infinitus service restart`. For a foreground server, stop it and run `infinitus serve` again.

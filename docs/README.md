@@ -65,7 +65,12 @@ source alone does not explain. Most code changes do not need an internal documen
 ### Runbooks
 
 - [Development and local builds](./operations/development.md)
+<<<<<<< HEAD
 - [Infinitus Connect setup](./operations/connect-setup.md)
+=======
+- [Scenarios: real-app proof for a fix](./operations/scenarios.md)
+- [T3 Connect setup](./operations/connect-setup.md)
+>>>>>>> upstream-sync-82479522cb-upstream-renamed
 - [Release](./operations/release.md)
 - [Observability](./operations/observability.md)
 - [Relay observability](./operations/relay-observability.md)
