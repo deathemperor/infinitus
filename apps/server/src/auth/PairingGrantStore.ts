@@ -32,6 +32,7 @@ import * as Stream from "effect/Stream";
 import * as ServerConfig from "../config.ts";
 import * as AuthConnectDevices from "../persistence/AuthConnectDevices.ts";
 import * as AuthPairingLinks from "../persistence/AuthPairingLinks.ts";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export interface BootstrapGrant {
   readonly method: ServerAuthBootstrapMethod;
@@ -95,7 +96,7 @@ export class BootstrapCredentialConnectApprovalPendingError extends Schema.Tagge
   },
 ) {
   override get message(): string {
-    return "This T3 Connect device is waiting for approval.";
+    return `This ${CONNECT_NAME} device is waiting for approval.`;
   }
 }
 
@@ -187,7 +188,7 @@ export class ConnectDevicesError extends Schema.TaggedError<ConnectDevicesError>
   },
 ) {
   override get message(): string {
-    return `Failed to ${this.operation} T3 Connect devices.`;
+    return `Failed to ${this.operation} ${CONNECT_NAME} devices.`;
   }
 }
 

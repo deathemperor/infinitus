@@ -23,6 +23,7 @@ import {
   McpConsent,
   readAuthorizationRequest,
 } from "./ConnectAgentSurface";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const isUnavailable = Schema.is(ConnectMcpApprovalUnavailableError);
 
@@ -124,7 +125,7 @@ export function ApproveAgentSurface() {
     return (
       <Message
         title="Could not load sign-in"
-        description="T3 Connect sign-in did not load. Check your connection, then try again."
+        description={`${CONNECT_NAME} sign-in did not load. Check your connection, then try again.`}
       >
         <div className="mt-6">
           <Button type="button" onClick={retryClerkLoad}>
@@ -140,7 +141,7 @@ export function ApproveAgentSurface() {
       <StandalonePage>
         <StandalonePageHeader
           context="Agent sign-in"
-          title="Connecting to T3 Connect"
+          title={`Connecting to ${CONNECT_NAME}`}
           description="One moment while your account loads."
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
@@ -152,7 +153,7 @@ export function ApproveAgentSurface() {
     return (
       <Message
         title="Sign in to approve"
-        description="Sign in to T3 Connect with the account this environment is linked to."
+        description={`Sign in to ${CONNECT_NAME} with the account this environment is linked to.`}
       >
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>

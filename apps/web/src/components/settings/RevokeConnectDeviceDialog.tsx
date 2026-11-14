@@ -12,6 +12,7 @@ import {
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Spinner } from "../ui/spinner";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export interface ConnectDeviceRevokeRequest {
   readonly title: string;
@@ -80,7 +81,7 @@ function RevokeConnectDeviceDialogPopup({
       <AlertDialogHeader>
         <AlertDialogTitle>{request.title}</AlertDialogTitle>
         <AlertDialogDescription>
-          Approval for new devices is off, so a revoked device signed in to your T3 Connect account
+          Approval for new devices is off, so a revoked device signed in to your {CONNECT_NAME} account
           can connect again on its own.
         </AlertDialogDescription>
         <label className="mt-2 flex cursor-pointer items-start gap-3">

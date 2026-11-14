@@ -8,6 +8,7 @@ import type {
 import * as DateTime from "effect/DateTime";
 
 import type { IssuedBearerSession, IssuedPairingLink } from "./auth/EnvironmentAuth.ts";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const newline = "\n";
 
@@ -230,7 +231,7 @@ export function formatConnectDeviceList(
         (request) => `  ${request.verificationCode}  ${describe(request.client)}`,
       ),
       "",
-      devices.trusted.length === 0 ? "No trusted T3 Connect devices." : "Trusted:",
+      devices.trusted.length === 0 ? `No trusted ${CONNECT_NAME} devices.` : "Trusted:",
       ...devices.trusted.map(
         (device) =>
           `  ${device.verificationCode}  ${describe(device.client)}  since ${toIsoString(device.approvedAt)}`,

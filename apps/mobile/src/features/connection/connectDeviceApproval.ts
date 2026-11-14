@@ -1,4 +1,5 @@
 import type { AuthClientMetadata, AuthPairingLink } from "@infinitus/contracts";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export interface ConnectDeviceApprovalPrompt {
   readonly pairingLinkId: string;
@@ -32,7 +33,7 @@ export function connectDeviceApprovalPrompts(input: {
     .map(({ link, verificationCode, client: device }) => ({
       pairingLinkId: link.id,
       title: "Approve this device?",
-      message: `${describeConnectDevice(device)} wants to connect to ${input.environmentLabel} through T3 Connect. It shows code ${verificationCode}. Approve it only if that code matches.`,
+      message: `${describeConnectDevice(device)} wants to connect to ${input.environmentLabel} through ${CONNECT_NAME}. It shows code ${verificationCode}. Approve it only if that code matches.`,
     }));
 }
 

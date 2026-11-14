@@ -9,6 +9,7 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const ProcessIdentity = Schema.Struct({
   pid: Schema.Int,
@@ -193,7 +194,7 @@ export const make = Effect.fn("RelayClientLedger.make")(function* (input: {
   const stopOrphan = Effect.fn("RelayClientLedger.stopOrphan")(function* (client: ProcessIdentity) {
     let state = yield* compare(client);
     if (state !== "same") return state === "gone";
-    yield* Effect.logInfo("Stopping a relay client left by a previous T3 Code server", {
+    yield* Effect.logInfo(`Stopping a relay client left by a previous ${PRODUCT_NAME} server`, {
       pid: client.pid,
     });
     for (const name of ["SIGTERM", "SIGKILL"] as const) {

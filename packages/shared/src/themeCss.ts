@@ -1,4 +1,5 @@
 import { THEME_COLOR_ROLES } from "./themePalettes.ts";
+import { PRODUCT_NAME } from "./productName.ts";
 
 const FETCHES_BY_STRING = /image-set\(|\bsrc\(/i;
 // Only CSS whitespace may come first. \s also matches U+00A0, which makes the address relative.
@@ -72,7 +73,7 @@ export const THEME_CSS_HOOKS = [
 
 /** What an agent needs to restyle the app. `t3_theme_read` returns it. */
 export const THEME_GUIDE = [
-  "Themes restyle T3 Code on web and desktop. Mobile does not use them.",
+  `Themes restyle ${PRODUCT_NAME} on web and desktop. Mobile does not use them.`,
   "",
   "Colors: `canvas` and `accent` (hex) derive a full palette. `colors` overrides single roles, and `variants.light` or `variants.dark` does that for the other appearance. Prefer colors over CSS.",
   `Roles: ${THEME_COLOR_ROLES.join(", ")}.`,

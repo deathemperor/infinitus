@@ -4,10 +4,11 @@ import { Tool, Toolkit } from "effect/ai";
 
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolExposure from "../../McpToolExposure.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const ToolSearchTool = Tool.make(McpToolExposure.TOOL_SEARCH, {
   description:
-    "Load T3 Code tools you do not have yet, then call them by name. Search by name or purpose: threads (t3_thread_*), projects (t3_project_*), worktrees, preview_* browser, device_*, html_preview/html_render, schedule_task, pull requests and guides, attachments, request_secret, environment links. Exact names work too.",
+    `Load ${PRODUCT_NAME} tools you do not have yet, then call them by name. Search by name or purpose: threads (t3_thread_*), projects (t3_project_*), worktrees, preview_* browser, device_*, html_preview/html_render, schedule_task, pull requests and guides, attachments, request_secret, environment links. Exact names work too.`,
   parameters: Schema.Struct({ query: Schema.String.check(Schema.isMaxLength(500)) }),
   success: Schema.Struct({
     tools: Schema.Array(Schema.Struct({ name: Schema.String, description: Schema.String })),

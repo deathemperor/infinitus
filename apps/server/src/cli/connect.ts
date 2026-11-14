@@ -225,7 +225,7 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
       : publishOnly
         ? [
             "",
-            "This link only publishes agent activity. Remote access through T3 Connect is off, so other devices need their own route to this machine, such as LAN or Tailscale.",
+            `This link only publishes agent activity. Remote access through ${CONNECT_NAME} is off, so other devices need their own route to this machine, such as LAN or Tailscale.`,
           ]
         : status.reachability === null
           ? [

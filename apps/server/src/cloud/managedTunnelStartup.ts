@@ -7,6 +7,7 @@ import * as Schedule from "effect/Schedule";
 import * as Semaphore from "effect/Semaphore";
 
 import { isRelayUnavailable, relayRetryAfterMillis } from "./relayResponse.ts";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 // Relinking revoked environments is the user's choice; startup takes no action.
 export type ManagedTunnelRegistrationResult =
@@ -251,14 +252,14 @@ export const watchManagedTunnelOrigin = Effect.fn("ManagedTunnelOrigin.watch")(f
       continue;
     }
     yield* Effect.logWarning(
-      "T3 Connect routes this server's tunnel to another origin; registering this server again",
+      `${CONNECT_NAME} routes this server's tunnel to another origin; registering this server again`,
       { ingressOrigin: ingressOrigin ?? "unparseable", localOrigin },
     );
     yield* options.register.pipe(
       Effect.catchCause((cause) =>
         Cause.hasInterrupts(cause)
           ? Effect.interrupt
-          : Effect.logWarning("Failed to register this server's T3 Connect origin again", {
+          : Effect.logWarning(`Failed to register this server's ${CONNECT_NAME} origin again`, {
               cause,
             }),
       ),

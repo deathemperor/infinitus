@@ -52,6 +52,7 @@ import * as ManagedLimits from "../policy/managedLimits.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import { MCP_APPROVAL_SUBJECT_PREFIX } from "../persistence/AuthPairingLinks.ts";
 import { requestUrl } from "../requestUrl.ts";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const DEFAULT_SESSION_SUBJECT = "cli-issued-session";
 export const INTERNAL_ADMINISTRATIVE_BOOTSTRAP_SUBJECT = "administrative-bootstrap";
@@ -346,7 +347,7 @@ export class ServerAuthConnectDevicesError extends Schema.TaggedError<ServerAuth
   },
 ) {
   override get message(): string {
-    return "Failed to update T3 Connect devices.";
+    return `Failed to update ${CONNECT_NAME} devices.`;
   }
 }
 
@@ -451,7 +452,7 @@ export class ServerAuthConnectApprovalPendingError extends Schema.TaggedError<Se
   {},
 ) {
   override get message(): string {
-    return "This T3 Connect device is waiting for approval.";
+    return `This ${CONNECT_NAME} device is waiting for approval.`;
   }
 }
 
@@ -1221,7 +1222,7 @@ export const make = Effect.gen(function* () {
       subject: CLOUD_CONNECT_SUBJECT,
       // Long enough for someone to notice the request and approve it.
       ttl: mustWait ? Duration.minutes(10) : Duration.minutes(2),
-      label: "T3 Connect",
+      label: CONNECT_NAME,
       proofKeyThumbprint,
       ...(mustWait ? { requiresConnectApproval: true } : {}),
     });

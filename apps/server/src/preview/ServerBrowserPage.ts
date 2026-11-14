@@ -25,6 +25,7 @@ import type { CDPSession, ConsoleMessage, Frame, Locator, Page } from "playwrigh
 import * as NodeCrypto from "node:crypto";
 import * as NodeUtil from "node:util";
 import { BrowserControlInterrupted } from "./SessionControl.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const isBrowserControlInterrupted = Schema.is(BrowserControlInterrupted);
 
@@ -535,7 +536,7 @@ export const captureViewport = async (
           new ServerBrowserOperationError({
             tag: "PreviewAutomationExecutionError",
             message:
-              "The browser is not producing screenshot frames. For a desktop tab, show or restore the T3 Code window and try again.",
+              `The browser is not producing screenshot frames. For a desktop tab, show or restore the ${PRODUCT_NAME} window and try again.`,
           }),
         ),
       SCREENSHOT_TIMEOUT_MS,

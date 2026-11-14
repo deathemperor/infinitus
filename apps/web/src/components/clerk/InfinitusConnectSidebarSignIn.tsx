@@ -60,7 +60,7 @@ function ConfiguredInfinitusConnectSidebarSignIn() {
         <SidebarMenuItem>
           <SidebarMenuButton onClick={retryClerkLoad}>
             <RotateCwIcon />
-            <span>Retry T3 Connect</span>
+            <span>Retry {CONNECT_NAME}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
