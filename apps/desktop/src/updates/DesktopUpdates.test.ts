@@ -1263,7 +1263,7 @@ describe("DesktopUpdates", () => {
           .setChannel("nightly", { minimumVersion: "1.2.5-nightly.20261028.1" })
           .pipe(Effect.flip);
         assert.equal(error._tag, "DesktopUpdateChannelPersistenceError");
-        assert.equal((yield* updates.getState).channel, "latest");
+        assert.equal((yield* updates.getState).channel, "infinitus");
 
         harness.emit("update-available", { version: "1.2.4" });
         yield* flushCallbacks;
