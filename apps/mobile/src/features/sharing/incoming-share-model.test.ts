@@ -135,7 +135,7 @@ describe("incoming native shares", () => {
     expect(result.warnings).toEqual([]);
     expect(result.attachments).toEqual([
       {
-        id: "share-render:image:0",
+        id: "share-render-image-0",
         type: "image",
         name: "Screenshot.jpg",
         mimeType: "image/jpeg",
