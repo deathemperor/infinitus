@@ -139,6 +139,7 @@ vi.mock("./use-thread-outbox", async () => {
       const { [messageId]: _released, ...rest } = appAtomRegistry.get(editingQueuedMessageIdsAtom);
       appAtomRegistry.set(editingQueuedMessageIdsAtom, rest);
     },
+    retryingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
     threadOutboxShellStatusesAtom: Atom.make(new Map()),
   };
 });

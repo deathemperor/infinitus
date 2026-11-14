@@ -114,6 +114,8 @@ export type ThemeDefinition = Readonly<{
   /** Which stage scene that artwork draws. Falls back to the night sky. */
   stageArt?: StageArtScene;
   managed?: boolean;
+  /** Custom styles for web and desktop. */
+  css?: string;
 }>;
 
 export const T3_CODE_LIGHT_THEME_COLORS: ThemeColors = {

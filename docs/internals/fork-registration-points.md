@@ -582,11 +582,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `null`. `FcmDeliveries.ts` — the queue job's optional `alert`
   (`FcmAlertData`): a ready-made alert with a null state, sent over the card
   the consumer computes anyway and never acknowledged as a card delivery.
-  `ApnsDeliveries.ts` and `AgentActivityPublisher.ts` — `sendForTarget`
-  takes the `publishedThread` (#1636): the no-card alert push used to ring for
-  the aggregate's top row, so a waiting thread rang again on every other
-  thread's publish; it rings for the published thread's own state now, as
-  Android's `androidAlertForState` always did.
+  The fork's `publishedThread` fix (#1636) left with the sync that brought
+  upstream's own (#15015): the no-card alert push rings for the published
+  state passed to `sendForTarget`.
 - `scripts/build-cli-archive.ts` — one call before the stage is copied:
   `applyWebBrandAssets(resolveWebAssetBrandForPackageVersion(version),
   "apps/server/dist/client")`, so a runtime unpacked from the archive serves

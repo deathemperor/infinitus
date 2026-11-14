@@ -1,3 +1,4 @@
+import { resolveProviderProbeTimeoutMs } from "@infinitus/provider-core/server/snapshotProbe";
 import { parseSemver } from "@infinitus/shared/semver";
 import * as Cache from "effect/Cache";
 import * as Duration from "effect/Duration";
@@ -18,8 +19,8 @@ export interface ProbedOpenCode {
 }
 
 // Meant to stop a hung `--version`; wrapped installs can take several seconds to start cold.
-const OPENCODE_VERSION_PROBE_TIMEOUT = "10 seconds";
-const OPENCODE_SERVER_PROBE_TIMEOUT = "5 seconds";
+const OPENCODE_VERSION_PROBE_TIMEOUT_MS = 10_000;
+const OPENCODE_SERVER_PROBE_TIMEOUT_MS = 5_000;
 // 2.x's own CLI decodes `{version, pid}` from `/api/info`; requiring both keeps unrelated JSON out.
 const decodeApiInfo = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ version: Schema.String, pid: Schema.Int })),
@@ -56,11 +57,16 @@ function classifyOpenCodeProbeResponse(
   return probed(Option.getOrUndefined(version));
 }
 
-const probeOpenCodeBinary = Effect.fn("probeOpenCodeBinary")(function* (
+export const probeOpenCodeBinary = Effect.fn("probeOpenCodeBinary")(function* (
   binaryPath: string,
   environment: NodeJS.ProcessEnv | undefined,
 ) {
   const runtime = yield* OpenCodeRuntime.OpenCodeRuntime;
+  const timeoutMs = resolveProviderProbeTimeoutMs(
+    "opencode",
+    OPENCODE_VERSION_PROBE_TIMEOUT_MS,
+    environment,
+  );
   const { stdout } = yield* runtime
     .runOpenCodeCommand({
       binaryPath,
@@ -69,12 +75,12 @@ const probeOpenCodeBinary = Effect.fn("probeOpenCodeBinary")(function* (
     })
     .pipe(
       Effect.timeoutOrElse({
-        duration: OPENCODE_VERSION_PROBE_TIMEOUT,
+        duration: timeoutMs,
         orElse: () =>
           Effect.fail(
             new OpenCodeRuntime.OpenCodeRuntimeError({
               operation: "probeOpenCodeBinary",
-              detail: `OpenCode CLI version probe timed out after ${OPENCODE_VERSION_PROBE_TIMEOUT}.`,
+              detail: `OpenCode CLI version probe timed out after ${timeoutMs / 1_000} seconds.`,
             }),
           ),
       }),
@@ -91,6 +97,7 @@ const probeOpenCodeBinary = Effect.fn("probeOpenCodeBinary")(function* (
 const probeOpenCodeServer = Effect.fn("probeOpenCodeServer")(function* (
   serverUrl: string,
   serverPassword: string,
+  environment?: NodeJS.ProcessEnv,
 ) {
   const client = yield* HttpClient.HttpClient;
   const baseUrl = URL.parse(serverUrl.trim());
@@ -133,7 +140,11 @@ const probeOpenCodeServer = Effect.fn("probeOpenCodeServer")(function* (
             }),
         ),
         Effect.timeoutOrElse({
-          duration: OPENCODE_SERVER_PROBE_TIMEOUT,
+          duration: resolveProviderProbeTimeoutMs(
+            "opencode",
+            OPENCODE_SERVER_PROBE_TIMEOUT_MS,
+            environment,
+          ),
           orElse: () =>
             Effect.fail(
               new OpenCodeRuntime.OpenCodeRuntimeError({
@@ -170,7 +181,7 @@ export const probeOpenCodeRuntime = (
   HttpClient.HttpClient | OpenCodeRuntime.OpenCodeRuntime
 > =>
   settings.serverUrl.trim().length > 0
-    ? probeOpenCodeServer(settings.serverUrl, settings.serverPassword)
+    ? probeOpenCodeServer(settings.serverUrl, settings.serverPassword, environment)
     : probeOpenCodeBinary(settings.binaryPath, environment);
 
 // Only 2.x is kept: 1.x can be upgraded in place while T3 runs, and 2.x converts the shared
@@ -186,5 +197,6 @@ export const makeOpenCodeRuntimeProbe = <E>(probe: Effect.Effect<ProbedOpenCode,
       get: Cache.get(cache, undefined),
       refresh: Cache.refresh(cache, undefined),
       lastSuccess: Cache.getSuccess(cache, undefined),
+      record: (probed: ProbedOpenCode) => Cache.set(cache, undefined, probed),
     }),
   );

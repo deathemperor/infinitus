@@ -51,7 +51,11 @@ import * as RelayTracing from "../cloud/relayTracing.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ExternalLauncher from "../process/externalLauncher.ts";
-import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
+import {
+  isProcessAlive,
+  readLiveServerRuntimeState,
+  readPersistedServerRuntimeState,
+} from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import { resolveCliCommand } from "./invocation.ts";
 import * as CliService from "./service.ts";
@@ -195,6 +199,7 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
       : status.desired && status.authenticated
         ? "pending server startup"
         : "not provisioned";
+  const publishOnly = status.desired && status.linkMode === "publish_only";
   const nextStep = !status.authenticated
     ? `Run \`t3 connect link\` to authorize and enable ${CONNECT_NAME}.`
     : status.revoked
@@ -202,30 +207,37 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
       : !status.desired
         ? `Run \`t3 connect link\` to enable ${CONNECT_NAME}.`
         : !status.linked
-          ? `Start ${PRODUCT_NAME} to provision the environment link and launch its managed tunnel.`
+          ? publishOnly
+            ? `Start ${PRODUCT_NAME} to provision the environment link.`
+            : `Start ${PRODUCT_NAME} to provision the environment link and launch its managed tunnel.`
           : undefined;
 
   return [
     CONNECT_NAME,
-    `  Exposure: ${status.desired ? "enabled" : "disabled"}`,
+    `  Exposure: ${publishOnly ? "publish-only" : status.desired ? "enabled" : "disabled"}`,
     `  Authorization: ${status.authenticated ? "stored credential" : "missing"}`,
     `  Environment link: ${provisioned}`,
     `  Relay: ${status.relayUrl ?? "not provisioned"}`,
     `  Publish agent activity: ${status.publishAgentActivity ? "enabled" : "disabled"}`,
     ...formatRelayClientStatus(status.relayClient),
-    ...(!status.desired || status.linkMode !== "managed"
+    ...(!status.desired
       ? []
-      : status.reachability === null
+      : publishOnly
         ? [
             "",
-            "No running server answered, so reachability was not checked. Check the background service with `t3 service status`.",
+            "This link only publishes agent activity. Remote access through T3 Connect is off, so other devices need their own route to this machine, such as LAN or Tailscale.",
           ]
-        : status.reachability.status === "reachable"
+        : status.reachability === null
           ? [
               "",
-              `✓ Other devices can reach this machine · ${formatConnectReachable(status.reachability)}`,
+              "No running server answered, so reachability was not checked. Check the background service with `t3 service status`.",
             ]
-          : ["", formatReachabilityFailure(status.reachability)]),
+          : status.reachability.status === "reachable"
+            ? [
+                "",
+                `✓ Other devices can reach this machine · ${formatConnectReachable(status.reachability)}`,
+              ]
+            : ["", formatReachabilityFailure(status.reachability)]),
     ...(nextStep ? ["", `Next: ${nextStep}`] : []),
   ].join("\n");
 }
@@ -342,7 +354,7 @@ const CLOUD_CLI_REACHABILITY_RETRY = Duration.seconds(5);
 /** Asks the running server to check T3 Connect now. `null` when no server answers. */
 const checkLiveReachability = Effect.fn("cloud.cli.check_live_reachability")(function* () {
   const config = yield* ServerConfig.ServerConfig;
-  const runtimeState = yield* readPersistedServerRuntimeState(config.serverRuntimeStatePath);
+  const runtimeState = yield* readLiveServerRuntimeState(config.serverRuntimeStatePath);
   if (Option.isNone(runtimeState)) return null;
   const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
   return yield* withCloudCliSessionToken(environmentAuth, AuthRelayReadScope, (token) =>
