@@ -173,7 +173,9 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")(
           },
         );
         expect(code, output).not.toBe(0);
-        expect(output).toMatch(new RegExp(`infinitus install: .*${archive.replaceAll(".", "\\.")}`));
+        expect(output).toMatch(
+          new RegExp(`infinitus install: .*${archive.replaceAll(".", "\\.")}`),
+        );
       } finally {
         server.closeAllConnections();
         await new Promise<void>((resolve) => server.close(() => resolve()));
