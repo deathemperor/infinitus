@@ -2,6 +2,7 @@ import type {
   ModelSelection,
   OrchestrationV2ThreadShell,
   ProviderInstanceConfigMap,
+  ProviderInstanceId,
   RunId,
   ThreadId,
 } from "@infinitus/contracts";
@@ -24,6 +25,8 @@ import type { ClaudeUsageLimitRefusal } from "../../orchestration-v2/Adapters/Cl
 
 /** Fleets whose accounts are Claude ones, whatever engine runs them. */
 const CLAUDE_PROVIDER = "claude";
+/** The driver of every Claude instance; a default instance's id is its driver. */
+const CLAUDE_DRIVER = "claudeAgent";
 /** The engine that writes the CLI's own credentials. A plain instance spends
     that fleet's active account and no other: the proxy engines (cliproxy,
     9router) are reached over `ANTHROPIC_BASE_URL`, which makes the instance a
@@ -192,6 +195,16 @@ export function refusedAccount(
     (account) => account !== active && matches(account) === true,
   );
   return { fleetKey: fleet.key, account: others.length === 1 ? accountLabel(others[0]!) : null };
+}
+
+/** Whether a run's instance is a Claude one. Another provider's usage limit (a Codex plan out
+    of credits) spends no swapd account: blaming the live one for it benched healthy accounts in
+    turn, as each resume failed again at once. */
+export function runsOnClaude(
+  instances: ProviderInstanceConfigMap,
+  instanceId: ProviderInstanceId,
+): boolean {
+  return (instances[instanceId]?.driver ?? instanceId) === CLAUDE_DRIVER;
 }
 
 /**
