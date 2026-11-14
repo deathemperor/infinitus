@@ -4,7 +4,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@infinitus/client-runtime/state/runtime";
-import { type EnvironmentId, TRIAGE_PROMPT_FILE_NAME } from "@infinitus/contracts";
+import type { EnvironmentId } from "@infinitus/contracts";
 import { useRouter } from "@tanstack/react-router";
 
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
@@ -25,9 +25,6 @@ const copyTriageCliCommand = () =>
       title: `Could not copy. Type ${TRIAGE_CLI_COMMAND} instead.`,
     }),
   );
-
-/** A draft is a triage draft while its message still links the playbook file. */
-export const isTriagePrompt = (prompt: string) => prompt.includes(`[${TRIAGE_PROMPT_FILE_NAME}](`);
 
 /**
  * In-app `t3 triage`: the server writes the session files and starts cloning
