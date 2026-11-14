@@ -3,6 +3,7 @@ import {
   MessageId,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ThreadShell,
+  type ProviderInstanceId,
   type RunId,
   type ThreadId,
 } from "@infinitus/contracts";
@@ -125,11 +126,11 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         Effect.orElseSucceed(() => null),
       );
 
-    const onClaude = (shell: Pick<OrchestrationV2ThreadShell, "modelSelection">) =>
+    const onClaude = (instanceId: ProviderInstanceId) =>
       settings.getSettings.pipe(
-        Effect.map((current) => current.providerInstances),
-        Effect.orElseSucceed(() => ({})),
-        Effect.map((instances) => runsOnClaude(instances, shell.modelSelection)),
+        Effect.map((current) => runsOnClaude(current.providerInstances, instanceId)),
+        // Unreadable settings keep a stop rather than drop one we cannot classify.
+        Effect.orElseSucceed(() => true),
       );
 
     const remember = <K, V>(map: Map<K, V>, limit: number, key: K, value: V) => {
@@ -277,7 +278,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
             const shell = yield* shellOf(threadId);
             if (shell === null) return;
             const refusal = refusals.get(threadId) ?? null;
-            const failed = (yield* onClaude(shell))
+            const failed = (yield* onClaude(run.providerInstanceId))
               ? failedStopFromShell(shell, yield* nowMillis, refusal)
               : null;
             if (failed === null || failed.runId !== run.id) {
@@ -490,7 +491,8 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       const now = yield* nowMillis;
       for (const shell of snapshot.threads) {
         const failed = failedStopFromShell(shell, now, null);
-        if (failed === null || !(yield* onClaude(shell))) continue;
+        // The shell carries the thread's instance; the failed run's own is not in the snapshot.
+        if (failed === null || !(yield* onClaude(shell.providerInstanceId))) continue;
         const proxy = yield* proxyFor(shell);
         // The account the stop was on is not persisted; the next probe's
         // reading of the window decides, as it does for a stop with no name.

@@ -2,6 +2,7 @@ import type {
   ModelSelection,
   OrchestrationV2ThreadShell,
   ProviderInstanceConfigMap,
+  ProviderInstanceId,
   RunId,
   ThreadId,
 } from "@infinitus/contracts";
@@ -196,14 +197,14 @@ export function refusedAccount(
   return { fleetKey: fleet.key, account: others.length === 1 ? accountLabel(others[0]!) : null };
 }
 
-/** Whether the thread runs on a Claude instance. Another provider's usage limit (a Codex plan out
+/** Whether a run's instance is a Claude one. Another provider's usage limit (a Codex plan out
     of credits) spends no swapd account: blaming the live one for it benched healthy accounts in
     turn, as each resume failed again at once. */
 export function runsOnClaude(
   instances: ProviderInstanceConfigMap,
-  selection: Pick<ModelSelection, "instanceId">,
+  instanceId: ProviderInstanceId,
 ): boolean {
-  return (instances[selection.instanceId]?.driver ?? selection.instanceId) === CLAUDE_DRIVER;
+  return (instances[instanceId]?.driver ?? instanceId) === CLAUDE_DRIVER;
 }
 
 /**

@@ -82,6 +82,7 @@ const shell = (
     latestRunCompletedAt: null,
     archivedAt: null,
     settledOverride: null,
+    providerInstanceId: "claudeAgent",
     modelSelection: { instanceId: "claudeAgent", model: "opus" },
     ...overrides,
   }) as unknown as OrchestrationV2ThreadShell;
@@ -91,13 +92,14 @@ const runUpdated = (
   threadId: ThreadId,
   runId: RunId,
   status: OrchestrationV2Run["status"],
+  providerInstanceId = "claudeAgent",
 ): OrchestrationV2DomainEvent =>
   ({
     type: "run.updated",
     id: `evt-${(counter += 1)}`,
     threadId,
     occurredAt: "1970-01-01T00:00:00Z",
-    payload: { id: runId, threadId, status },
+    payload: { id: runId, threadId, status, providerInstanceId },
   }) as never;
 const threadEvent = (
   threadId: ThreadId,
@@ -552,20 +554,20 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
     "another provider's usage limit is not a stop: no swapd account is blamed or resumed on",
     () =>
       Effect.gen(function* () {
-        const codexFailed = {
+        const failedOnLimit = {
           status: "failed",
           activeRunId: null,
           lastErrorClass: "usage_limit",
           usageLimitResetAt: HIEP1_WEEKLY,
-          modelSelection: { instanceId: "codex", model: "gpt-6-astra" },
         } as const;
         const h = yield* makeHarness({
-          shells: [shell(two, codexFailed as never)],
+          shells: [shell(two, { ...failedOnLimit, providerInstanceId: "codex" } as never)],
           snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 1 } } })),
         });
         expect(yield* h.stopped).toEqual([]);
-        yield* h.setShell(shell(one, codexFailed as never));
-        yield* h.emit(runUpdated(one, runOne, "failed"));
+        // The run's provider decides, not the thread's selection: here switched to Claude since.
+        yield* h.setShell(shell(one, failedOnLimit));
+        yield* h.emit(runUpdated(one, runOne, "failed", "codex"));
         expect(yield* h.stopped).toEqual([]);
         expect(yield* h.reports).toEqual([]);
         yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
