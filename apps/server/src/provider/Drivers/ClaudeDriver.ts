@@ -47,6 +47,10 @@ import { makeManagedServerProvider } from "@infinitus/provider-core/server/manag
 import * as ModelCatalog from "@infinitus/provider-core/server/ModelCatalog";
 import { resolveClaudeModelCatalog } from "../ClaudeModelCatalog.ts";
 import {
+  makeClaudeCodeModelRoutes,
+  resolveClaudeModelSettingsKey,
+} from "../ClaudeCodeModelRoutes.ts";
+import {
   defaultProviderContinuationIdentity,
   type ProviderDriver,
   type ProviderInstance,
@@ -167,10 +171,30 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
     });
 
     const scopedLimitNames = yield* makeClaudeScopedLimitNames;
+<<<<<<< HEAD
     // Fork (#648, #1627): resume-on-limit reads the adapter's rejected
     // windows through this service when the server provides it; a registry
     // built without it (tests, tools) gets an adapter that reports none.
     const limitStops = yield* Effect.serviceOption(InfinitusLimitStops);
+=======
+    // The SDK's user source is the host's home, not a custom one; same rule as the adapter.
+    const customHome =
+      effectiveConfig.homePath.trim().length > 0 ||
+      processEnv.CLAUDE_CONFIG_DIR !== (yield* HostProcess.Environment).CLAUDE_CONFIG_DIR;
+    // Only a successful probe records routes, so a failed one never sends turns back to slugs
+    // the backend rejects.
+    const modelRoutes = yield* makeClaudeCodeModelRoutes(
+      (cwd) =>
+        resolveClaudeModelSettingsKey(
+          customHome ? ["project", "local"] : ["user", "project", "local"],
+          cwd,
+        ).pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
+        ),
+      stateDir,
+    );
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
     const orchestrationAdapter = yield* createClaudeAdapterV2(
       {
         instanceId,
@@ -187,6 +211,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           ? { onUsageLimitRefusal: limitStops.value.reportRefusal }
           : {}),
         modelCatalog,
+        routeModelCatalog: modelRoutes.route,
       },
     ).pipe(
       Effect.mapError(
@@ -203,6 +228,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       effectiveConfig,
       processEnv,
       modelCatalog,
+      modelRoutes.route,
     );
 
     // Per-instance capabilities cache: keyed on binary + resolved HOME so
@@ -221,7 +247,12 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
               })),
             ),
           ),
-          Effect.tap(({ capabilities }) => Ref.set(lastGoodCapabilities, capabilities)),
+          Effect.tap(({ capabilities }) =>
+            Ref.set(lastGoodCapabilities, capabilities).pipe(
+              Effect.andThen(modelRoutes.record(capabilities.models ?? [])),
+            ),
+          ),
+          Effect.ensuring(modelRoutes.settle),
           Effect.catch((error) =>
             Ref.getAndSet(lastGoodCapabilities, undefined).pipe(
               Effect.flatMap((capabilities) =>
@@ -303,6 +334,8 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           Effect.map(stampIdentity),
         ),
       ),
+      // Disabled, failed version checks and interruption never reach the probe.
+      Effect.ensuring(modelRoutes.settle),
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       Effect.provideService(FileSystem.FileSystem, fileSystem),
       Effect.provideService(Path.Path, path),
@@ -351,6 +384,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
     const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = Effect.fn(
       "ClaudeDriver.consumeResetCredit",
     )(
+<<<<<<< HEAD
       function* (creditId?: string) {
         const current = yield* snapshot.getSnapshot;
         const credits = current.usageLimits?.resetCredits;
@@ -359,6 +393,17 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           creditId === undefined
             ? credits?.nextCreditId
             : credits?.kinds?.find((kind) => kind.nextCreditId === creditId)?.nextCreditId;
+=======
+      function* (creditId) {
+        const current = yield* snapshot.getSnapshot;
+        const credits = current.usageLimits?.resetCredits;
+        const grantId =
+          creditId === undefined
+            ? credits?.nextCreditId
+            : credits?.options?.some((option) => option.creditId === creditId)
+              ? creditId
+              : undefined;
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
         if (!grantId || !current.version) return "noCredit" as const;
         const version = current.version;
         // Keyed per grant too, so a retried request id is never sent for a different grant.
@@ -385,6 +430,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           }),
       ),
       Effect.tap((outcome) =>
+<<<<<<< HEAD
         Effect.gen(function* () {
           const before = (yield* snapshot.getSnapshot).usageLimits?.checkedAt;
           yield* invalidateCaches;
@@ -404,6 +450,26 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
             });
           }
         }),
+=======
+        ResetCreditCoordinator.refreshAfterRedemption({
+          outcome,
+          getSnapshot: snapshot.getSnapshot,
+          refresh: Cache.invalidateAll(capabilitiesProbeCache).pipe(
+            Effect.andThen(snapshot.refresh),
+          ),
+        }).pipe(
+          Effect.filterOrFail(
+            (confirmed) => confirmed,
+            () =>
+              new ProviderDriverError({
+                driver: DRIVER_KIND,
+                instanceId,
+                detail:
+                  "The reset was applied, but Claude could not confirm the new limits. Refresh to check.",
+              }),
+          ),
+        ),
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
       ),
     );
 

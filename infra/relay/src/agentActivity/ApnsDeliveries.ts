@@ -1,5 +1,6 @@
 import type {
   RelayAgentActivityAggregateState,
+  RelayAgentActivityState,
   RelayAgentAwarenessPreferences,
   RelayDeliveryKind,
   RelayDeliveryResult,
@@ -19,11 +20,12 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 import {
+  isExpiredAgentActivityState,
   notificationForActivity,
   sanitizeAgentActivityAggregateState,
   sanitizeApnsNotificationPayload,
 } from "./agentActivityPayloads.ts";
-import { makeAggregateState } from "./agentActivityAggregate.ts";
+import { makeAggregateState, statusForPhase } from "./agentActivityAggregate.ts";
 import * as Apns from "./ApnsClient.ts";
 import {
   ApnsDeliveryJobLiveActivityAggregateMissing,
@@ -185,6 +187,7 @@ function shouldUpdateLiveActivity(input: {
   );
 }
 
+<<<<<<< HEAD
 // Restart replays of old completions must not ring again.
 
 /** The thread whose state a publish carries. The alert push has no transition
@@ -197,15 +200,21 @@ export interface PublishedThreadRef {
 }
 
 function notificationForAggregate(input: {
+=======
+// Aggregate rows may belong to unrelated threads; fallback pushes use the published state.
+function notificationForState(input: {
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
   readonly target: LiveActivities.TargetRow;
-  readonly aggregate: RelayAgentActivityAggregateState | null;
+  readonly state?: RelayAgentActivityState | null;
   readonly nowMs: number;
   readonly publishedThread?: PublishedThreadRef | null;
 }): ApnsNotificationPayload | null {
-  if (!input.target.push_token || input.aggregate === null) {
+  const state = input.state;
+  if (!input.target.push_token || !state || isExpiredAgentActivityState(state, input.nowMs)) {
     return null;
   }
   const preferences = parsePreferences(input.target.preferences_json);
+<<<<<<< HEAD
   if (!preferences?.notificationsEnabled) {
     return null;
   }
@@ -221,6 +230,10 @@ function notificationForAggregate(input: {
   }
   if (!shouldAlertForActivity({ ...activity, preferences, nowMs: input.nowMs })) return null;
   return notificationForActivity(activity);
+=======
+  if (!shouldAlertForActivity({ ...state, preferences, nowMs: input.nowMs })) return null;
+  return notificationForActivity({ ...state, status: statusForPhase(state.phase) });
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
 }
 
 // Suppressed Live Activity updates must not fall back to alert pushes or unchanged replays would ring.
@@ -295,6 +308,7 @@ function chooseLiveActivityDelivery(input: {
 function chooseDelivery(input: {
   readonly target: LiveActivities.TargetRow;
   readonly aggregate: RelayAgentActivityAggregateState | null;
+  readonly state?: RelayAgentActivityState | null;
   readonly nowMs: number;
   readonly replay?: boolean;
   readonly publishedThread?: PublishedThreadRef | null;
@@ -306,7 +320,7 @@ function chooseDelivery(input: {
   if (liveActivityDelivery) {
     return liveActivityDelivery;
   }
-  const notification = input.replay ? null : notificationForAggregate(input);
+  const notification = input.replay ? null : notificationForState(input);
   return notification && input.target.push_token
     ? {
         kind: "push_notification",
@@ -501,13 +515,10 @@ export class ApnsDeliveries extends Context.Service<
     readonly sendForTarget: (input: {
       readonly target: LiveActivities.TargetRow;
       readonly aggregate: RelayAgentActivityAggregateState | null;
+      readonly state?: RelayAgentActivityState | null;
       readonly nowMs: number;
       readonly replay?: boolean;
       readonly publishedThread?: PublishedThreadRef | null;
-    }) => Effect.Effect<RelayDeliveryResult | null, ApnsDeliveryError>;
-    readonly sendPushNotificationForTarget: (input: {
-      readonly target: LiveActivities.TargetRow;
-      readonly aggregate: RelayAgentActivityAggregateState | null;
     }) => Effect.Effect<RelayDeliveryResult | null, ApnsDeliveryError>;
     readonly sendLiveActivity: (
       input: SendLiveActivityDeliveryInput,
@@ -1037,28 +1048,9 @@ const make = Effect.gen(function* () {
     sendLiveActivity,
     sendPushNotification,
     processSignedJob,
-    sendPushNotificationForTarget: Effect.fnUntraced(function* (input) {
-      if (!config.apns) return null;
-      const now = yield* DateTime.now;
-      const notification = notificationForAggregate({
-        target: input.target,
-        aggregate: input.aggregate,
-        nowMs: now.epochMilliseconds,
-      });
-      const token = input.target.push_token;
-      return yield* notification && token
-        ? deliveryQueue.enqueuePushNotification({
-            userId: input.target.user_id,
-            deviceId: input.target.device_id,
-            token,
-            bundleId: input.target.bundle_id,
-            apsEnvironment: input.target.aps_environment,
-            notification,
-          })
-        : Effect.succeed(null);
-    }),
     sendForTarget: Effect.fnUntraced(function* (input) {
       if (!config.apns) return null;
+<<<<<<< HEAD
       const delivery = chooseDelivery({
         target: input.target,
         aggregate: input.aggregate,
@@ -1066,6 +1058,9 @@ const make = Effect.gen(function* () {
         replay: input.replay ?? false,
         publishedThread: input.publishedThread ?? null,
       });
+=======
+      const delivery = chooseDelivery(input);
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
       if (!delivery) {
         return null;
       }
@@ -1080,6 +1075,7 @@ const make = Effect.gen(function* () {
         });
         return result;
       }
+<<<<<<< HEAD
       const notification = input.replay
         ? null
         : notificationForAggregate({
@@ -1088,6 +1084,9 @@ const make = Effect.gen(function* () {
             nowMs: input.nowMs,
             publishedThread: input.publishedThread ?? null,
           });
+=======
+      const notification = input.replay ? null : notificationForState(input);
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
       // Use the end alert only when no companion notification will ring, preserving feedback for Live-Activity-only users.
       const alert = input.replay
         ? null

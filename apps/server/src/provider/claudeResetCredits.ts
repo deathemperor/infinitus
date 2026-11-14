@@ -9,6 +9,7 @@ import * as NodeCrypto from "node:crypto";
 
 import type {
   ProviderConsumeResetCreditOutcome,
+  ServerProviderResetCreditOption,
   ServerProviderResetCredits,
 } from "@infinitus/contracts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
@@ -58,6 +59,7 @@ export function claudeKeychainService(configDirEnv: string | undefined): string 
 }
 
 const Credentials = Schema.Struct({
+<<<<<<< HEAD
   claudeAiOauth: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -65,6 +67,16 @@ const Credentials = Schema.Struct({
         expiresAt: Schema.optional(Schema.NullOr(Schema.Number)),
       }),
     ),
+=======
+  claudeAiOauth: Schema.optional(Schema.Struct({ accessToken: Schema.optional(Schema.String) })),
+});
+const Config = Schema.Struct({
+  oauthAccount: Schema.optional(
+    Schema.Struct({
+      organizationUuid: Schema.optional(Schema.String),
+      accountUuid: Schema.optional(Schema.Unknown),
+    }),
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
   ),
 });
 const decodeCredentials = Schema.decodeUnknownOption(Schema.fromJsonString(Credentials));
@@ -77,11 +89,17 @@ const Grant = Schema.Struct({
   ends_at: Schema.optional(Schema.NullOr(Schema.String)),
   paused: Schema.optional(Schema.Boolean),
   usable_now: Schema.optional(Schema.Boolean),
+<<<<<<< HEAD
   use_requires_limit: Schema.optional(Schema.Boolean),
   type: Schema.optional(Schema.NullOr(Schema.String)),
   clears: Schema.optional(Schema.NullOr(Schema.Array(Schema.String))),
   gives_back_weekly: Schema.optional(Schema.NullOr(Schema.Boolean)),
   unavailable_reason: Schema.optional(Schema.NullOr(Schema.String)),
+=======
+  clears: Schema.optional(Schema.Array(Schema.Unknown)),
+  type: Schema.optional(Schema.Unknown),
+  gives_back_weekly: Schema.optional(Schema.Boolean),
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
 });
 const decodeGrant = Schema.decodeUnknownOption(Grant);
 type Grant = typeof Grant.Type;
@@ -182,6 +200,7 @@ const isoFuture = (value: string | null | undefined, nowMs: number): string | un
   return DateTime.formatIso(dt.value);
 };
 
+<<<<<<< HEAD
 const isPast = (value: string | null | undefined, nowMs: number): boolean => {
   if (!value) return false;
   const dt = DateTime.make(value);
@@ -194,6 +213,33 @@ const isPast = (value: string | null | undefined, nowMs: number): boolean => {
  * says why, so a client shows the balance and waits the button instead of spending a click on
  * `not_limited`.
  */
+=======
+// Claude Code's own grouping: a grant that gives back weekly usage is a Fable reset, else its
+// declared type, else what it clears.
+const RESET_KINDS = {
+  session: { label: "5-hour reset", description: "Refills your 5-hour limit." },
+  weekly: { label: "Weekly reset", description: "Refills your weekly limit." },
+  fable: {
+    label: "Fable reset",
+    description:
+      "Refills your Fable allowance and gives back what Fable used on your weekly limit. It doesn't reset your whole week.",
+  },
+  full: { label: "Full reset", description: "Refills your 5-hour and weekly limits." },
+} as const;
+type ResetKind = keyof typeof RESET_KINDS;
+
+const grantKind = (grant: typeof Grant.Type): ResetKind => {
+  if (grant.gives_back_weekly) return "fable";
+  if (grant.type === "session" || grant.type === "weekly" || grant.type === "full") {
+    return grant.type;
+  }
+  const clears = grant.clears ?? [];
+  const session = clears.includes("five_hour");
+  const other = clears.some((limit) => limit !== "five_hour");
+  return session && !other ? "session" : other && !session ? "weekly" : "full";
+};
+
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
 export function claudeResetCreditsToContract(
   block: unknown,
   nowMs: number,
@@ -203,6 +249,7 @@ export function claudeResetCreditsToContract(
   const status = parsed.value;
   const live = (status.grants ?? [])
     .flatMap((raw) => Option.toArray(decodeGrant(raw)))
+<<<<<<< HEAD
     .filter((grant) => !grant.paused && !isPast(grant.ends_at, nowMs));
   const next = live.find((grant) => grant.id === status.next_grant_id);
   const cooldownUntil = isoFuture(status.cooldown_until, nowMs);
@@ -230,6 +277,47 @@ export function claudeResetCreditsToContract(
     ...(live.some(namesKind)
       ? { kinds: creditKinds(live, status.at_limit === true, cooldownUntil, nowMs) }
       : {}),
+=======
+    .filter(
+      (grant) =>
+        !grant.paused &&
+        grant.usable_now &&
+        (grant.ends_at == null || isFutureTimestamp(grant.ends_at, nowMs)),
+    );
+  const next = live.find((grant) => grant.id === parsed.value.next_grant_id);
+  const expiresAt = (grant: typeof Grant.Type | undefined) => {
+    const at = grant?.ends_at ? DateTime.make(grant.ends_at) : Option.none();
+    return Option.isSome(at) ? DateTime.formatIso(at.value) : undefined;
+  };
+  const byKind = new Map<ResetKind, Array<typeof Grant.Type>>();
+  for (const grant of live) {
+    if (grant.resets_left === 0) continue;
+    const kind = grantKind(grant);
+    byKind.set(kind, [...(byKind.get(kind) ?? []), grant]);
+  }
+  const options = (Object.keys(RESET_KINDS) as Array<ResetKind>).flatMap(
+    (kind): Array<ServerProviderResetCreditOption> => {
+      const grants = byKind.get(kind);
+      const target = grants?.[0];
+      if (!grants || !target) return [];
+      const optionExpiresAt = expiresAt(target);
+      return [
+        {
+          creditId: target.id,
+          ...RESET_KINDS[kind],
+          availableCount: grants.reduce((sum, grant) => sum + grant.resets_left, 0),
+          ...(optionExpiresAt ? { expiresAt: optionExpiresAt } : {}),
+        },
+      ];
+    },
+  );
+  const nextExpiresAt = expiresAt(next);
+  return {
+    availableCount: next ? live.reduce((sum, grant) => sum + grant.resets_left, 0) : 0,
+    ...(nextExpiresAt ? { nextExpiresAt } : {}),
+    ...(next ? { nextCreditId: next.id } : {}),
+    ...(next ? { options } : {}),
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
   };
 }
 
@@ -372,6 +460,7 @@ export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
   Effect.orElseSucceed(() => undefined),
 );
 
+<<<<<<< HEAD
 /**
  * The organization the claim is posted to, from the token's own profile
  * rather than `.claude.json`: an account engine that swaps the live login
@@ -385,6 +474,12 @@ const readOrganization = Effect.fn("readClaudeOrganization")(function* (
   const client = yield* HttpClient.HttpClient;
   const response = yield* client.execute(
     HttpClientRequest.get(`${API_BASE}/api/oauth/profile`).pipe(withClaudeHeaders(token, version)),
+=======
+export const readClaudeOauthAccount = (accountConfigPath: string) =>
+  readJson(Config, accountConfigPath).pipe(
+    Effect.map((config) => config.oauthAccount),
+    Effect.orElseSucceed(() => undefined),
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
   );
   if (response.status === 401 || response.status === 403) {
     return yield* new ClaudeResetCreditError({ reason: "signedOut" });
@@ -397,7 +492,15 @@ const readOrganization = Effect.fn("readClaudeOrganization")(function* (
   return profile.organization?.uuid?.trim() || undefined;
 });
 
+<<<<<<< HEAD
 /** The CLI keeps the account record beside its settings, or in the home directory by default. */
+=======
+export const readClaudeOrganizationId = (accountConfigPath: string) =>
+  readClaudeOauthAccount(accountConfigPath).pipe(
+    Effect.map((account) => account?.organizationUuid?.trim() || undefined),
+  );
+
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
 export const claudeAccountConfigPath = Effect.fn("claudeAccountConfigPath")(function* (
   configDir: string | undefined,
 ) {

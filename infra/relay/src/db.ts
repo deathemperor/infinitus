@@ -56,6 +56,7 @@ export const NeonDatabase = Effect.gen(function* () {
   const orgId = yield* Config.NonEmptyString("NEON_ORG_ID").pipe(Config.option);
   const project =
     mode === "shared-database"
+<<<<<<< HEAD
       ? yield* Neon.Project("RelayNeonProject", {
           name: "infinitus-relay",
           region: "aws-ap-southeast-1",
@@ -64,6 +65,14 @@ export const NeonDatabase = Effect.gen(function* () {
           historyRetentionSeconds: 21600,
           ...(Option.isSome(orgId) ? { orgId: orgId.value } : {}),
           migrations,
+=======
+      ? yield* Planetscale.PostgresDatabase("RelayPostgresDatabase", {
+          name: "t3coderelay",
+          region: { slug: "us-west" },
+          clusterSize: "PS_160",
+          migrations: { dir: schema.out, table: "relay_migrations" },
+          replicas: 2,
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
         }).pipe(RemovalPolicy.retain())
       : yield* Neon.Project.ref("RelayNeonProject", { stage: "prod" });
   const branch =

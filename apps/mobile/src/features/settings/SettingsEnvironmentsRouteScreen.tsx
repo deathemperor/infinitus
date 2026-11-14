@@ -4,7 +4,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { managedRelaySessionAtom } from "@infinitus/client-runtime/relay";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { useRef, useState } from "react";
-import { RefreshControl } from "react-native";
+import { RefreshControl } from "../../components/ui/RefreshControl";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SettingsScreen } from "./components/SettingsScreen";

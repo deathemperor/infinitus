@@ -180,7 +180,12 @@ project crumb.
 The Projects category, under Code, holds the project's name, icon, actions,
 checkouts and removal. Actions belong to a project: editing them creates the project's own list
 on each selected environment, and reset returns to the environment's shared list. A project's
+<<<<<<< HEAD
 `infinitus.json` actions can be imported there.
+=======
+`t3.json` actions can be imported there. When a project has several checkouts on one environment,
+choose one in the scope line at the top to see or change only that checkout's settings.
+>>>>>>> upstream-sync-8a45c51d8b-upstream-renamed
 
 Settings a repository can also declare in `infinitus.json`, such as the workspace for new threads,
 resolve in one order: a project override, then the environment setting, then `infinitus.json`, then the
@@ -233,8 +238,9 @@ manually. Custom applies separate worktree rules to the selected project or chec
 captures and log retention remain machine-wide.
 
 Worktrees can be removed after a chosen number of inactive days, after a thread settles, after
-merging, or when they have no commits beyond the default branch. Set settled retention to 0 days
-to remove a worktree at the next cleanup after settlement. In repositories without remotes,
+merging, or when they have no commits beyond the default branch and their thread is settled or
+archived. Set settled retention to 0 days to remove a worktree at the next cleanup after
+settlement. In repositories without remotes,
 unchanged-worktree cleanup compares against the branch checked out in the project workspace;
 if that checkout has a detached HEAD, the worktree is kept. Only Infinitus-managed worktrees are eligible.
 Active sessions and shared worktrees prevent removal. **Keep worktrees with local changes** defaults
@@ -254,6 +260,15 @@ Existing prompts for deleting a worktree manually remain available when this pol
 Choose **Delete now** to run the enabled rules immediately. The latest results show which
 worktrees were removed or kept and why, plus any failures.
 Results also list folders in the worktree folder that no thread uses, with their sizes; cleanup never removes them, so remove them manually if you want.
+
+The inactive and settled retention periods also apply to the folders of
+[threads without a project](./thread-sidebar.md#start-without-a-project). Those folders are not
+Git repositories, so their files are deleted with them and cannot be recovered; the thread stays,
+and its next turn starts in a new, empty folder. A folder is kept when it has a Git repository
+anywhere inside it or when its thread has an enabled scheduled task. Every file in such a folder
+counts as untracked, so only **Edited tracked files** removes a folder that holds anything other
+than `node_modules`; the other two rules remove only empty folders. Folders that no thread uses
+are listed here too.
 
 Browser captures and rotated logs have separate retention periods. Expired capture links stop
 working. Current logs, message attachments, and browser profiles are kept.
