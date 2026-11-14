@@ -328,10 +328,8 @@ const SUMMARY: Record<PullRequestWatchChange["kind"], string> = {
   "merge-queue-removed": "removed from merge queue",
 };
 
-const WATCHING_CLOSING =
-  `Look into each item and act on it as your task requires. This PR stays linked and watched, so do not link, watch, or list it again. End your turn when you are done, and ${PRODUCT_NAME} wakes you on the next change. When you hand the work back to the user, call unwatch_pull_request first so the thread returns to their inbox.`;
-const WATCHING_CLOSING_PLURAL =
-  `Look into each item and act on it as your task requires. Each PR ${PRODUCT_NAME} still watches stays linked and watched, so do not link, watch, or list them again. End your turn when you are done, and ${PRODUCT_NAME} wakes you on the next change. When you hand the work back to the user, call unwatch_pull_request for each first so the thread returns to their inbox.`;
+const WATCHING_CLOSING = `Look into each item and act on it as your task requires. This PR stays linked and watched, so do not link, watch, or list it again. End your turn when you are done, and ${PRODUCT_NAME} wakes you on the next change. When you hand the work back to the user, call unwatch_pull_request first so the thread returns to their inbox.`;
+const WATCHING_CLOSING_PLURAL = `Look into each item and act on it as your task requires. Each PR ${PRODUCT_NAME} still watches stays linked and watched, so do not link, watch, or list them again. End your turn when you are done, and ${PRODUCT_NAME} wakes you on the next change. When you hand the work back to the user, call unwatch_pull_request for each first so the thread returns to their inbox.`;
 
 export interface PullRequestWatchWake {
   readonly text: string;

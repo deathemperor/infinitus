@@ -1383,7 +1383,15 @@ export const make = Effect.gen(function* () {
     const resolved = yield* resolveTranscriptDirs(settings, retentionCutoffMs, false).pipe(
       Effect.provideContext(readerContext),
     );
-    const dirs = yield* collectDirs(resolved, cutoff, settings, retentionCutoffMs, false, false, true);
+    const dirs = yield* collectDirs(
+      resolved,
+      cutoff,
+      settings,
+      retentionCutoffMs,
+      false,
+      false,
+      true,
+    );
     const sessions: StatsSession[] = [];
     const sources: UsageSource[] = [];
     const cwds = new Set<string>();

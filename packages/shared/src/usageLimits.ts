@@ -776,6 +776,7 @@ export interface ResetCreditChoice {
   readonly input: ProviderConsumeResetCreditInput;
 }
 
+/** @public Upstream's per-kind redeem; the fork's clients render `kinds` instead. */
 export function resetCreditChoices(
   credits: ServerProviderResetCredits,
   input: ProviderConsumeResetCreditInput,

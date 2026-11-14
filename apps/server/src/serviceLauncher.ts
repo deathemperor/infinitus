@@ -932,7 +932,9 @@ export class Launcher {
       const lock = await tryAcquireSqliteLock(lockPath);
       if (lock !== undefined) return lock;
       if (attempt >= LOCK_ATTEMPTS) {
-        throw new Error(`Another ${PRODUCT_NAME} service launcher still runs for this ${PRODUCT_NAME} home.`);
+        throw new Error(
+          `Another ${PRODUCT_NAME} service launcher still runs for this ${PRODUCT_NAME} home.`,
+        );
       }
       await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
     }

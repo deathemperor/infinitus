@@ -236,7 +236,9 @@ const connectDeviceRevokeCommand = Command.make("revoke", {
 );
 
 const connectDeviceCommand = Command.make("connect-device").pipe(
-  Command.withDescription(`Approve and revoke devices that reach this host through ${CONNECT_NAME}.`),
+  Command.withDescription(
+    `Approve and revoke devices that reach this host through ${CONNECT_NAME}.`,
+  ),
   Command.withSubcommands([
     connectDeviceListCommand,
     connectDeviceApproveCommand,

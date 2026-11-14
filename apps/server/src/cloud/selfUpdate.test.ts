@@ -613,7 +613,13 @@ it.layer(NodeServices.layer)("pruning runtimes on start", (it) => {
         ? path.join(tempDir, "alias-home")
         : baseDir;
       if (input.servicePlistThroughLink) yield* fs.symlink(realHome, programHome);
-      const program = path.join(programHome, "runtime", "versions", input.servicePlistStarts, "infinitus");
+      const program = path.join(
+        programHome,
+        "runtime",
+        "versions",
+        input.servicePlistStarts,
+        "infinitus",
+      );
       yield* fs.writeFileString(
         path.join(agentsDir, "com.t3tools.t3code.service.plist"),
         `<plist><dict>\n<key>ProgramArguments</key>\n<array>\n<string>${program}</string>\n<string>__service-launcher</string>\n</array>\n</dict></plist>\n`,

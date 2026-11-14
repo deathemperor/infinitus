@@ -181,10 +181,7 @@ describe("ssh tunnel scripts", () => {
       script,
       "T3_RELEASE_BASE_URL='https://github.com/deathemperor/infinitus/releases/download'",
     );
-    assert.include(
-      script,
-      'T3_ARCHIVE="infinitus-$T3_ARCHIVE_VERSION-$T3_PLATFORM_KEY.tar.gz"',
-    );
+    assert.include(script, 'T3_ARCHIVE="infinitus-$T3_ARCHIVE_VERSION-$T3_PLATFORM_KEY.tar.gz"');
     assert.include(script, '"$T3_STAGING/infinitus" --version');
     assert.include(script, 'exec "$T3_RUNTIME_DIR/infinitus" "$@"');
   });
@@ -347,7 +344,10 @@ describe("ssh tunnel scripts", () => {
           assert.include(result.stderr, "download attempt");
           // A bare curl error does not tell the user that t3 itself could not be downloaded.
           assert.include(result.stderr, ARCHIVE.archiveVersion);
-          assert.include(result.stderr, "https://github.com/deathemperor/infinitus/releases/download");
+          assert.include(
+            result.stderr,
+            "https://github.com/deathemperor/infinitus/releases/download",
+          );
         } else {
           assert.notInclude(result.stderr, "download attempt");
           assert.include(result.stderr, "has no Infinitus release archive.");

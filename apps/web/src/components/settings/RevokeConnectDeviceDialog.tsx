@@ -81,8 +81,8 @@ function RevokeConnectDeviceDialogPopup({
       <AlertDialogHeader>
         <AlertDialogTitle>{request.title}</AlertDialogTitle>
         <AlertDialogDescription>
-          Approval for new devices is off, so a revoked device signed in to your {CONNECT_NAME} account
-          can connect again on its own.
+          Approval for new devices is off, so a revoked device signed in to your {CONNECT_NAME}{" "}
+          account can connect again on its own.
         </AlertDialogDescription>
         <label className="mt-2 flex cursor-pointer items-start gap-3">
           <Checkbox
