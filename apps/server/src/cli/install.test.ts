@@ -9,6 +9,7 @@ import * as Path from "effect/Path";
 import * as TestClock from "effect/testing/TestClock";
 
 import packageJson from "../../package.json" with { type: "json" };
+import { posixLauncherScript } from "../cloud/pinnedRuntime.ts";
 import { installCli, isForegroundProcStat, isForegroundPs, offerCliInstall } from "./install.ts";
 
 const VERSION = packageJson.version;
@@ -53,8 +54,13 @@ const setup = Effect.gen(function* () {
   };
 });
 
+<<<<<<< HEAD
 it.layer(NodeServices.layer)("infinitus install", (it) => {
   it.effect("links the running runtime, records it, and never replaces another infinitus", () =>
+=======
+it.layer(NodeServices.layer)("t3 install", (it) => {
+  it.effect("installs the running runtime, records it, and never replaces another t3", () =>
+>>>>>>> upstream-sync-7379f1969b-upstream-renamed
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -64,7 +70,7 @@ it.layer(NodeServices.layer)("infinitus install", (it) => {
       yield* fs.makeDirectory(path.dirname(link), { recursive: true });
       yield* fs.symlink(older, link);
       const installed = yield* provide(installCli());
-      assert.equal(yield* fs.readLink(link), executable);
+      assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
       assert.isFalse(installed.onPath);
       assert.include(installed.pathCommand, "$HOME/bin");
 
@@ -103,30 +109,25 @@ it.layer(NodeServices.layer)("infinitus install", (it) => {
       yield* fs.remove(link);
       yield* fs.symlink(path.join(root, ".t3/bin/infinitus"), link);
       yield* provide(installCli());
-      assert.equal(yield* fs.readLink(link), executable);
+      assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
 
-      // A failed swap over our own link leaves a staging path it did not create alone.
-      yield* fs.remove(link);
-      yield* fs.symlink(older, link);
-      const staging = `${link}.${process.pid}.tmp`;
-      yield* fs.writeFileString(staging, "someone else's\n");
-      const linkFailed = yield* provide(installCli()).pipe(Effect.flip);
-      assert.include(linkFailed.message, "Could not link");
-      assert.equal(yield* fs.readFileString(staging), "someone else's\n");
-      yield* fs.remove(staging);
+      // A script an earlier install wrote is ours too.
+      yield* fs.writeFileString(link, posixLauncherScript(older));
+      yield* provide(installCli());
+      assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
 
       // An empty spot is created exclusively: a file that appears first is kept.
       yield* fs.remove(link);
       const racing = installCli().pipe(
         Effect.provideService(FileSystem.FileSystem, {
           ...fs,
-          symlink: (target, path) =>
+          link: (from, to) =>
             fs
-              .writeFileString(path, "#!/bin/sh\necho raced\n")
-              .pipe(Effect.andThen(fs.symlink(target, path))),
+              .writeFileString(to, "#!/bin/sh\necho raced\n")
+              .pipe(Effect.andThen(fs.link(from, to))),
         }),
       );
-      assert.include((yield* provide(racing).pipe(Effect.flip)).message, "Could not link");
+      assert.include((yield* provide(racing).pipe(Effect.flip)).message, "Could not write");
       assert.equal(yield* fs.readFileString(link), "#!/bin/sh\necho raced\n");
       yield* fs.remove(link);
 
@@ -265,6 +266,7 @@ it.layer(NodeServices.layer)("infinitus install", (it) => {
         yield* offer(true);
         assert.equal(asked, 1);
 
+<<<<<<< HEAD
         yield* fs.remove(declined);
         yield* fs.remove(link);
         const waiting = yield* Deferred.make<void>();
@@ -277,6 +279,83 @@ it.layer(NodeServices.layer)("infinitus install", (it) => {
         assert.isTrue(yield* fs.exists(declined));
         assert.isFalse(yield* fs.exists(link));
       }),
+=======
+      // Scripts, CI, sudo, dumb terminals, background jobs, and help never ask.
+      yield* offer(false, { interactive: false });
+      yield* offer(false, { env: { CI: "true" } });
+      yield* offer(false, { env: { SUDO_USER: "theo" } });
+      yield* offer(false, { env: { TERM: "dumb" } });
+      yield* offer(false, { env: { npm_config_yes: "true" } });
+      yield* offer(false, { args: ["--completions", "zsh"] });
+      yield* offer(false, { foreground: false });
+      yield* offer(false, { args: ["connect", "--help"] });
+      yield* offer(false, { args: ["--log-level", "debug", "install"] });
+      yield* offer(false, { args: ["status", "--json"] });
+      yield* offer(false, { args: ["up", "--yes"] });
+      yield* offer(false, { args: ["status", "--json=true"] });
+      const globalBin = path.join(root, "global-bin");
+      yield* fs.makeDirectory(globalBin);
+      yield* fs.writeFileString(path.join(globalBin, "t3"), "");
+      yield* offer(false, { env: { PATH: globalBin } });
+      assert.equal(asked, 0);
+      assert.isFalse(yield* fs.exists(link));
+
+      // A runner's own .bin on PATH is not an installed t3.
+      const npxBin = path.join(npmPackage, "../.bin");
+      const pnpmBin = path.join(root, ".cache/pnpm/dlx/abc/node_modules/.bin");
+      for (const bin of [npxBin, pnpmBin]) {
+        yield* fs.makeDirectory(bin, { recursive: true });
+        yield* fs.writeFileString(path.join(bin, "t3"), "");
+      }
+      assert.isFalse(yield* offer(undefined, { env: { PATH: `${npxBin}:${pnpmBin}` } }));
+      assert.equal(asked, 1);
+      assert.isFalse(yield* fs.exists(path.join(runtimeDir, "install-prompt-declined")));
+      asked = 0;
+
+      // `service install` is not `t3 install`; it still leaves the command unlinked.
+      yield* offer(false, { args: ["service", "install"] });
+      assert.equal(asked, 1);
+      yield* offer(false);
+      assert.equal(asked, 1);
+      assert.isFalse(yield* fs.exists(link));
+
+      yield* fs.writeFileString(path.join(runtimeDir, "install-prompt-declined"), "0.0\n");
+      yield* offer(true);
+      assert.equal(asked, 2);
+      assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
+
+      yield* fs.remove(path.join(runtimeDir, "install-prompt-declined"));
+      yield* offer(true);
+      assert.equal(asked, 2);
+
+      // A yes that cannot install, and no answer at all, also wait for the next minor release.
+      const declined = path.join(runtimeDir, "install-prompt-declined");
+      yield* fs.remove(link);
+      yield* fs.remove(path.join(runtimeDir, "launchers"));
+      yield* fs.writeFileString(link, "#!/bin/sh\necho mine\n");
+      asked = 0;
+      assert.isTrue(yield* offer(true));
+      assert.equal(yield* fs.readFileString(link), "#!/bin/sh\necho mine\n");
+      assert.equal(
+        (yield* fs.readFileString(declined)).trim(),
+        VERSION.split(".").slice(0, 2).join("."),
+      );
+      yield* offer(true);
+      assert.equal(asked, 1);
+
+      yield* fs.remove(declined);
+      yield* fs.remove(link);
+      const waiting = yield* Deferred.make<void>();
+      const unanswered = yield* offer(
+        Effect.andThen(Deferred.succeed(waiting, undefined), Effect.never),
+      ).pipe(Effect.forkChild);
+      yield* Deferred.await(waiting);
+      yield* TestClock.adjust("30 seconds");
+      assert.isTrue(yield* Fiber.join(unanswered));
+      assert.isTrue(yield* fs.exists(declined));
+      assert.isFalse(yield* fs.exists(link));
+    }),
+>>>>>>> upstream-sync-7379f1969b-upstream-renamed
   );
 
   it.effect("reads the terminal's foreground group from /proc and ps", () =>
