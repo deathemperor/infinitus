@@ -10,6 +10,29 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.46
+
+### Mac
+- An account swapd holds as reported-limited now says so on its row, with when it is back.
+- Banked Claude resets are counted and spent per kind, so a Fable reset and a weekly reset each get their own count and menu item.
+- After an app update the account engine always comes back, so account switching never silently stays off.
+
+### Desktop
+- Accounts rows and Usage → Limits show Claude's Fable and weekly resets separately, each with its own Use button.
+- A Codex or other non-Claude thread that runs out of its own credits no longer marks your Claude accounts as spent or swaps through them one after another.
+- Choose the interface language in Settings: Spanish, Chinese, Japanese, Korean, German, French, Brazilian Portuguese and Russian.
+- New Infinitus Connect devices can wait for approval from a device already connected.
+- Agents sign in through Infinitus Connect approval instead of typing a code.
+- Drop a folder on the sidebar to add it as a project.
+- Reply to an assistant message from its hover actions.
+- Messages can be sent while their attachments are still uploading.
+- Stopped provider threads resume natively.
+- Agents can restyle Infinitus with theme colors and CSS when you ask.
+
+### Phone
+- Accounts rows and Usage → Limits show Claude's Fable and weekly resets separately, each redeemable on its own.
+- Choose the settings language.
+
 ## 0.5.0-alpha.45
 
 ### Mac
