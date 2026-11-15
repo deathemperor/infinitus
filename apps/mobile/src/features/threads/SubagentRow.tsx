@@ -4,7 +4,10 @@ import {
   resolveProviderInstanceDisplayName,
   shouldShowInstanceBadge,
 } from "@infinitus/client-runtime/state/provider-instance-display";
-import { resolveSubagentMetadata } from "@infinitus/client-runtime/state/subagent-display";
+import {
+  resolveSubagentMetadata,
+  subagentCardDetail,
+} from "@infinitus/client-runtime/state/subagent-display";
 import { formatSubagentEffort } from "@infinitus/client-runtime/state/thread-execution";
 import type { EnvironmentId, OrchestrationV2Subagent } from "@infinitus/contracts";
 import type { ReactNode } from "react";
@@ -15,7 +18,6 @@ import { SymbolView } from "../../components/ui/AppSymbol";
 import { ProviderIcon, ProviderInstanceIcon } from "../../components/ProviderIcon";
 import { cn } from "../../lib/cn";
 import { useEnvironmentServerConfig, useProject, useThreadShell } from "../../state/entities";
-import { subagentCardDetail } from "./subagent-card-presentation";
 import { SUBAGENT_TONE_TEXT_CLASS, SubagentStatusDot } from "./SubagentStatusDot";
 import { resolveSubagentRowPresentation } from "./threadAgentsPresentation";
 
