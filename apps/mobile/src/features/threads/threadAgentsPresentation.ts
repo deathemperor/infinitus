@@ -1,6 +1,7 @@
 import {
   formatSubagentDisplayTitle,
   resolveSubagentMetadata,
+  subagentCardDetail,
   subagentDetailPreview,
 } from "@infinitus/client-runtime/state/subagent-display";
 import {
@@ -16,8 +17,6 @@ import type {
   ThreadId,
 } from "@infinitus/contracts";
 import { resolveSelectableModel } from "@infinitus/shared/model";
-
-import { subagentCardDetail } from "./subagent-card-presentation";
 
 const PROMPT_TITLE_LIMIT = 80;
 

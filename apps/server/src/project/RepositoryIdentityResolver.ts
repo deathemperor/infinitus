@@ -1,7 +1,7 @@
 import type { RepositoryIdentity, SourceControlProviderError } from "@infinitus/contracts";
 import { parseGitRemoteHost } from "@infinitus/source-control-core/shared/definition";
 import { repositoryPathFromRemoteUrl } from "@infinitus/source-control-core/server/SourceControlProvider";
-import { normalizeGitRemoteUrl } from "@infinitus/shared/git";
+import { canonicalRepositoryPath, normalizeGitRemoteUrl } from "@infinitus/shared/git";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -126,8 +126,9 @@ function repositoryPathOf(canonicalKey: string, remoteUrl: string): string {
   if (displayPath === null) return canonicalPath;
   // A host that names repositories literally keeps the `.git` the display path drops.
   return (
-    [displayPath, `${displayPath}.git`].find((path) => path.toLowerCase() === canonicalPath) ??
-    canonicalPath
+    [displayPath, `${displayPath}.git`].find(
+      (path) => canonicalRepositoryPath(path) === canonicalRepositoryPath(canonicalPath),
+    ) ?? canonicalPath
   );
 }
 

@@ -55,6 +55,7 @@ import {
   squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@infinitus/client-runtime/state/runtime";
+import { readComposerImageBytes } from "./chat/composerAttachmentFiles";
 import { videoMimeType } from "@infinitus/shared/video";
 import {
   appendCodexArtifactTemplateUsePrompt,
@@ -656,7 +657,11 @@ export async function prepareRevertedMessageAttachments(input: {
       if (url === null) throw new Error("The environment returned an invalid attachment URL.");
       const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
       if (!response.ok) throw new Error(`Could not restore attachment: ${attachment.name}`);
-      return new File([await response.blob()], attachment.name, { type: attachment.mimeType });
+      const file = new File([await response.blob()], attachment.name, {
+        type: attachment.mimeType,
+      });
+      if (attachment.type === "image") await readComposerImageBytes(file);
+      return file;
     }),
   );
 }
