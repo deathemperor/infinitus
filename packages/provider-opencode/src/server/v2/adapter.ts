@@ -70,6 +70,8 @@ import * as McpProviderSessions from "@infinitus/provider-core/server/McpProvide
 import { buildRuntimeInstructions } from "@infinitus/provider-core/server/runtimeInstructions";
 import { t3OrchestrationSystemPrompt } from "@infinitus/provider-core/server/orchestrationInstructions";
 import { SKILL_MENTION_PATTERN } from "@infinitus/shared/composerInlineTokens";
+import { HTML_RENDER_TOOL_NAME } from "@infinitus/shared/htmlRender";
+import { htmlRenderFromToolItem } from "@infinitus/shared/toolOutput";
 import { compareSemverVersions } from "@infinitus/shared/semver";
 import * as KeyedLock from "@infinitus/shared/KeyedLock";
 import { getModelSelectionStringOptionValue, modelSelectionsEqual } from "@infinitus/shared/model";
@@ -97,8 +99,16 @@ import {
 import * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
 import { turnScopedSelectionTransition } from "@infinitus/provider-core/server/selectionTransition";
 import { OPENCODE_PROVIDER, openCodePermissionRequestKind } from "../adapter.ts";
+<<<<<<< HEAD
 import { openCodeCommandFailed, openCodeToolTurnItem } from "../toolItems.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import {
+  openCodeCodeModeHtmlRenders,
+  openCodeCommandFailed,
+  openCodeToolTurnItem,
+} from "../toolItems.ts";
+>>>>>>> upstream-sync-b3eeeaac01-upstream-renamed
 
 const NativeGoal = Schema.NullOr(
   Schema.Struct({
@@ -264,6 +274,8 @@ interface ActiveTurn {
   unsent: boolean;
   readonly steers: Set<string>;
   readonly settledInbox: Set<string>;
+  // Reconnects replay finished tools, so each nested html_render takes a page only once.
+  readonly takenPages: Set<string>;
   heldEnd: TurnTerminal | undefined;
   awaitingStart: boolean;
   /** Scope child tool IDs because model-generated IDs can repeat parent IDs. */
@@ -460,6 +472,7 @@ const sameRules = (left: ReadonlyArray<Rule> | undefined, right: ReadonlyArray<R
 
 // Rejection without a message stops the whole execution, meaning Cancel.
 const DECLINED = "The user declined this request.";
+const DISMISSED = "The user dismissed this question. Continue without an answer.";
 
 // Steer before decline; otherwise the model sees only Unable to execute command and retries.
 const declinedNote = (action: string, resources: ReadonlyArray<string>) =>
@@ -1367,28 +1380,52 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
           ? "failed"
           : status;
       yield* emitNode(state, turn, nativeId, "tool_call", settled, startedAt, completedAt);
-      yield* emit({
-        type: "turn_item.updated",
-        driver,
-        turnItem: openCodeToolTurnItem(
-          {
-            ...itemBase(state, turn, nativeId, settled, startedAt, completedAt, updatedAt),
-            ...(result?.nativeTaskId === undefined
-              ? {}
-              : { nativeItemRef: ref(result.nativeTaskId) }),
+      const turnItem = openCodeToolTurnItem(
+        {
+          ...itemBase(state, turn, nativeId, settled, startedAt, completedAt, updatedAt),
+          ...(result?.nativeTaskId === undefined
+            ? {}
+            : { nativeItemRef: ref(result.nativeTaskId) }),
+        },
+        {
+          name: tool.name,
+          input: tool.input,
+          output: result?.output,
+          files: result?.files,
+          completedMetadata:
+            status === "completed" || result?.nativeTaskId !== undefined
+              ? result?.metadata
+              : undefined,
+        },
+      );
+      yield* emit({ type: "turn_item.updated", driver, turnItem });
+      if (status === "running") return;
+      // A script that returns the reference already renders through its own item.
+      const returnedPage =
+        turnItem.type === "dynamic_tool" ? htmlRenderFromToolItem(turnItem) : undefined;
+      const pages = openCodeCodeModeHtmlRenders(
+        result?.metadata,
+        yield* mcpServerNameFor(turn.input.threadId),
+      );
+      for (const { index, input } of pages) {
+        const pageId = `${nativeId}:${HTML_RENDER_TOOL_NAME}:${index}`;
+        if (turn.takenPages.has(pageId)) continue;
+        turn.takenPages.add(pageId);
+        const page = yield* mcpSessions.takeHtmlRender(turn.input.threadId, input);
+        if (page === undefined || page.attachmentId === returnedPage?.attachmentId) continue;
+        yield* emitNode(state, turn, pageId, "tool_call", "completed", startedAt, updatedAt);
+        yield* emit({
+          type: "turn_item.updated",
+          driver,
+          turnItem: {
+            ...itemBase(state, turn, pageId, "completed", startedAt, updatedAt, updatedAt),
+            type: "dynamic_tool",
+            toolName: `t3-code.${HTML_RENDER_TOOL_NAME}`,
+            input: { title: page.title, height: page.height },
+            output: { htmlRender: page },
           },
-          {
-            name: tool.name,
-            input: tool.input,
-            output: result?.output,
-            files: result?.files,
-            completedMetadata:
-              status === "completed" || result?.nativeTaskId !== undefined
-                ? result?.metadata
-                : undefined,
-          },
-        ),
-      });
+        });
+      }
     });
 
     const emitCompaction = Effect.fnUntraced(function* (
@@ -1483,6 +1520,14 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
       yield* emitRetry(state, turn, "running");
     });
 
+    // A background child's question outlives its parent's turn; keep the ingestor from dismissing it.
+    const retainedRequestsOf = (turn: ActiveTurn) => {
+      const ids = [...pending.values()].flatMap((entry) =>
+        entry.turn === turn ? [entry.request.id] : [],
+      );
+      return ids.length === 0 ? {} : { retainedRuntimeRequestIds: ids };
+    };
+
     const emitProviderTurn = (
       state: ThreadState,
       turn: ActiveTurn,
@@ -1494,6 +1539,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
         driver,
         threadId: turn.input.threadId,
         providerTurn,
+        ...(providerTurn.completedAt === null ? {} : retainedRequestsOf(turn)),
       });
     };
 
@@ -1525,6 +1571,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
       unsent: false,
       steers: new Set(),
       settledInbox: new Set(),
+      takenPages: new Set(),
       heldEnd: undefined,
       awaitingStart: options.awaitingStart,
       scope: options.scope,
@@ -2303,6 +2350,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
         providerTurnId: turn.providerTurn.id,
         runOrdinal: turn.input.runOrdinal,
         threadDisposition,
+        ...retainedRequestsOf(turn),
       };
       yield* emit(
         terminal.status === "failed"
@@ -5148,6 +5196,8 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
                   ? client.session.form.cancel({
                       sessionID: entry.sessionId,
                       formID: Form.ID.make(native.id),
+                      // Without a message OpenCode aborts the step, and a background subagent never reports.
+                      ...(asker.subagent === undefined ? {} : { message: DISMISSED }),
                     })
                   : client.session.form.reply({
                       sessionID: entry.sessionId,
