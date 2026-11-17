@@ -82,7 +82,12 @@ vi.mock("../state/use-atom-command", () => ({
         return AsyncResult.failure(Cause.fail(new Error("Server denied the request")));
       }
       state.afterRequest?.(action);
-      return AsyncResult.success(undefined);
+      // Fork: deleteThread reads the removal's saved-work result for its toast.
+      return AsyncResult.success(
+        action === "removeWorktree"
+          ? { branch: null, savedWorkCommit: null, branchDeleted: false }
+          : undefined,
+      );
     },
 }));
 vi.mock("../state/use-atom-query-runner", () => ({
@@ -447,7 +452,8 @@ describe("thread action permissions", () => {
       },
     });
     expect((await useThreadActions().deleteThread(target))._tag).toBe("Success");
-    expect(state.confirm).toHaveBeenCalledOnce();
+    // Fork: after the worktree, a second confirm offers to delete its branch.
+    expect(state.confirm).toHaveBeenCalledTimes(2);
     expect(state.requests.map((request) => request.action)).toEqual([
       "stopSession",
       "delete",
