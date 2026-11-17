@@ -23,7 +23,8 @@
     "@infinitus/provider-core": "workspace:*",
     "@infinitus/shared": "workspace:*",
     "@infinitus/source-control-core": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@effect/graphql-generator": "catalog:",

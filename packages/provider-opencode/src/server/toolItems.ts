@@ -1,4 +1,5 @@
 import type { OrchestrationV2TurnItem } from "@infinitus/contracts";
+import { HTML_RENDER_TOOL_NAME } from "@infinitus/shared/htmlRender";
 import { resolveT3McpToolId } from "@infinitus/shared/t3McpToolPresentation";
 import { formatReadToolLabel, formatSearchToolLabel } from "@infinitus/shared/toolActivity";
 import {
@@ -120,6 +121,26 @@ export function openCodeCommandFailed(toolName: string, completedMetadata: unkno
     exitCode !== undefined &&
     exitCode !== 0
   );
+}
+
+/** Code Mode reports nested calls with their input but no result, so pages are found by input. */
+export function openCodeCodeModeHtmlRenders(
+  completedMetadata: unknown,
+  mcpServerName: string,
+): ReadonlyArray<{ readonly index: number; readonly input: Record<string, unknown> }> {
+  if (typeof completedMetadata !== "object" || completedMetadata === null) return [];
+  const toolCalls = (completedMetadata as Record<string, unknown>)["toolCalls"];
+  if (!Array.isArray(toolCalls)) return [];
+  return toolCalls.flatMap((call: unknown, index) => {
+    if (typeof call !== "object" || call === null) return [];
+    const { tool, status, input } = call as Record<string, unknown>;
+    return tool === `${mcpServerName}.${HTML_RENDER_TOOL_NAME}` &&
+      status === "completed" &&
+      typeof input === "object" &&
+      input !== null
+      ? [{ index, input: input as Record<string, unknown> }]
+      : [];
+  });
 }
 
 export function openCodeToolTurnItem(
