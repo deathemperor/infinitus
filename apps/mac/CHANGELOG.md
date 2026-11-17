@@ -10,6 +10,28 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.47
+
+### Desktop
+- Long threads open about 2.5x faster.
+- Typing or answering a question no longer re-renders the whole chat view.
+- Themes can use full-size background images.
+- Theme CSS can hold up to 50,000 characters.
+- Voice input can stream its transcription as you speak.
+- Add-project folder search matches partial names and fuzzy spellings.
+- One busy thread no longer stalls other threads' queued runs or wakes.
+- A failed turn start no longer leaves the thread stuck starting.
+- Turns stuck in provider retries fail after 10 minutes instead of running forever.
+- The first file search after a big folder is added no longer freezes the server.
+- A window whose page keeps crashing reloads with a backoff instead of staying blank.
+- Pull no longer waits behind other repositories' fetches.
+
+### Phone
+- iOS images open in a native viewer.
+- Language moved into General settings.
+- Expanding a live tool call no longer crashes the thread.
+- Long threads no longer jump to the bottom after they appear.
+
 ## 0.5.0-alpha.46
 
 ### Mac
