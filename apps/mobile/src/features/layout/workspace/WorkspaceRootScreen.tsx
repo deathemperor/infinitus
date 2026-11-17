@@ -1,5 +1,7 @@
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { WorkspaceNoTabs } from "./WorkspaceNoTabs";
+import { isSharedSlotTab } from "./navigation-tab-order";
+import { SharedSlotTitle } from "./SharedSlotTitle";
 import { WORKSPACE_TAB_LABELS, useEnabledNavigationTabs } from "./navigation-tabs";
 import { WorkspaceExtraTab } from "./WorkspaceExtraTab";
 import { WorkspaceSettingsList } from "../../settings/SettingsRouteScreen";
@@ -28,6 +30,7 @@ import { HomeRouteScreen } from "../../home/HomeRouteScreen";
 import { WorkspaceConnectionTitle } from "../../home/WorkspaceConnectionTitle";
 import { useAdaptiveWorkspaceLayout } from "../AdaptiveWorkspaceLayout";
 import { PullRequestsScreen } from "../../pull-requests/PullRequestsScreen";
+import { IssuesScreen } from "../../issues/IssuesScreen";
 import {
   WorkspaceTabsContext,
   WorkspaceTabsProvider,
@@ -60,7 +63,17 @@ function WorkspaceRootTitle(props: {
   return (
     <View style={{ width: maxWidth, minHeight: 32, justifyContent: "center" }}>
       <WorkspaceConnectionTitle
+<<<<<<< HEAD
         brand={<CompactBrandTitle accessibilityLabel={`${PRODUCT_NAME}, ${tabTitle}`} fit />}
+=======
+        brand={
+          !settingsOpen && isSharedSlotTab(state.selectedTab) ? (
+            <SharedSlotTitle tab={state.selectedTab} />
+          ) : (
+            <CompactBrandTitle accessibilityLabel={`T3 Code, ${tabTitle}`} fit />
+          )
+        }
+>>>>>>> upstream-sync-5842231421-upstream-renamed
         maxWidth={maxWidth}
         onPress={props.onOpenEnvironments}
       />
@@ -162,6 +175,8 @@ function WorkspaceRootContent() {
             <HomeRouteScreen />
           ) : state.selectedTab === "pullRequests" ? (
             <PullRequestsScreen />
+          ) : state.selectedTab === "issues" ? (
+            <IssuesScreen />
           ) : (
             <WorkspaceExtraTab tab={state.selectedTab} />
           )}
@@ -170,8 +185,7 @@ function WorkspaceRootContent() {
           <WorkspaceSidebarTabs />
         ) : null}
         {enabled.length === 0 && !settingsOpen ? null : settingsOpen ||
-          state.selectedTab === "threads" ||
-          state.selectedTab === "pullRequests" ? (
+          state.selectedTab !== "usage" ? (
           <WorkspaceToolbar sidebar={sidebarNavigation} onNewTask={startNewTask} />
         ) : (
           <WorkspaceSectionToolbar onNewTask={startNewTask} showCompose={false} />

@@ -236,10 +236,21 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
           ]
         : [`Make sure ${host} is awake and online.`, checkHost];
     case "server":
+<<<<<<< HEAD
       return [
         `Make sure ${PRODUCT_NAME} is running on ${host}.`,
         "Retry. If it keeps failing, copy the diagnostics.",
       ];
+=======
+      return failure?.reason === "authentication"
+        ? [
+            `This device's sign-in to ${host} expired or was revoked. Pair it again with a new pairing link from ${host}.`,
+          ]
+        : [
+            `Make sure T3 Code is running on ${host}.`,
+            "Retry. If it keeps failing, copy the diagnostics.",
+          ];
+>>>>>>> upstream-sync-5842231421-upstream-renamed
   }
 }
 

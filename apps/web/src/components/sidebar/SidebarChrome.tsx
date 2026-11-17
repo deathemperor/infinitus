@@ -14,7 +14,12 @@ import {
 } from "../../navigationHistory";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { cn } from "../../lib/utils";
+<<<<<<< HEAD
 import { usePullRequestsSupported } from "../../state/environments";
+=======
+import { useIssuesSupported, usePullRequestsSupported } from "../../state/environments";
+import { InfinitusWordmark } from "../InfinitusWordmark";
+>>>>>>> upstream-sync-5842231421-upstream-renamed
 import {
   resolveEnvironmentIdentificationPillLabel,
   SidebarStageBackdrop,
@@ -33,7 +38,12 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+<<<<<<< HEAD
 import { InfinitusSidebarUtilityItems } from "./InfinitusSidebarUtilityItems";
+=======
+import { readIssueListPreferences } from "../issue/issueListPreferences";
+import { IssueGlyph } from "../issue/issuePresentation";
+>>>>>>> upstream-sync-5842231421-upstream-renamed
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
@@ -213,6 +223,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
   const pullRequestsSupported = usePullRequestsSupported();
+  const issuesSupported = useIssuesSupported();
   const closeMobileSidebar = () => {
     if (isMobile) {
       setOpenMobile(false);
@@ -224,6 +235,10 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
       to: "/pull-requests",
       search: readPullRequestListPreferences(),
     });
+  };
+  const handleIssuesClick = () => {
+    closeMobileSidebar();
+    void navigate({ to: "/issues", search: readIssueListPreferences() });
   };
   const handleSettingsClick = () => {
     closeMobileSidebar();
@@ -265,7 +280,17 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               onClick={handlePullRequestsClick}
             />
           ) : null}
+<<<<<<< HEAD
           <InfinitusSidebarUtilityItems onBeforeNavigate={closeMobileSidebar} />
+=======
+          {issuesSupported ? (
+            <SidebarUtilityItem
+              icon={<IssueGlyph.issue />}
+              label="Issues"
+              onClick={handleIssuesClick}
+            />
+          ) : null}
+>>>>>>> upstream-sync-5842231421-upstream-renamed
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
             label="Usage"

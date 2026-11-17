@@ -94,6 +94,8 @@ export class DesktopShellEnvironment extends Context.Service<
     readonly awaitDiscovery: Effect.Effect<boolean>;
     /** Whether the user's own login shell, not a fallback, gave the PATH a new terminal gets. */
     readonly awaitUserShellDiscovery: Effect.Effect<boolean>;
+    /** Whether discovery has settled (the user's shell answered or retries ran out), without waiting. */
+    readonly discoveryFinished: Effect.Effect<boolean>;
     readonly updates: Stream.Stream<DesktopShellEnvironmentSnapshot>;
   }
 >()("@infinitus/desktop/shell/DesktopShellEnvironment") {}
@@ -123,6 +125,7 @@ const LOGIN_SHELL_ENV_NAMES = [
   "NODE_EXTRA_CA_CERTS",
   "T3CODE_TELEMETRY_ENABLED",
   "T3CODE_GITHUB_APP_CLIENT_ID",
+  "T3CODE_RELEASE_BASE_URL",
   "__MISE_DIFF",
   "JAVA_HOME",
 ] as const;
@@ -560,6 +563,7 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
       "JAVA_HOME",
       "T3CODE_TELEMETRY_ENABLED",
       "T3CODE_GITHUB_APP_CLIENT_ID",
+      "T3CODE_RELEASE_BASE_URL",
     ] as const) {
       if (!config.env[name] && shellEnvironment[name]) {
         config.env[name] = shellEnvironment[name];
@@ -663,6 +667,7 @@ const CACHED_ENV_NAMES = [
   "SSL_CERT_FILE",
   "SSL_CERT_DIR",
   "NODE_EXTRA_CA_CERTS",
+  "T3CODE_TELEMETRY_ENABLED",
 ] as const;
 
 /** @public */
@@ -684,6 +689,7 @@ export const make = Effect.gen(function* () {
   const changes = yield* PubSub.unbounded<DesktopShellEnvironmentSnapshot>();
   const latest = yield* Ref.make<Option.Option<DesktopShellEnvironmentSnapshot>>(Option.none());
   const discovered = yield* Deferred.make<ShellDiscovery>();
+  const settledDiscovery = yield* Deferred.make<void>();
   const publish = Effect.fn("desktop.shellEnvironment.publish")(function* (
     patch: ShellEnvironmentPatch,
     discovered = false,
@@ -753,6 +759,7 @@ export const make = Effect.gen(function* () {
             ),
           ),
     ),
+    Effect.onExit(() => Deferred.succeed(settledDiscovery, undefined)),
   );
   const installIntoProcess = yield* Effect.cached(
     Effect.gen(function* () {
@@ -808,6 +815,7 @@ export const make = Effect.gen(function* () {
       Effect.andThen(Deferred.await(discovered)),
       Effect.map(({ fromUserShell }) => fromUserShell),
     ),
+    discoveryFinished: Deferred.isDone(settledDiscovery),
     updates,
   });
 });

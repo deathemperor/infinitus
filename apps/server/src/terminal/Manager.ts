@@ -43,7 +43,7 @@ import { makeKeyedCoalescingWorker } from "@infinitus/shared/KeyedCoalescingWork
 import * as KeyedLock from "@infinitus/shared/KeyedLock";
 import { AgentScope } from "@infinitus/shared/AgentScope";
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import { mergePathEntries } from "@infinitus/shared/shell";
+import { SpawnExecutableResolution, mergePathEntries } from "@infinitus/shared/shell";
 
 import { acpRegistryManagedBinaryDirectories } from "@infinitus/provider-acp-registry/server";
 import { getTerminalLabel } from "@infinitus/shared/terminalLabels";
@@ -603,6 +603,9 @@ function shellCandidateFromCommand(
   if (platform === "win32" && (shellName === "pwsh.exe" || shellName === "powershell.exe")) {
     return { shell: command, args: ["-NoLogo", "-NoExit", "-Command", POWERSHELL_UTF8_SETUP] };
   }
+  if (platform === "win32" && (shellName === "bash.exe" || shellName === "bash")) {
+    return { shell: command, args: ["--login", "-i"] };
+  }
   if (platform !== "win32" && shellName === "zsh") {
     return { shell: command, args: ["-o", "nopromptsp"] };
   }
@@ -653,7 +656,10 @@ const resolveShellCandidates = Effect.fn("terminal.resolveShellCandidates")(func
   shellResolver: () => string,
   platform: NodeJS.Platform,
   env: NodeJS.ProcessEnv,
+  terminalShell: string | undefined,
 ) {
+  // This is an executable path, not a command line; spaces belong to the path.
+  const configured = shellCandidateFromCommand(terminalShell?.trim() || null, platform);
   const requested = shellCandidateFromCommand(
     yield* normalizeShellCommand(shellResolver(), platform),
     platform,
@@ -661,6 +667,7 @@ const resolveShellCandidates = Effect.fn("terminal.resolveShellCandidates")(func
 
   if (platform === "win32") {
     return uniqueShellCandidates([
+      configured,
       requested,
       shellCandidateFromCommand("pwsh.exe", platform),
       shellCandidateFromCommand(windowsPowerShellPath(env), platform),
@@ -672,6 +679,7 @@ const resolveShellCandidates = Effect.fn("terminal.resolveShellCandidates")(func
   }
 
   return uniqueShellCandidates([
+    configured,
     requested,
     shellCandidateFromCommand(yield* normalizeShellCommand(env.SHELL, platform), platform),
     shellCandidateFromCommand("/bin/zsh", platform),
@@ -1783,6 +1791,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   const platform = yield* HostProcess.Platform;
   const architecture = yield* HostProcess.Architecture;
   const agentScope = yield* AgentScope;
+  const resolveExecutable = yield* SpawnExecutableResolution;
   // Inherit the full environment minus createTerminalSpawnEnv's blocklist; allowlists silently drop user tooling variables.
   const baseEnv = options.env ?? process.env;
   const environment = yield* Effect.serviceOption(ServerEnvironment);
@@ -2734,8 +2743,41 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       );
     }
 
+    // PATH lookup must use the child's working directory, not the server's.
+    const lookupEnv =
+      platform === "win32"
+        ? spawnEnv
+        : {
+            ...spawnEnv,
+            PATH: (spawnEnv.PATH ?? spawnEnv.Path ?? spawnEnv.path ?? "")
+              .split(":")
+              // An empty entry means the working directory, which resolve("") yields.
+              .map((entry) => path.resolve(session.cwd, entry.replace(/^"+|"+$/g, "")))
+              .join(":"),
+          };
+    // POSIX node-pty can return a PTY before exec fails, so validate before accepting a candidate.
+    const executable =
+      platform !== "win32"
+        ? resolveExecutable(
+            candidate.shell.includes("/")
+              ? path.resolve(session.cwd, candidate.shell)
+              : candidate.shell,
+            platform,
+            lookupEnv,
+          )
+        : candidate.shell;
+    if (executable === undefined) {
+      return yield* trySpawn(
+        shellCandidates,
+        spawnEnv,
+        session,
+        index + 1,
+        new PtyAdapter.PtySpawnError({ adapter: "terminal-manager", shell: candidate.shell }),
+      );
+    }
+
     const launch = yield* agentScope.wrap({
-      command: candidate.shell,
+      command: executable,
       args: candidate.args ?? [],
       name: "terminal",
       env: spawnEnv,
@@ -2812,6 +2854,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
               shellResolver,
               platform,
               baseEnv,
+              session.runtimeEnv?.T3CODE_TERMINAL_SHELL ?? baseEnv.T3CODE_TERMINAL_SHELL,
             ).pipe(Effect.provideService(FileSystem.FileSystem, fileSystem));
             const terminalEnv = withProviderSessionEnvironment(
               createTerminalSpawnEnv(

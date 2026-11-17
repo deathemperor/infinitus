@@ -1,5 +1,9 @@
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
+import {
+  isAtomCommandInterrupted,
+  squashAtomCommandFailure,
+} from "@infinitus/client-runtime/state/runtime";
 import { deriveThreadQueueWorkflowState } from "@infinitus/client-runtime/state/thread-workflows";
 import { assistantCitationsToPlainText } from "@infinitus/shared/assistantCitations";
 import {
@@ -35,6 +39,7 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { isImageAttachment, type ChatImageAttachment, type ChatMessage } from "../../types";
 import { cn } from "~/lib/utils";
 import { Button, InlineButton } from "../ui/button";
+import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { TimestampFormat } from "@infinitus/contracts/settings";
 import { GuestMessageName } from "./guestMessageStyle";
@@ -172,19 +177,27 @@ export function QueuedRunsControl({
     if (!canSendRun(freshContext) || steerInFlightRef.current) return;
     steerInFlightRef.current = true;
     setBusyRunId(queuedRunId);
-    if (workflow?.canSendNow) {
-      await resume({
-        environmentId: props.environmentId,
-        input: { threadId: props.threadId, runId: queuedRunId },
-      });
-    } else if (activeRun !== null) {
-      await promote({
-        environmentId: props.environmentId,
-        input: { threadId: props.threadId, queuedRunId, targetRunId: activeRun.id },
-      });
-    }
+    const result = workflow?.canSendNow
+      ? await resume({
+          environmentId: props.environmentId,
+          input: { threadId: props.threadId, runId: queuedRunId },
+        })
+      : activeRun !== null
+        ? await promote({
+            environmentId: props.environmentId,
+            input: { threadId: props.threadId, queuedRunId, targetRunId: activeRun.id },
+          })
+        : null;
     steerInFlightRef.current = false;
     setBusyRunId(null);
+    if (result?._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      const error = squashAtomCommandFailure(result);
+      toastManager.add({
+        type: "error",
+        title: "Could not send queued message",
+        description: error instanceof Error ? error.message : "An error occurred.",
+      });
+    }
   };
 
   useImperativeHandle(ref, () => ({

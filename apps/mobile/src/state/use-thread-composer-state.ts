@@ -1,4 +1,5 @@
 import { useComposerAttachmentActions } from "./use-composer-attachment-actions";
+import * as Effect from "effect/Effect";
 import * as Dialog from "../components/ui/Dialog";
 import { AuthOrchestrationOperateScope } from "@infinitus/contracts";
 import { readEnvironmentScope } from "./session";
@@ -72,6 +73,7 @@ import { pendingThreadCreationMessage } from "./pending-thread-creation";
 import {
   composerAttachmentUploadBlockReason,
   composerAttachmentUploadsAtom,
+  uploadComposerAttachmentShared,
 } from "./composer-attachment-uploads";
 import {
   appendComposerDraftAttachments,
@@ -120,8 +122,12 @@ import {
 } from "./use-thread-detail";
 import { useThreadSelection } from "./use-thread-selection";
 import { enqueueThreadOutboxMessage } from "./thread-outbox";
+<<<<<<< HEAD
 import { dispatchingQueuedMessageAtom } from "./queued-message-dispatch";
 import { useThreadOutboxMessages } from "./use-thread-outbox";
+=======
+import { dispatchingQueuedMessageIdsAtom, useThreadOutboxMessages } from "./use-thread-outbox";
+>>>>>>> upstream-sync-5842231421-upstream-renamed
 import { threadEnvironment } from "./threads";
 import { useAtomCommand } from "./use-atom-command";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
@@ -217,12 +223,16 @@ export function useThreadComposerState(input: {
   const selectedThreadVisibleTurnItems = useSelectedThreadVisibleTurnItems();
   const acknowledgedMessages = useAtomValue(acknowledgedThreadMessagesAtom);
   const queuedMessagesByThreadKey = useThreadOutboxMessages();
+<<<<<<< HEAD
   const dispatchingQueuedMessage = useAtomValue(dispatchingQueuedMessageAtom);
   const dispatchingQueuedMessageId = dispatchingQueuedMessage?.messageId ?? null;
   // Infinitus (fork, #1501): the feed hides a queued reply's edit and delete
   // controls only while its send RPC is in flight, not during its upload.
   const sendingQueuedMessageId =
     dispatchingQueuedMessage?.phase === "sending" ? dispatchingQueuedMessage.messageId : null;
+=======
+  const dispatchingQueuedMessageIds = useAtomValue(dispatchingQueuedMessageIdsAtom);
+>>>>>>> upstream-sync-5842231421-upstream-renamed
   const [feedbackSubmissionsByThreadKey, setFeedbackSubmissionsByThreadKey] = useState<
     Record<string, ReadonlyArray<CodexFeedbackSubmission>>
   >({});
@@ -245,6 +255,10 @@ export function useThreadComposerState(input: {
         (message) => message.creation === undefined,
       )
     : [];
+  // The thread sends one message at a time, the head of its queue.
+  const dispatchingQueuedMessageId =
+    selectedThreadQueuedMessages.find((message) => dispatchingQueuedMessageIds[message.messageId])
+      ?.messageId ?? null;
   const feedbackSubmissions = selectedThreadKey
     ? (feedbackSubmissionsByThreadKey[selectedThreadKey] ?? [])
     : [];
@@ -517,11 +531,15 @@ export function useThreadComposerState(input: {
     setIsSavingQueuedEdit(true);
     const capabilities = selectedEnvironmentRuntime?.serverConfig?.environment.capabilities;
     const prepared = await settlePromise(() =>
-      prepareTurnAttachments({
-        environmentId: thread.environmentId,
-        attachments: draft.attachments,
-        supportsImageUploads: capabilities !== undefined,
-      }),
+      Effect.runPromise(
+        prepareTurnAttachments({
+          environmentId: thread.environmentId,
+          attachments: draft.attachments,
+          supportsImageUploads: capabilities !== undefined,
+          uploadAttachment: (attachment) =>
+            uploadComposerAttachmentShared(thread.environmentId, attachment),
+        }),
+      ),
     );
     if (AsyncResult.isFailure(prepared)) {
       savingQueuedEditRef.current = false;
