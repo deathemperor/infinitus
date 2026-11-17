@@ -117,7 +117,7 @@ jobs:
           fi
           # Fork rule: GitHub-hosted runners, never Blacksmith (INFINITUS.md).
           if grep -rl "runs-on: blacksmith-" .github/workflows >/dev/null 2>&1; then
-            sed -i -E 's/runs-on: blacksmith-[0-9]+vcpu-ubuntu-2404/runs-on: ubuntu-24.04/; s/runs-on: blacksmith-[0-9]+vcpu-macos-26/runs-on: macos-latest/; s/runs-on: blacksmith-[0-9]+vcpu-windows-2025/runs-on: windows-2025/' .github/workflows/*.yml
+            sed -i -E 's/runs-on: blacksmith-[0-9]+vcpu-ubuntu-2404/runs-on: ubuntu-24.04/; s/runs-on: blacksmith-[0-9]+vcpu-macos-2[67]/runs-on: macos-latest/; s/runs-on: blacksmith-[0-9]+vcpu-windows-2025/runs-on: windows-2025/' .github/workflows/*.yml
             git commit -am "ci: GitHub-hosted runners after the upstream merge" --no-verify || true
           fi
           git push -u origin "$branch"

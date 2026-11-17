@@ -152,6 +152,13 @@ export function classifyReachability(
       restart,
     );
   }
+  if (status === 530 && cloudflareError === "1016") {
+    return fail(
+      "dns_failed",
+      `The ${CONNECT_NAME} address no longer points to this machine's tunnel (Cloudflare error 1016). ${CONNECT_NAME} may have removed this environment.`,
+      `Link this environment again. Turn ${CONNECT_NAME} off and on in Settings > Sharing & access, or run \`infinitus connect link\` and then restart ${PRODUCT_NAME}.`,
+    );
+  }
   if (status !== null) {
     const code = cloudflareError === undefined ? "" : ` (Cloudflare error ${cloudflareError})`;
     return fail(

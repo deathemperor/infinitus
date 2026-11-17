@@ -3,7 +3,10 @@ import type {
   SidebarProjectSortOrder,
   SidebarThreadSortOrder,
 } from "@infinitus/contracts/settings";
+import { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@infinitus/shared/pinOrderKey";
 import type { EnvironmentThreadShell } from "./models.ts";
+
+export { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@infinitus/shared/pinOrderKey";
 
 export interface ThreadSortInput {
   readonly createdAt: string;
@@ -182,17 +185,6 @@ export function getLatestThreadForProject<
   }
   return latest;
 }
-
-// ── Pinned reorder: fractional index keys ──────────────────────────────
-// Pinned threads carry an optional pinOrderKey (base-26, see
-// `@infinitus/shared/orderKeys`). Keyed threads sort by plain string comparison,
-// so a drag or Move up/down writes ONE key to ONE thread on its own server.
-import {
-  generateSpreadOrderKeys as generateSpreadPinOrderKeys,
-  orderKeyBetween as pinOrderKeyBetween,
-} from "@infinitus/shared/orderKeys";
-
-export { generateSpreadPinOrderKeys, pinOrderKeyBetween };
 
 export function planPinnedReorder(input: {
   readonly orderedIds: readonly string[];
