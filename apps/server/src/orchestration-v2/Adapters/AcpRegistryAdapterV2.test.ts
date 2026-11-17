@@ -1271,7 +1271,7 @@ describe("AcpRegistryAdapterV2", () => {
     }).pipe(Effect.provide(layerTest)),
   );
 
-  it.effect("gives HTTP-capable agents T3's MCP server over HTTP", () =>
+  it.effect("gives HTTP-capable agents Infinitus's MCP server over HTTP", () =>
     Effect.gen(function* () {
       const selfInvocation = yield* resolveSelfInvocation();
       const mockAgentPath = yield* (yield* Path.Path).fromFileUrl(
@@ -1360,7 +1360,7 @@ describe("AcpRegistryAdapterV2", () => {
       const plainHttp = (authorization: string) => [
         {
           type: "http",
-          name: "t3-code",
+          name: "infinitus",
           url: endpoint,
           headers: [{ name: "Authorization", value: authorization }],
         },

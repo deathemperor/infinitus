@@ -832,7 +832,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   working and below approval and input; the row's pill reads "Held" /
   "Paused" with no icon (`TopStatusIcon` takes `null`), and
   `resolveSidebarFolderDot` calls the resolver through a lambda so `map`'s
-  index never reaches its options parameter. The phone's twin: `apps/mobile/src/features/threads/threadListV2.ts`,
+  index never reaches its options parameter. Upstream's row resolvers
+  (`resolveSidebarRowStatus`, `resolveThreadListV2RowStatus`) take the same
+  options and pass them through. The phone's twin: `apps/mobile/src/features/threads/threadListV2.ts`,
   `thread-list-v2-items.tsx` and `thread-row-emphasis.ts`, through
   `features/infinitus/useThreadHeldEntry.ts`. `makeInfinitusServerLayers`
   (`InfinitusServerLayers.ts`) provides `InfinitusSessionHoldsIdle` until the policies land.
@@ -922,7 +924,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   runs `scripts/infinitus-rename.ts --check` after `vp check`. The Mac
   jobs sit after upstream's `Check` aggregator and are not in its `needs`:
   they are path-filtered and required by the ruleset on their own. The sync workflow
-  re-applies the runner swap after every merge, and once
+  re-applies the runner swap after every merge (ubuntu-2404 → ubuntu-24.04,
+  macos-26 and macos-27 → macos-latest, windows-2025 stays), and once
   `scripts/infinitus-rename.ts --check` passes on `main` it renames
   upstream's tip on its own branch before merging (#1368 C,
   `docs/internals/infinitus-rename.md`). It pushes with the
@@ -934,6 +937,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `infra/relay/migrations/postgres/20261005232034_managed_endpoint_tunnel_released_at/snapshot.json` — its `prevIds` also names the fork's Team snapshot, so the chain has one head that includes the Team tables. Procedure: `docs/internals/release-and-updates.md`.
 - `apps/server/src/vcs/GitVcsDriverCore.test.ts` — the "keeps complete stats for files beyond the combined patch limit" fixture rewrites `a-large.txt` to a different byte length (#1517): upstream's same-size rewrite in the same second as its commit intermittently read as unchanged through the index stat cache and dropped the file from the working-tree stats on CI.
 - `apps/server/src/project/AgentSessionScanner.ts` — the base and worktrees dirs are also compared by their realpath (#1661): the candidate was realpath'd but the roots were not, so a T3 home behind a symlink (macOS temp dirs, a linked home) let its own sandboxes into the import list.
+- `apps/server/src/ws.test.ts` — the compression test that builds `Ws.layer` adds `layerInfinitusWsRpcUnused` (`infinitus/Layers/InfinitusWsRpc.testkit.ts`) to its services, since the fork's RPC layer reads seven fork services.
 - `apps/server/src/cli/invocation.test.ts` — the "manual server installation ownership" prefix fixtures realpath their temp root (#1661): the resolver reports the realpath'd prefix, which on macOS is `/private/var/…`, not `/var/…`.
 - `apps/server/src/orchestration-v2/RunExecutionService.ts` — the run's event filter takes a `turn.terminal` for another turn of its own provider thread and run ordinal as the root's while the root turn is open, and the ingest loop logs the mismatch (#1514, `ProviderEventRouteIdentity.runOrdinal`); the "auxiliary or stale provider terminals" test models those as a child provider thread's and another ordinal's.
 - `apps/server/src/orchestration-v2/ProviderSessionManager.ts` — `markIdle` also clears the provider thread's busy turns of earlier run ordinals, so a stopped run's turn no longer holds the idle release (#1514).
@@ -970,7 +974,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (the follow-up copy), `apps/mobile/src/features/threads/ThreadQueueControl.tsx`
   (the "Next step" tag); `docs/user/composer.md` says a steer lands at the
   next step.
-- `apps/server/src/preview/ServerBrowser.ts` (+ test) — the desktop `attached` handler also hands a tab that started headless (no panel showed it within `DESKTOP_ATTACH_TIMEOUT`) to the desktop's page once it mounts, so the agent drives the page the person sees, with their sign-ins; `dropTab`'s `handOff` sends streaming viewers `reconnect`. Port of upstream's closed #17336 for its open #16901. Upstream's #22877 took the other road (it marks a headless tab headless so the desktop streams it); ours drops its `markHeadless` call and its test, so the handoff still happens: the sign-in is the point.
+- `apps/server/src/preview/ServerBrowser.ts` (+ test) — the desktop `attached` handler also hands a tab that started headless (no panel showed it within `DESKTOP_ATTACH_TIMEOUT`) to the desktop's page once it mounts, so the agent drives the page the person sees, with their sign-ins; `dropTab`'s `handOff` sends streaming viewers `reconnect`. Port of upstream's closed #17336 for its open #16901. Upstream's #22877 took the other road (it marks a headless tab headless so the desktop streams it); ours drops its `markHeadless` call and its test, so the handoff still happens: the sign-in is the point. A test that finds its tab as the one not marked headless finds the fixture's server-only tab here instead, so it looks the tab up by id.
 - `apps/web/package.json` — `react-test-renderer` and `@types/react-test-renderer` as devDependencies: upstream moved every React test into a real browser and dropped them (#20944), while the fork's component tests (`AccountsPage`, `StatsPage`, `ComposerCapturesMenu`, `InfinitusEventToasts`, `settings/infinitus/*`) still render with them.
 - `packages/source-control-forgejo/src/server/ForgejoSourceControlProvider.test.ts` — "reads Forgejo jobs that did not run as finished checks" (#16668) mocks `branches/main` as `{}`: upstream wrote it before its checks read began fetching the base branch's protection, so on upstream's own `main` the mock answers that read with `[]` and the test fails. Take upstream's version once it fixes the test.
 - `oxlint-plugin-t3code/rules/no-low-value-comments.ts` — `CHECK_BARE_ISSUE_REFS = false`: upstream's rule (#21514) rejects a bare `#123` in a comment as history git already keeps, but the fork's comments cite this repository's issues as the design record (INFINITUS.md), so that one check is off and the rule's others stand.
