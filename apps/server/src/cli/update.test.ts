@@ -204,9 +204,9 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-" });
-      const oldExe = path.join(root, "runtime/versions/1.0.0/t3");
-      const newExe = path.join(root, "runtime/versions/2.0.0/t3");
-      const launcher = path.join(root, "bin/t3");
+      const oldExe = path.join(root, "runtime/versions/1.0.0/infinitus");
+      const newExe = path.join(root, "runtime/versions/2.0.0/infinitus");
+      const launcher = path.join(root, "bin/infinitus");
       for (const file of [oldExe, newExe]) {
         yield* fs.makeDirectory(path.dirname(file), { recursive: true });
         yield* fs.writeFileString(file, "");
@@ -239,15 +239,16 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
         );
         // A quote and a space in the home path exercise the script's quoting.
         const home = path.join(root, "it's home");
-        const entry = (version: string) => path.join(home, "runtime/versions", version, "t3");
+        const entry = (version: string) =>
+          path.join(home, "runtime/versions", version, "infinitus");
         for (const version of ["1.0.0", "2.0.0"]) {
           yield* fs.makeDirectory(path.dirname(entry(version)), { recursive: true });
           yield* fs.writeFileString(entry(version), '#!/bin/sh\nprintf \'[%s]\\n\' "$0" "$@"\n', {
             mode: 0o755,
           });
         }
-        const launcher = path.join(root, "bin/t3");
-        const alias = path.join(root, "alias/t3");
+        const launcher = path.join(root, "bin/infinitus");
+        const alias = path.join(root, "alias/infinitus");
         yield* fs.makeDirectory(path.dirname(launcher), { recursive: true });
         yield* fs.makeDirectory(path.dirname(alias), { recursive: true });
         yield* fs.writeFileString(launcher, posixLauncherScript(entry("1.0.0")), { mode: 0o755 });
@@ -273,7 +274,7 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
 
         // Like the shell, a relative PATH entry resolves from the working directory, and a
         // script nobody can execute is passed over.
-        const unrunnable = path.join(root, "unrunnable/t3");
+        const unrunnable = path.join(root, "unrunnable/infinitus");
         yield* fs.makeDirectory(path.dirname(unrunnable), { recursive: true });
         yield* fs.writeFileString(unrunnable, posixLauncherScript(entry("2.0.0")), { mode: 0o644 });
         yield* fs.writeFileString(launcher, posixLauncherScript(entry("2.0.0")), { mode: 0o755 });
@@ -301,12 +302,12 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
   it.effect.each([
     { name: "no launcher records", recorded: undefined },
     { name: "an empty launcher record", recorded: "" },
-    { name: "whole launcher records", recorded: "/opt/t3\n" },
-    { name: "Windows launcher records", recorded: "C:\\t3.cmd\r\n" },
+    { name: "whole launcher records", recorded: "/opt/infinitus\n" },
+    { name: "Windows launcher records", recorded: "C:\\infinitus.cmd\r\n" },
     // An interrupted append cut this record short.
     { name: "an unterminated launcher record", recorded: "/opt/t" },
     // Another process's append is cut short after t3 update reads the records.
-    { name: "a record cut short after the read", recorded: "/opt/t3\n", cut: "/opt/t" },
+    { name: "a record cut short after the read", recorded: "/opt/infinitus\n", cut: "/opt/t" },
   ])("keeps the runtime a repointed launcher off PATH points at with $name", ({ recorded, cut }) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -316,7 +317,7 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
       for (const version of ["1.0.0", "2.0.0"]) {
         const directory = path.join(root, "runtime/versions", version);
         yield* fs.makeDirectory(directory, { recursive: true });
-        yield* fs.writeFileString(path.join(directory, "t3"), "");
+        yield* fs.writeFileString(path.join(directory, "infinitus"), "");
         yield* fs.writeFileString(path.join(directory, ".install-complete"), `${version}\n`);
         yield* fs.utimes(path.join(directory, ".install-complete"), 0, 0);
       }
@@ -324,14 +325,14 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
         yield* fs.writeFileString(path.join(root, "runtime/launchers"), recorded);
       }
       // A launcher in the T3 home itself, which neither PATH nor the default bin dir reaches.
-      const launcher = path.join(root, "t3");
-      yield* fs.symlink(path.join(root, "runtime/versions/1.0.0/t3"), launcher);
+      const launcher = path.join(root, "infinitus");
+      yield* fs.symlink(path.join(root, "runtime/versions/1.0.0/infinitus"), launcher);
 
       const launchersFile = path.join(root, "runtime/launchers");
       yield* repointLauncher({
         launchedAs: launcher,
         baseDir: root,
-        targetEntryPath: path.join(root, "runtime/versions/2.0.0/t3"),
+        targetEntryPath: path.join(root, "runtime/versions/2.0.0/infinitus"),
       }).pipe(
         Effect.provideService(FileSystem.FileSystem, {
           ...fs,
@@ -358,7 +359,7 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
       assert.deepStrictEqual(removed, ["1.0.0"]);
       assert.equal(
         yield* readPosixLauncherTarget(launcher),
-        path.join(root, "runtime/versions/2.0.0/t3"),
+        path.join(root, "runtime/versions/2.0.0/infinitus"),
       );
     }).pipe(Effect.provideService(HostProcess.Platform, "linux")),
   );
@@ -367,9 +368,9 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-" });
-    const oldExe = path.join(root, "runtime/versions/1.0.0/t3");
-    const newExe = path.join(root, "runtime/versions/2.0.0/t3");
-    const launcher = path.join(root, "t3");
+    const oldExe = path.join(root, "runtime/versions/1.0.0/infinitus");
+    const newExe = path.join(root, "runtime/versions/2.0.0/infinitus");
+    const launcher = path.join(root, "infinitus");
     for (const file of [oldExe, newExe]) {
       yield* fs.makeDirectory(path.dirname(file), { recursive: true });
       yield* fs.writeFileString(file, "");
@@ -453,12 +454,12 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-" });
-      const newExe = path.join(root, "runtime/versions/2.0.0/t3");
-      const copy = path.join(root, "copy/t3");
-      const foreign = path.join(root, "foreign/t3");
-      const elsewhere = path.join(root, "elsewhere/t3");
-      const otherHome = path.join(root, "other/runtime/versions/1.0.0/t3");
-      const otherLauncher = path.join(root, "other/bin/t3");
+      const newExe = path.join(root, "runtime/versions/2.0.0/infinitus");
+      const copy = path.join(root, "copy/infinitus");
+      const foreign = path.join(root, "foreign/infinitus");
+      const elsewhere = path.join(root, "elsewhere/infinitus");
+      const otherHome = path.join(root, "other/runtime/versions/1.0.0/infinitus");
+      const otherLauncher = path.join(root, "other/bin/infinitus");
       for (const file of [newExe, copy, elsewhere, otherHome]) {
         yield* fs.makeDirectory(path.dirname(file), { recursive: true });
         yield* fs.writeFileString(file, "");
@@ -487,24 +488,24 @@ it.layer(NodeServices.layer)("t3 update launcher", (it) => {
       const path = yield* Path.Path;
       const delimiter = (yield* HostProcess.Platform) === "win32" ? ";" : ":";
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-" });
-      const launcher = path.join(root, "bin/t3");
+      const launcher = path.join(root, "bin/infinitus");
       yield* fs.makeDirectory(path.dirname(launcher), { recursive: true });
       yield* fs.writeFileString(launcher, "", { mode: 0o755 });
 
       const bare = yield* resolveLauncherPath.pipe(
-        Effect.provideService(HostProcess.InvokedAs, "t3"),
+        Effect.provideService(HostProcess.InvokedAs, "infinitus"),
         Effect.provideService(HostProcess.Environment, {
           PATH: [path.join(root, "missing"), path.join(root, "bin")].join(delimiter),
         }),
         Effect.provideService(HostProcess.WorkingDirectory, root),
       );
       const relative = yield* resolveLauncherPath.pipe(
-        Effect.provideService(HostProcess.InvokedAs, "./bin/t3"),
+        Effect.provideService(HostProcess.InvokedAs, "./bin/infinitus"),
         Effect.provideService(HostProcess.Environment, { PATH: "" }),
         Effect.provideService(HostProcess.WorkingDirectory, root),
       );
       const absent = yield* resolveLauncherPath.pipe(
-        Effect.provideService(HostProcess.InvokedAs, "t3"),
+        Effect.provideService(HostProcess.InvokedAs, "infinitus"),
         Effect.provideService(HostProcess.Environment, { PATH: path.join(root, "missing") }),
         Effect.provideService(HostProcess.WorkingDirectory, root),
       );

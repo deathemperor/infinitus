@@ -15,7 +15,7 @@ import {
   resolveLauncherPath,
 } from "../cloud/pinnedRuntime.ts";
 
-const PINNED_RUNTIME_ENTRY = /^(.*)\/runtime\/versions\/[^/]+\/t3$/;
+const PINNED_RUNTIME_ENTRY = /^(.*)\/runtime\/versions\/[^/]+\/infinitus$/;
 
 export type CliRunner = "npx" | "pnpm dlx" | "bunx";
 

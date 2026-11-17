@@ -448,15 +448,13 @@ describe("device setup consent", () => {
       name: "a Windows host",
       exitCode: 1,
       stderr: "private diagnostics",
-      expected:
-        `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
+      expected: `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
     },
     {
       name: "a Windows host returning 9009",
       exitCode: 9009,
       stderr: "private diagnostics",
-      expected:
-        `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
+      expected: `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
     },
     {
       name: "missing Node on a Windows host with a POSIX shell",
@@ -697,8 +695,7 @@ it.effect.each([
     name: "untrusted host key",
     exitCode: 255,
     stderr: "Host key verification failed.\r\n",
-    reason:
-      `SSH encountered an untrusted host key while connecting to probe.test from the machine running this ${PRODUCT_NAME} server. Connect once with ssh from there to identify the host and verify its key before accepting it.`,
+    reason: `SSH encountered an untrusted host key while connecting to probe.test from the machine running this ${PRODUCT_NAME} server. Connect once with ssh from there to identify the host and verify its key before accepting it.`,
   },
   {
     name: "unrecognized SSH failure",

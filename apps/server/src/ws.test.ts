@@ -1,4 +1,5 @@
 import * as SecretResolver from "@infinitus/secret-provider-core/server/SecretResolver";
+import { layerInfinitusWsRpcUnused } from "./infinitus/Layers/InfinitusWsRpc.testkit.ts";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { WebSocket } from "@effect/platform-node/NodeWS";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Bind an isolated WebSocket negotiation fixture.
@@ -960,6 +961,7 @@ it.live.each([
         }),
         ProviderInstallationGate.layer,
         FetchHttpClient.layer,
+        layerInfinitusWsRpcUnused,
       );
       const context = yield* Layer.build(
         HttpRouter.serve(Ws.layer, { disableListenLog: true }).pipe(

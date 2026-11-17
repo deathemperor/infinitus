@@ -1836,7 +1836,7 @@ it.effect("closing a tab force-closes a page that never finishes unloading", () 
 it.effect("closing a desktop tab during setup unloads its page before disconnecting", () =>
   Effect.scoped(
     Effect.gen(function* () {
-      const { broker } = yield* ready;
+      const { broker, tabId: readyTabId } = yield* ready;
       const manager = yield* Manager.PreviewManager;
       desktopRendersNext = true;
       const gate = (desktopConnectionGate = Promise.withResolvers<void>());
@@ -1855,7 +1855,9 @@ it.effect("closing a desktop tab during setup unloads its page before disconnect
       page.beforeUnload = "listen";
       page.unloadGate = Promise.withResolvers<void>();
       const { sessions } = yield* manager.list({ threadId: testThread.threadId });
-      const session = sessions.find((candidate) => !candidate.headless)!;
+      // Fork (#1688): the fixture's server-only tab is not marked headless while the desktop
+      // channel is up, so the tab being set up is the one that is not the fixture's.
+      const session = sessions.find((candidate) => candidate.tabId !== readyTabId)!;
       const closing = yield* manager
         .close({ threadId: testThread.threadId, tabId: session.tabId })
         .pipe(Effect.forkScoped({ startImmediately: true }));

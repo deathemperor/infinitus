@@ -767,11 +767,11 @@ describe("queued delivery timing", () => {
   /** Runs `change`, then resolves once the delivery it starts has settled. */
   async function deliveryAfter(change: () => void): Promise<void> {
     const settled = Promise.withResolvers<void>();
-    const release = appAtomRegistry.subscribe(dispatchingQueuedMessageIdAtom, (id) => {
-      if (id === null) settled.resolve();
+    const release = appAtomRegistry.subscribe(dispatchingQueuedMessageAtom, (dispatching) => {
+      if (dispatching === null) settled.resolve();
     });
     change();
-    expect(appAtomRegistry.get(dispatchingQueuedMessageIdAtom)).not.toBeNull();
+    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).not.toBeNull();
     await settled.promise.finally(release);
   }
 
@@ -792,7 +792,7 @@ describe("queued delivery timing", () => {
     state.cleanups.push(() => appAtomRegistry.set(composerAttachmentUploadsAtom, {}));
     await state.manager.enqueue(message({ attachments: [photo] }));
     startDelivery();
-    expect(appAtomRegistry.get(dispatchingQueuedMessageIdAtom)).toBeNull();
+    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toBeNull();
 
     await deliveryAfter(() =>
       appAtomRegistry.set(composerAttachmentUploadsAtom, {

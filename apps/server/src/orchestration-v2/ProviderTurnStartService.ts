@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { modelSelectionsEqual } from "@infinitus/shared/model";
 import { projectComposerContextForProvider } from "@infinitus/shared/composerContextReferences";
 import {
@@ -131,8 +132,7 @@ export const isProviderTurnStartRunStateMissingError = Schema.is(
   ProviderTurnStartRunStateMissingError,
 );
 
-const START_GAVE_UP_MESSAGE =
-  "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.";
+const START_GAVE_UP_MESSAGE = `${PRODUCT_NAME} could not start this turn. Send the message again; if it keeps failing, check the server logs.`;
 
 const startFailureMessage = (error: Error): string => {
   const nestedCause = "cause" in error ? error.cause : undefined;

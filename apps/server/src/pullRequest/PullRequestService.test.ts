@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { SourceControlProviderKind } from "@infinitus/contracts";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -2413,7 +2414,7 @@ it.effect.each([
       expect(error).toMatchObject({
         _tag: "PullRequestUnavailableError",
         reason: "repository-without-project",
-        message: `${repository} is not a project in T3 Code. Add it as a project to read its change requests.`,
+        message: `${repository} is not a project in ${PRODUCT_NAME}. Add it as a project to read its change requests.`,
       });
     }
   }),

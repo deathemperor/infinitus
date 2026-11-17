@@ -749,8 +749,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const status = resolveSidebarRowStatus(
     { ...thread, lastVisitedAt },
     {
-    limitStopped: limitStop !== null,
-    hold: heldEntry?.kind ?? null,
+      limitStopped: limitStop !== null,
+      hold: heldEntry?.kind ?? null,
     },
   );
   const lastVisitedDate = lastVisitedAt === undefined ? null : parseTimestampDate(lastVisitedAt);

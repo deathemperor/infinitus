@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it, vi } from "vite-plus/test";
@@ -1459,8 +1460,7 @@ effectIt.effect(
           title: "Turn failed to start",
           failure: {
             class: "unknown",
-            message:
-              "T3 Code could not start this turn. Send the message again; if it keeps failing, check the server logs.",
+            message: `${PRODUCT_NAME} could not start this turn. Send the message again; if it keeps failing, check the server logs.`,
           },
         },
       ]);

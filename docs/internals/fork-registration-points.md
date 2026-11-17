@@ -529,8 +529,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); `acceptsTrackSwitchRelease` takes a `DesktopUpdateChannel` and reads `infinitus-nightly` as the nightly train; re-flipped after every sync with its fixtures, `packages/shared/src/cliRelease.test.ts`, `packages/ssh/src/tunnel.test.ts` and `apps/mobile/src/features/settings/environment-maintenance.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/shared/package.json` — the `./productName`, `./homeDir`,
   `./desktopIdentity`, `./infinitusControl`, `./infinitusControlSocket`,
-  `./orderKeys`, `./stats` (#659) and `./infinitusTeamRedaction` (#1592)
-  exports.
+  `./stats` (#659) and `./infinitusTeamRedaction` (#1592) exports.
 - `apps/desktop/src/app/DesktopUserData.ts` — `resolveUserDataPath` answers
   the fork's directory from `@infinitus/shared/desktopIdentity`
   (`infinitus-desktop` / `infinitus-desktop-dev`) and probes nothing: upstream

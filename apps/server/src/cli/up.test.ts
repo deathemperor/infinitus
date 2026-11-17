@@ -206,7 +206,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
     },
     {
       label: "a route turns off with no service to run",
-      prints: ["Run `t3 --base-dir <baseDir>` to use T3 Code here."],
+      prints: ["Run `infinitus --base-dir <baseDir>` to use Infinitus here."],
       installed: false,
       env: "T3CODE_LAN=true\n",
       args: ["--no-lan"],
@@ -290,8 +290,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
       installed: true,
       reportStatus: true,
       prints: [
-        "Turn it off: `t3 up --base-dir <baseDir> --no-lan`.",
-        "Change access: `t3 up --base-dir <baseDir>`.",
+        "Turn it off: `infinitus up --base-dir <baseDir> --no-lan`.",
+        "Change access: `infinitus up --base-dir <baseDir>`.",
       ],
       env: "",
       args: [],

@@ -51,7 +51,7 @@ export class SshConnectError extends Schema.TaggedError<SshConnectError>()("SshC
   cause: Schema.Defect(),
 }) {
   override get message(): string {
-    const here = "the machine running this T3 Code server";
+    const here = `the machine running this ${PRODUCT_NAME} server`;
     const detail = this.detail.replace(/\.$/u, "");
     switch (this.reason) {
       case "host_key_unknown":

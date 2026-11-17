@@ -372,11 +372,13 @@ describe("ssh tunnel scripts", () => {
       const archive = `infinitus-${ARCHIVE.archiveVersion}-linux-x64.tar.gz`;
       NodeFS.mkdirSync(bin);
       NodeFS.mkdirSync(home);
-      NodeFS.mkdirSync(NodePath.join(release, "t3"), { recursive: true });
-      NodeFS.writeFileSync(NodePath.join(release, "t3", "t3"), "#!/bin/sh\necho ok\n", {
-        mode: 0o755,
-      });
-      NodeChildProcess.execFileSync("tar", ["-czf", archive, "t3"], { cwd: release });
+      NodeFS.mkdirSync(NodePath.join(release, "infinitus"), { recursive: true });
+      NodeFS.writeFileSync(
+        NodePath.join(release, "infinitus", "infinitus"),
+        "#!/bin/sh\necho ok\n",
+        { mode: 0o755 },
+      );
+      NodeChildProcess.execFileSync("tar", ["-czf", archive, "infinitus"], { cwd: release });
       NodeChildProcess.execFileSync("sh", ["-c", `sha256sum ${archive} > SHA256SUMS`], {
         cwd: release,
       });

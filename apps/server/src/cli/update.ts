@@ -197,7 +197,10 @@ export const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function
   }).pipe(
     Effect.mapError(
       (cause) =>
-        new CliUpdateError({ reason: `Could not repoint the infinitus launcher at ${launcher}.`, cause }),
+        new CliUpdateError({
+          reason: `Could not repoint the infinitus launcher at ${launcher}.`,
+          cause,
+        }),
     ),
   );
   return Option.some(launcher);

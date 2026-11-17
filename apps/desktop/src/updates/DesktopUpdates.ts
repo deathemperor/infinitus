@@ -745,7 +745,7 @@ export const make = Effect.gen(function* () {
         // electron-updater downloads what its last check found, which can be hours old.
         yield* logUpdaterInfo("checking for updates", { reason: "download" });
         yield* runUpdaterCheck(
-          offered.channel !== desktopUpdateChannelOf(environment.appVersion),
+          offered.channel !== resolveDefaultDesktopUpdateChannel(environment.appVersion),
         ).pipe(
           // A failed check keeps electron-updater's earlier result, so the known offer still downloads.
           Effect.catchTags({
@@ -1073,7 +1073,7 @@ export const make = Effect.gen(function* () {
       (yield* checkForUpdates(
         "install",
         "acquire",
-        retained.channel !== desktopUpdateChannelOf(environment.appVersion),
+        retained.channel !== resolveDefaultDesktopUpdateChannel(environment.appVersion),
       )) &&
       (yield* Ref.get(updateStateRef)).status === "available"
     ) {
@@ -1154,7 +1154,8 @@ export const make = Effect.gen(function* () {
       ) {
         return;
       }
-      const result = yield* downloadAvailableUpdate;
+      // The check that offered it just ran, so the download needs no fresh one.
+      const result = yield* downloadAvailableUpdate(false);
       if (result.accepted) {
         yield* logUpdaterInfo("update downloaded without a click (fork channel)", {
           completed: result.completed,

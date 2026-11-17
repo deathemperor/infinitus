@@ -155,8 +155,8 @@ export function classifyReachability(
   if (status === 530 && cloudflareError === "1016") {
     return fail(
       "dns_failed",
-      "The T3 Connect address no longer points to this machine's tunnel (Cloudflare error 1016). T3 Connect may have removed this environment.",
-      "Link this environment again. Turn T3 Connect off and on in Settings > Sharing & access, or run `t3 connect link` and then restart T3 Code.",
+      `The ${CONNECT_NAME} address no longer points to this machine's tunnel (Cloudflare error 1016). ${CONNECT_NAME} may have removed this environment.`,
+      `Link this environment again. Turn ${CONNECT_NAME} off and on in Settings > Sharing & access, or run \`infinitus connect link\` and then restart ${PRODUCT_NAME}.`,
     );
   }
   if (status !== null) {
