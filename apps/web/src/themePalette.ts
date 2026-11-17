@@ -32,6 +32,7 @@ import {
 } from "./lib/contextChipAccents";
 
 import { appAtomRegistry, subscribeAtomChanges } from "./rpc/atomRegistry";
+import { applyThemeBackground } from "./themeBackground";
 import { applyThemeCss } from "./themeCss";
 import { themeServerEnvironmentThemesAtom } from "./state/server";
 
@@ -429,7 +430,9 @@ const LEGACY_THEME_ID_ALIASES: Readonly<Record<string, string>> = {
 };
 
 function normalizeThemeId(themeId: string): string {
-  return LEGACY_THEME_ID_ALIASES[themeId] ?? themeId;
+  return Object.hasOwn(LEGACY_THEME_ID_ALIASES, themeId)
+    ? (LEGACY_THEME_ID_ALIASES[themeId] ?? themeId)
+    : themeId;
 }
 
 export function canonicalThemePreference(theme: string): string {
@@ -1707,6 +1710,7 @@ export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppe
   setThemePreviewAppearance(null);
   const palette = getThemeDefinition(theme);
   applyThemeCss(palette?.css);
+  applyThemeBackground(palette?.id);
 
   if (palette) {
     root.dataset.themeId = palette.id;

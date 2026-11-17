@@ -1,4 +1,8 @@
-import { TrimmedString, makeProviderSettingsSchema } from "@infinitus/contracts";
+import {
+  CustomModelSetting,
+  TrimmedString,
+  makeProviderSettingsSchema,
+} from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -58,7 +62,7 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed("auto")),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
-    customModels: Schema.Array(Schema.String).pipe(
+    customModels: Schema.Array(CustomModelSetting).pipe(
       Schema.withDecodingDefault(Effect.succeed([])),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),

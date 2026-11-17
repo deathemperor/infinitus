@@ -3,7 +3,10 @@ import type {
   SidebarProjectSortOrder,
   SidebarThreadSortOrder,
 } from "@infinitus/contracts/settings";
+import { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@infinitus/shared/pinOrderKey";
 import type { EnvironmentThreadShell } from "./models.ts";
+
+export { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@infinitus/shared/pinOrderKey";
 
 export interface ThreadSortInput {
   readonly createdAt: string;

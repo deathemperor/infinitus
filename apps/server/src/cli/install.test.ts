@@ -9,6 +9,7 @@ import * as Path from "effect/Path";
 import * as TestClock from "effect/testing/TestClock";
 
 import packageJson from "../../package.json" with { type: "json" };
+import { posixLauncherScript } from "../cloud/pinnedRuntime.ts";
 import { installCli, isForegroundProcStat, isForegroundPs, offerCliInstall } from "./install.ts";
 
 const VERSION = packageJson.version;
@@ -54,7 +55,7 @@ const setup = Effect.gen(function* () {
 });
 
 it.layer(NodeServices.layer)("infinitus install", (it) => {
-  it.effect("links the running runtime, records it, and never replaces another infinitus", () =>
+  it.effect("installs the running runtime, records it, and never replaces another infinitus", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -64,7 +65,7 @@ it.layer(NodeServices.layer)("infinitus install", (it) => {
       yield* fs.makeDirectory(path.dirname(link), { recursive: true });
       yield* fs.symlink(older, link);
       const installed = yield* provide(installCli());
-      assert.equal(yield* fs.readLink(link), executable);
+      assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
       assert.isFalse(installed.onPath);
       assert.include(installed.pathCommand, "$HOME/bin");
 
@@ -103,30 +104,25 @@ it.layer(NodeServices.layer)("infinitus install", (it) => {
       yield* fs.remove(link);
       yield* fs.symlink(path.join(root, ".t3/bin/infinitus"), link);
       yield* provide(installCli());
-      assert.equal(yield* fs.readLink(link), executable);
+      assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
 
-      // A failed swap over our own link leaves a staging path it did not create alone.
-      yield* fs.remove(link);
-      yield* fs.symlink(older, link);
-      const staging = `${link}.${process.pid}.tmp`;
-      yield* fs.writeFileString(staging, "someone else's\n");
-      const linkFailed = yield* provide(installCli()).pipe(Effect.flip);
-      assert.include(linkFailed.message, "Could not link");
-      assert.equal(yield* fs.readFileString(staging), "someone else's\n");
-      yield* fs.remove(staging);
+      // A script an earlier install wrote is ours too.
+      yield* fs.writeFileString(link, posixLauncherScript(older));
+      yield* provide(installCli());
+      assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
 
       // An empty spot is created exclusively: a file that appears first is kept.
       yield* fs.remove(link);
       const racing = installCli().pipe(
         Effect.provideService(FileSystem.FileSystem, {
           ...fs,
-          symlink: (target, path) =>
+          link: (from, to) =>
             fs
-              .writeFileString(path, "#!/bin/sh\necho raced\n")
-              .pipe(Effect.andThen(fs.symlink(target, path))),
+              .writeFileString(to, "#!/bin/sh\necho raced\n")
+              .pipe(Effect.andThen(fs.link(from, to))),
         }),
       );
-      assert.include((yield* provide(racing).pipe(Effect.flip)).message, "Could not link");
+      assert.include((yield* provide(racing).pipe(Effect.flip)).message, "Could not write");
       assert.equal(yield* fs.readFileString(link), "#!/bin/sh\necho raced\n");
       yield* fs.remove(link);
 
@@ -244,7 +240,7 @@ it.layer(NodeServices.layer)("infinitus install", (it) => {
         yield* fs.writeFileString(path.join(runtimeDir, "install-prompt-declined"), "0.0\n");
         yield* offer(true);
         assert.equal(asked, 2);
-        assert.equal(yield* fs.readLink(link), executable);
+        assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
 
         yield* fs.remove(path.join(runtimeDir, "install-prompt-declined"));
         yield* offer(true);

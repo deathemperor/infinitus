@@ -108,6 +108,11 @@ import Migration0098 from "./Migrations/098_TurnItemTypeStatusIndex.ts";
 import Migration0099 from "./Migrations/099_ShellThreadReadIndexes.ts";
 import Migration0100 from "./Migrations/100_AuthConnectDevices.ts";
 import Migration0101 from "./Migrations/101_AuthConnectDeniedRequests.ts";
+import Migration0102 from "./Migrations/102_QueuedTurnInputIndexJsonValid.ts";
+import Migration0103 from "./Migrations/103_ProviderTurnAttemptIndex.ts";
+import Migration0104 from "./Migrations/104_TurnItemMessageOrdinalIndex.ts";
+import Migration0105 from "./Migrations/105_TurnItemInlineWorkOutput.ts";
+import Migration0106 from "./Migrations/106_RepairStaleTitleRegeneration.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -220,6 +225,11 @@ const migrationEntries = [
   [99, "ShellThreadReadIndexes", Migration0099],
   [100, "AuthConnectDevices", Migration0100],
   [101, "AuthConnectDeniedRequests", Migration0101],
+  [102, "QueuedTurnInputIndexJsonValid", Migration0102],
+  [103, "ProviderTurnAttemptIndex", Migration0103],
+  [104, "TurnItemMessageOrdinalIndex", Migration0104],
+  [105, "TurnItemInlineWorkOutput", Migration0105],
+  [106, "RepairStaleTitleRegeneration", Migration0106],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -309,7 +319,8 @@ export const runMigrations = Effect.fn("runMigrations")(function* ({
 }: RunMigrationsOptions = {}) {
   // Upstream's reconcileV2PreviewMigration is not carried here (INFINITUS.md).
   // The desktop waits past its readiness budget until the finished line follows this one.
-  if (yield* hasPendingMigrations()) yield* Effect.log(DATABASE_MIGRATIONS_STARTED_MESSAGE);
+  const hasPending = yield* hasPendingMigrations();
+  if (hasPending) yield* Effect.log(DATABASE_MIGRATIONS_STARTED_MESSAGE);
   const includesV2 =
     toMigrationInclusive === undefined || toMigrationInclusive >= FIRST_V2_MIGRATION_ID;
   if (includesV2) {

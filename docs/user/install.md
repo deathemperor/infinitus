@@ -26,7 +26,7 @@ curl -fsSL https://infinitus.run/install.sh | sh
 
 It takes the newest release's `infinitus-<version>-linux-<arch>.tar.gz` (releases cut
 after 0.5.0-alpha.11 attach them, with `SHA256SUMS`), verifies it, unpacks it
-under `~/.infinitus/runtime` and links `infinitus` into `~/.local/bin`. Then run:
+under `~/.infinitus/runtime` and installs the `infinitus` command into `~/.local/bin`. Then run:
 
 ```bash
 infinitus
@@ -50,9 +50,10 @@ Run `infinitus help` or `infinitus --help` for the full reference. To start in a
 new working directory, use an explicit path such as `infinitus ./my-project`. A
 bare directory name is accepted only if it already exists.
 
-If `infinitus` or `infinitus start` reports an already running server, connect
-to that server instead. Stop it before starting a replacement, or use a
-different `--base-dir` for an independent server.
+If `infinitus` or `infinitus start` reports an already running server, run the
+`infinitus pair` command it names and open the pairing URL to connect to that
+server. Stop it before starting a replacement, or use a different `--base-dir`
+for an independent server.
 
 You can also download an archive from a
 [release](https://github.com/deathemperor/infinitus/releases) yourself and run

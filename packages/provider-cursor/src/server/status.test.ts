@@ -8,11 +8,13 @@ import type { CursorSettings } from "../settings.ts";
 import { CursorSettings as CursorSettingsSchema } from "../settings.ts";
 import { createModelCapabilities } from "@infinitus/shared/model";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { COMPACT_SLASH_COMMAND } from "@infinitus/provider-core/server/snapshotProbe";
 
 import {
   buildCursorCapabilitiesFromSdkModel,
   buildCursorDiscoveredModelsFromSdk,
   buildCursorProviderSnapshot,
+  buildInitialCursorProviderSnapshot,
   checkCursorProviderStatus,
 } from "./status.ts";
 import * as CursorSdkCatalog from "./CursorSdkCatalog.ts";
@@ -97,6 +99,19 @@ const sdkParameterizedModel = {
   ],
 } satisfies SDKModel;
 
+describe("buildInitialCursorProviderSnapshot", () => {
+  it.effect.each([true, false])("advertises manual compaction only when enabled (%s)", (enabled) =>
+    Effect.gen(function* () {
+      const provider = yield* buildInitialCursorProviderSnapshot({
+        ...baseCursorSettings,
+        enabled,
+      });
+
+      expect(provider.slashCommands).toEqual(enabled ? [COMPACT_SLASH_COMMAND] : []);
+    }),
+  );
+});
+
 describe("buildCursorProviderSnapshot", () => {
   it("downgrades ready status to warning when SDK model discovery returns no models", () => {
     expect(
@@ -114,6 +129,7 @@ describe("buildCursorProviderSnapshot", () => {
       status: "warning",
       message: "Cursor SDK model discovery returned no built-in models.",
       models: [],
+      slashCommands: [COMPACT_SLASH_COMMAND],
       supportsConversationRollback: false,
     });
   });
@@ -139,19 +155,32 @@ describe("Cursor SDK model discovery", () => {
     );
   });
 
-  it("filters invalid and duplicate SDK model entries", () => {
+  it("keeps catalog aliases and filters invalid and duplicate SDK model entries", () => {
+    const composer = {
+      id: "composer-2",
+      displayName: "Composer 2",
+      aliases: [" composer-latest ", "", "composer"],
+    } satisfies SDKModel;
     expect(
       buildCursorDiscoveredModelsFromSdk([
         sdkParameterizedModel,
         { ...sdkParameterizedModel, displayName: "Duplicate" },
         { id: "", displayName: "Invalid" },
+        composer,
       ]),
-    ).toEqual([
+    ).toStrictEqual([
       {
         slug: "claude-opus-4-8",
         name: "Opus 4.8",
         isCustom: false,
         capabilities: buildCursorCapabilitiesFromSdkModel(sdkParameterizedModel),
+      },
+      {
+        slug: "composer-2",
+        name: "Composer 2",
+        aliases: ["composer-latest", "composer"],
+        isCustom: false,
+        capabilities: buildCursorCapabilitiesFromSdkModel(composer),
       },
     ]);
   });
@@ -184,6 +213,7 @@ describe("checkCursorProviderStatus", () => {
 
       expect(provider).toMatchObject({
         status: "ready",
+        slashCommands: [COMPACT_SLASH_COMMAND],
         auth: {
           status: "authenticated",
           type: "api-key",
