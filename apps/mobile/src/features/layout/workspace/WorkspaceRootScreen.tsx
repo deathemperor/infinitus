@@ -1,5 +1,7 @@
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { WorkspaceNoTabs } from "./WorkspaceNoTabs";
+import { isSharedSlotTab } from "./navigation-tab-order";
+import { SharedSlotTitle } from "./SharedSlotTitle";
 import { WORKSPACE_TAB_LABELS, useEnabledNavigationTabs } from "./navigation-tabs";
 import { WorkspaceExtraTab } from "./WorkspaceExtraTab";
 import { WorkspaceSettingsList } from "../../settings/SettingsRouteScreen";
@@ -13,7 +15,10 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area
 import { CompactBrandTitle } from "../../../components/CompactBrandTitle";
 import { HeaderItemsWidthContext } from "../../../native/header-items-width";
 import { NativeStackScreenOptions } from "../../../native/StackHeader";
-import { NativePrimaryColumnContext } from "../../../native/v5-workspace-context";
+import {
+  NativePrimaryColumnContext,
+  NativeWorkspaceTabActivityContext,
+} from "../../../native/v5-workspace-context";
 import { isDuoDevice } from "../../../lib/device-type";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../../native/native-glass";
 import {
@@ -25,6 +30,7 @@ import { HomeRouteScreen } from "../../home/HomeRouteScreen";
 import { WorkspaceConnectionTitle } from "../../home/WorkspaceConnectionTitle";
 import { useAdaptiveWorkspaceLayout } from "../AdaptiveWorkspaceLayout";
 import { PullRequestsScreen } from "../../pull-requests/PullRequestsScreen";
+import { IssuesScreen } from "../../issues/IssuesScreen";
 import {
   WorkspaceTabsContext,
   WorkspaceTabsProvider,
@@ -57,7 +63,17 @@ function WorkspaceRootTitle(props: {
   return (
     <View style={{ width: maxWidth, minHeight: 32, justifyContent: "center" }}>
       <WorkspaceConnectionTitle
+<<<<<<< HEAD
         brand={<CompactBrandTitle accessibilityLabel={`${PRODUCT_NAME}, ${tabTitle}`} fit />}
+=======
+        brand={
+          !settingsOpen && isSharedSlotTab(state.selectedTab) ? (
+            <SharedSlotTitle tab={state.selectedTab} />
+          ) : (
+            <CompactBrandTitle accessibilityLabel={`T3 Code, ${tabTitle}`} fit />
+          )
+        }
+>>>>>>> upstream-sync-d6419d92a0-upstream-renamed
         maxWidth={maxWidth}
         onPress={props.onOpenEnvironments}
       />
@@ -90,6 +106,7 @@ function WorkspaceRootContent() {
   const { state } = workspace;
   // Settings is a workspace tab too; its list takes the place of the selected tab's.
   const settingsOpen = workspace.settingsOpen;
+  const headerOnly = use(NativeWorkspaceTabActivityContext)?.headerOnly === true;
   const renderHeaderTitle = () => (
     <WorkspaceRootTitle
       columnWidth={width}
@@ -101,8 +118,8 @@ function WorkspaceRootContent() {
     layout.variant === "medium" && state.selectedTab === "usage"
       ? workspaceDockBottomClearance({ bottomInset: insets.bottom, keyboardHeight })
       : isDuoDevice(deviceType)
-        ? // The column's safe area already holds the Duo's search toolbar and keyboard.
-          Math.max(insets.bottom, keyboardHeight) + 16
+        ? // The column's safe area holds the Duo's search toolbar, but not the sidebar's own tab bar.
+          Math.max(insets.bottom + (sidebarPicker ? 64 : 0), keyboardHeight) + 16
         : compactTabs || deviceType === "pad"
           ? workspaceDockBottomClearance({ bottomInset: insets.bottom, keyboardHeight })
           : Math.max(insets.bottom, keyboardHeight) +
@@ -120,7 +137,6 @@ function WorkspaceRootContent() {
           optionsVersion={[
             settingsOpen,
             state.selectedTab,
-            state.selectionRevision,
             width,
             sidebarNavigation,
             enabled.length,
@@ -150,7 +166,8 @@ function WorkspaceRootContent() {
           }}
         />
         <SafeAreaInsetsContext value={compactTabs ? { ...insets, bottom: 0 } : insets}>
-          {settingsOpen ? (
+          {/* Usage draws its own header, and skips its body itself. */}
+          {headerOnly && (settingsOpen || state.selectedTab !== "usage") ? null : settingsOpen ? (
             <WorkspaceSettingsList />
           ) : enabled.length === 0 ? (
             <WorkspaceNoTabs />
@@ -158,6 +175,8 @@ function WorkspaceRootContent() {
             <HomeRouteScreen />
           ) : state.selectedTab === "pullRequests" ? (
             <PullRequestsScreen />
+          ) : state.selectedTab === "issues" ? (
+            <IssuesScreen />
           ) : (
             <WorkspaceExtraTab tab={state.selectedTab} />
           )}
@@ -166,8 +185,7 @@ function WorkspaceRootContent() {
           <WorkspaceSidebarTabs />
         ) : null}
         {enabled.length === 0 && !settingsOpen ? null : settingsOpen ||
-          state.selectedTab === "threads" ||
-          state.selectedTab === "pullRequests" ? (
+          state.selectedTab !== "usage" ? (
           <WorkspaceToolbar sidebar={sidebarNavigation} onNewTask={startNewTask} />
         ) : (
           <WorkspaceSectionToolbar onNewTask={startNewTask} showCompose={false} />

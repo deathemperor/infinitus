@@ -35,9 +35,8 @@ import { useSettingsEnvironmentFilter } from "./settings-environment-filter";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { filterSettingsSections } from "./settings-search";
 import { usePaneRole } from "../../components/ui/Pane";
-import { I18nProvider, useGT, useLanguagePreference } from "../../i18n/I18nProvider";
-import { nativeLanguageName } from "@infinitus/client-runtime/locales";
-import { SUPPORTED_LOCALES } from "../../i18n/locales";
+import { useGT } from "gt-react-native";
+import { I18nProvider } from "../../i18n/I18nProvider";
 
 export function SettingsRouteScreen() {
   const list = useSettingsListPlacement();
@@ -256,7 +255,6 @@ function SettingsList(props: {
 
 function useSettingsIndexSections(): SettingsListSection[] {
   const gt = useGT();
-  const language = useLanguagePreference();
   const { selectedTargets, projectGroups, selectedProjectKey } = useSettingsEnvironmentFilter();
   const noServerTargets = selectedTargets.length === 0;
   const selectedProject = projectGroups.find((group) => group.key === selectedProjectKey);
@@ -288,11 +286,6 @@ function useSettingsIndexSections(): SettingsListSection[] {
       rows: [
         page("SettingsOrganization", "gearshape", gt("General")),
         page("SettingsAppearance", "paintbrush", gt("Appearance")),
-        page("SettingsLanguage", "globe", gt("Language"), {
-          value: SUPPORTED_LOCALES.includes(language)
-            ? nativeLanguageName(language)
-            : gt("System default"),
-        }),
         page("SettingsFollowUp", "bubble.left.and.bubble.right", gt("Chat")),
         ...(navigationCustomizationAvailable()
           ? [page("SettingsNavigation", "line.3.horizontal", gt("Navigation tabs"))]
@@ -321,7 +314,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
         serverPage(
           "SettingsEnvironmentSourceControl",
           "arrow.triangle.branch",
-          gt("Source control"),
+          gt("Source control & issues"),
         ),
         serverPage("SettingsWorktrees", "square.on.square", gt("Worktrees")),
       ],

@@ -8,6 +8,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
+<<<<<<< HEAD
 // Fork: this repository's releases are one `v<VERSION>` train; the installer takes the newest tag
 // without a nightly or preview suffix from the API list and refuses the other channels.
 const releases = [
@@ -66,6 +67,15 @@ const runInstaller = async (channel: string, version: string) => {
     await NodeFSP.rm(root, { recursive: true, force: true });
   }
 };
+=======
+/** The launcher install.sh, `t3 install`, and `t3 update` write; exec by absolute path. */
+const launcherScript = (executable: string) =>
+  `#!/bin/sh\nexec '${executable.replaceAll("'", "'\\''")}' "$@"\n`;
+
+const nightlies = Array.from({ length: 100 }, (_, index) => ({
+  tag_name: `v1.2.4-nightly.20261020.${200 - index}`,
+}));
+>>>>>>> upstream-sync-d6419d92a0-upstream-renamed
 
 describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home", () => {
   it("installs a relative home from a directory ending in a newline", async () => {
@@ -81,6 +91,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home
     try {
       await NodeFSP.mkdir(target, { recursive: true });
       await NodeFSP.writeFile(NodePath.join(target, ".install-complete"), `${version}\n`);
+<<<<<<< HEAD
       await NodeFSP.writeFile(
         NodePath.join(target, "infinitus"),
         "#!/bin/sh\necho 'infinitus v1.2.3'\n",
@@ -90,6 +101,13 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home
         "sh",
         [NodePath.resolve(import.meta.dirname, "install.sh")],
         {
+=======
+      await NodeFSP.writeFile(NodePath.join(target, "t3"), "#!/bin/sh\necho 't3 v1.2.3'\n", {
+        mode: 0o755,
+      });
+      const install = () =>
+        NodeChildProcess.spawnSync("sh", [NodePath.resolve(import.meta.dirname, "install.sh")], {
+>>>>>>> upstream-sync-d6419d92a0-upstream-renamed
           cwd: root,
           env: {
             ...process.env,
@@ -100,11 +118,21 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home
             T3CODE_RELEASE_BASE_URL: "http://127.0.0.1:1",
           },
           encoding: "utf8",
-        },
-      );
+        });
+      // The second run replaces the launcher the first wrote, newlines in its path and all.
+      const first = install();
+      expect(first.status, first.stdout + first.stderr).toBe(0);
+      const { status, stdout, stderr } = install();
       expect(status, stdout + stderr).toBe(0);
+<<<<<<< HEAD
       expect(stderr).toContain(`Installed Infinitus ${version}`);
       expect(await NodeFSP.readlink(launcher)).toBe(NodePath.join(target, "infinitus"));
+=======
+      expect(stderr).toContain(`Installed T3 Code ${version}`);
+      expect(await NodeFSP.readFile(launcher, "utf8")).toBe(
+        launcherScript(NodePath.join(target, "t3")),
+      );
+>>>>>>> upstream-sync-d6419d92a0-upstream-renamed
       expect(
         NodeChildProcess.execFileSync(launcher, ["--version"], {
           cwd: NodeOS.tmpdir(),
@@ -218,7 +246,7 @@ async function installOver(input: {
 }
 
 describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh t3 command", () => {
-  it("replaces only this home's own links and prints a PATH command", async () => {
+  it("replaces only this home's own launchers and prints a PATH command", async () => {
     const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-link-"));
     try {
       const home = NodePath.join(root, "home");
@@ -270,8 +298,13 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh t3 
         env: { HOME: root, SHELL: "/bin/zsh", PATH: "/usr/bin:/bin" },
       });
       expect(upgrade.code, upgrade.output).toBe(0);
+<<<<<<< HEAD
       expect(await NodeFSP.readlink(link)).toBe(
         NodePath.join(root, "alias/runtime/versions/1.2.3/infinitus"),
+=======
+      expect(await NodeFSP.readFile(link, "utf8")).toBe(
+        launcherScript(NodePath.join(root, "alias/runtime/versions/1.2.3/t3")),
+>>>>>>> upstream-sync-d6419d92a0-upstream-renamed
       );
       expect(upgrade.output).toContain(
         `printf '\\n%s\\n' 'export PATH="$PATH:$HOME/bin"' >> ~/.zshrc`,
@@ -308,6 +341,13 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh t3 
       expect(relative.code, relative.output).toBe(0);
       expect(relative.output).toContain(`'export PATH="$PATH:$HOME/bin"'`);
 
+      // A launcher script someone edited is theirs now.
+      const edited = `${launcherScript(NodePath.join(home, "runtime/versions/1.2.3/t3"))}# mine\n`;
+      await NodeFSP.writeFile(link, edited);
+      const overEdited = await installOver({ script: "install.sh", home, binDir });
+      expect(overEdited.code).not.toBe(0);
+      expect(await NodeFSP.readFile(link, "utf8")).toBe(edited);
+
       await NodeFSP.rm(link);
       await NodeFSP.symlink(NodePath.join(home, "bin/infinitus"), link);
       const overDesktop = await installOver({
@@ -316,8 +356,13 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("install.sh t3 
         binDir: `${binDir}/`,
       });
       expect(overDesktop.code, overDesktop.output).toBe(0);
+<<<<<<< HEAD
       expect(await NodeFSP.readlink(link)).toBe(
         NodePath.join(home, "runtime/versions/1.2.3/infinitus"),
+=======
+      expect(await NodeFSP.readFile(link, "utf8")).toBe(
+        launcherScript(NodePath.join(home, "runtime/versions/1.2.3/t3")),
+>>>>>>> upstream-sync-d6419d92a0-upstream-renamed
       );
     } finally {
       await NodeFSP.rm(root, { recursive: true, force: true });
@@ -444,6 +489,8 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
             "rm",
             "mv",
             "ln",
+            "chmod",
+            "sed",
             checksumTool,
           ]) {
             const executable = NodeChildProcess.execFileSync(
