@@ -1,4 +1,5 @@
 import { SourceControlProviderKind } from "@infinitus/contracts";
+import { canonicalRepositoryPath } from "@infinitus/shared/git";
 import {
   buildCommitUrl,
   changeRequestUrlBelow,
@@ -156,8 +157,8 @@ export const definition = defineSourceControl({
   canonicalRepositoryKey,
   isChangeRequestInRepository: (identity, link) => {
     if (!isChangeRequestAuthorityOfProject(identity, link)) return false;
-    const projectKey = identity.canonicalKey.toLowerCase();
-    const linkKey = `${link.host}/${link.repository}`.toLowerCase();
+    const projectKey = canonicalRepositoryPath(identity.canonicalKey);
+    const linkKey = canonicalRepositoryPath(`${link.host}/${link.repository}`);
     return (
       (canonicalRepositoryKey(projectKey) ?? projectKey) ===
       (canonicalRepositoryKey(linkKey) ?? linkKey)
