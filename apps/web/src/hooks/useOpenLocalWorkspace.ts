@@ -4,8 +4,10 @@ import {
   inferProjectTitleFromPath,
 } from "@infinitus/client-runtime/state/projects";
 import type { DesktopAppActivationRequest } from "@infinitus/contracts";
+import { msg } from "gt-react";
 
 import { handleDesktopAppActivationRequest } from "../desktopAppActivation";
+import { m } from "../i18n/messages";
 import { newProjectId } from "../lib/utils";
 import { readProjects, waitForProject } from "../state/entities";
 import { usePrimaryEnvironment } from "../state/environments";
@@ -73,7 +75,11 @@ export function useOpenLocalWorkspace() {
           const error = squashAtomCommandFailure(result);
           throw error instanceof Error
             ? error
+<<<<<<< HEAD
             : new Error(`${PRODUCT_NAME} could not add the project.`);
+=======
+            : new Error(m(msg("T3 Code could not add the project.")));
+>>>>>>> upstream-sync-9661141276-upstream-renamed
         }
         return projectId;
       },
@@ -91,7 +97,7 @@ export function useOpenLocalWorkspace() {
           void updateProject({
             environmentId: projectRef.environmentId,
             input: { projectId: projectRef.projectId, archived: false },
-          }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+          }).then((result) => reportProjectFailure(m(msg("Failed to unarchive project")), result));
         }
         return openThread(projectRef);
       },

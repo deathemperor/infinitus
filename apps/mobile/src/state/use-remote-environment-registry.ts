@@ -1,14 +1,17 @@
 import * as Dialog from "../components/ui/Dialog";
+import { errorDisplayMessage } from "@infinitus/client-runtime/errors";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
 import { Discovery } from "@infinitus/client-runtime/relay";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Cause from "effect/Cause";
+import { msg } from "gt-react-native";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { runAtomCommand } from "@infinitus/client-runtime/state/runtime";
 
 import { hasCloudPublicConfig } from "../features/cloud/publicConfig";
+import { m } from "../i18n/messages";
 import { useConnectionController } from "../features/connection/useConnectionController";
 import { useRetryEnvironment } from "../features/connection/useRetryEnvironment";
 import { environmentPresentations } from "./presentation";
@@ -24,9 +27,21 @@ import { relayEnvironmentDiscovery } from "./relay";
 import { connectPairingUrl as connectPairingUrlCommand } from "../connection/onboarding";
 
 const RELAY_REMOVAL_ACCOUNT_NOTE: Record<Discovery.RelayEnvironmentRegistration, string> = {
+<<<<<<< HEAD
   registered: `It stays on your ${CONNECT_NAME} account and keeps its host space. Deregister it under ${PRODUCT_NAME} Account → ${CONNECT_NAME} to free it.`,
   unregistered: `It's no longer on your ${CONNECT_NAME} account.`,
   unknown: `This doesn't change your ${CONNECT_NAME} account. To deregister it there, use ${PRODUCT_NAME} Account → ${CONNECT_NAME}.`,
+=======
+  registered: msg(
+    "It stays on your {connect} account and keeps its host space. Deregister it under {account} → {connect} to free it.",
+    { connect: "T3 Connect", account: "T3 Account" },
+  ),
+  unregistered: msg("It's no longer on your {connect} account.", { connect: "T3 Connect" }),
+  unknown: msg(
+    "This doesn't change your {connect} account. To deregister it there, use {account} → {connect}.",
+    { connect: "T3 Connect", account: "T3 Account" },
+  ),
+>>>>>>> upstream-sync-9661141276-upstream-renamed
 };
 
 const connectionPairingUrlAtom = Atom.make("").pipe(
@@ -65,14 +80,14 @@ export async function pairEnvironment(
     return { ok: true, error: null };
   }
   const error = Cause.squash(result.cause);
-  const message = error instanceof Error ? error.message : "Failed to pair with the environment.";
+  const message = errorDisplayMessage(error, m) ?? m(msg("Failed to pair with the environment."));
   if (
     error !== null &&
     typeof error === "object" &&
     "reason" in error &&
     error.reason === "unsupported"
   ) {
-    Dialog.alert("Client not supported", message);
+    Dialog.alert(m(msg("Client not supported")), message);
     return { ok: false, error: null };
   }
   return { ok: false, error: message };
@@ -182,7 +197,7 @@ export function useRemoteConnections() {
       return;
     }
     const remove = {
-      text: "Remove",
+      text: m(msg("Remove")),
       style: "destructive",
       onPress: () => {
         void controller.removeEnvironment(environmentId);
@@ -194,22 +209,36 @@ export function useRemoteConnections() {
         environmentId,
       );
       const openAccount = {
+<<<<<<< HEAD
         text: `Open ${PRODUCT_NAME} Account`,
+=======
+        text: m(msg("Open {account}", { account: "T3 Account" })),
+>>>>>>> upstream-sync-9661141276-upstream-renamed
         onPress: () => navigation.navigate("SettingsAuth"),
       };
+      const cancel = { text: m(msg("Cancel")), style: "cancel" } as const;
       Dialog.alert(
-        "Remove from this device?",
-        `Forget ${environment.environmentLabel} and its cached threads on this device.\n\n${RELAY_REMOVAL_ACCOUNT_NOTE[registration]}`,
+        m(msg("Remove from this device?")),
+        `${m(
+          msg("Forget {name} and its cached threads on this device.", {
+            name: environment.environmentLabel,
+          }),
+        )}\n\n${m(RELAY_REMOVAL_ACCOUNT_NOTE[registration])}`,
         registration === "unregistered" || !hasCloudPublicConfig()
-          ? [{ text: "Cancel", style: "cancel" }, remove]
-          : [{ text: "Cancel", style: "cancel" }, openAccount, remove],
+          ? [cancel, remove]
+          : [cancel, openAccount, remove],
       );
       return;
     }
     Dialog.alert(
-      "Remove from this device?",
-      `Forget ${environment.environmentLabel} and its cached threads on this device. Switch it off instead to keep it saved.`,
-      [{ text: "Cancel", style: "cancel" }, remove],
+      m(msg("Remove from this device?")),
+      m(
+        msg(
+          "Forget {name} and its cached threads on this device. Switch it off instead to keep it saved.",
+          { name: environment.environmentLabel },
+        ),
+      ),
+      [{ text: m(msg("Cancel")), style: "cancel" }, remove],
     );
   };
 

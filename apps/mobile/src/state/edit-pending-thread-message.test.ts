@@ -3,7 +3,11 @@ import { CommandId, EnvironmentId, MessageId, ThreadId } from "@infinitus/contra
 import type { QueuedThreadMessage } from "./thread-outbox-model";
 
 const state = vi.hoisted(() => ({
+<<<<<<< HEAD
   reclaim: vi.fn((_messageId: string) => true),
+=======
+  dispatching: {} as Record<string, true>,
+>>>>>>> upstream-sync-9661141276-upstream-renamed
   held: {} as Record<string, true>,
   draft: { text: "Existing draft", attachments: [] as { id: string }[] },
   confirm: vi.fn(async () => true),
@@ -20,6 +24,10 @@ vi.mock("./queued-message-dispatch", () => ({
   reclaimQueuedMessageFromDispatch: state.reclaim,
 }));
 vi.mock("./use-thread-outbox", () => ({
+<<<<<<< HEAD
+=======
+  dispatchingQueuedMessageIdsAtom: "dispatching",
+>>>>>>> upstream-sync-9661141276-upstream-renamed
   editingQueuedMessageIdsAtom: "editing",
   holdEditingQueuedMessage: (id: string) => {
     state.held[id] = true;
@@ -70,7 +78,11 @@ const message: QueuedThreadMessage = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+<<<<<<< HEAD
   state.reclaim.mockReturnValue(true);
+=======
+  state.dispatching = {};
+>>>>>>> upstream-sync-9661141276-upstream-renamed
   state.held = {};
   state.draft = { text: "Existing draft", attachments: [] };
   state.confirm.mockResolvedValue(true);
@@ -92,8 +104,13 @@ describe("editing a pending message", () => {
     expect(await editPendingThreadMessage(message)).toBe(true);
     expect(state.held).toEqual({});
   });
+<<<<<<< HEAD
   it("does not reclaim a message whose send is in flight", async () => {
     state.reclaim.mockReturnValueOnce(false);
+=======
+  it("does not reclaim a message already being dispatched", async () => {
+    state.dispatching = { [message.messageId]: true };
+>>>>>>> upstream-sync-9661141276-upstream-renamed
     expect(await editPendingThreadMessage(message)).toBe(false);
     expect(state.reclaim).toHaveBeenCalledWith(message.messageId);
     expect(state.confirm).not.toHaveBeenCalled();

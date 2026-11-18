@@ -27,10 +27,9 @@ import {
   ensurePinnedRuntimeInstalled,
   findPosixLauncher,
   launcherOwnsVersionsDir,
-  pinnedRuntimeCommand,
   isUnpublishedRelease,
-  PinnedRuntimeInstallError,
   pinnedRuntimePaths,
+  PinnedRuntimePreflightBlockedError,
   pinnedRuntimeVersionsDir,
   prunePinnedRuntimes,
   recordPinnedRuntimeLauncher,
@@ -38,7 +37,13 @@ import {
   windowsShimTarget,
   writePosixLauncher,
 } from "../cloud/pinnedRuntime.ts";
-import { compareExactServiceVersions, isExactServiceVersion } from "../cloud/serviceProtocol.ts";
+import {
+  compareExactServiceVersions,
+  decodeServiceUnit,
+  isExactServiceVersion,
+  SERVICE_LAUNCHER_PROTOCOL,
+} from "../cloud/serviceProtocol.ts";
+import { runStagedServicePreflight } from "../cloud/servicePreflight.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import { managedUpdateMirror, managedUpdateRefusal } from "../policy/managedUpdates.ts";
 import * as ProcessRunner from "../processRunner.ts";
@@ -274,6 +279,7 @@ export const updateCommand = Command.make("update", {
       return yield* runUpdate({
         baseDir: config.baseDir,
         logsDir: config.logsDir,
+        databasePath: config.dbPath,
         serverRuntimeStatePath: config.serverRuntimeStatePath,
         channel: Option.getOrUndefined(flags.channel),
         requestedVersion: Option.getOrUndefined(flags.version),
@@ -339,6 +345,7 @@ const belongsToBootService = Effect.fn("cli.update.belongs_to_boot_service")(fun
 export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   readonly baseDir: string;
   readonly logsDir: string;
+  readonly databasePath: string;
   readonly serverRuntimeStatePath: string;
   readonly channel: CliReleaseChannel | undefined;
   readonly requestedVersion: string | undefined;
@@ -494,6 +501,7 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     arch,
     releaseBaseUrl: mirror?.feedUrl ?? (environment[CLI_RELEASE_BASE_URL_ENV]?.trim() || undefined),
     requirePublishedRelease: mirror !== undefined,
+<<<<<<< HEAD
     validate: (paths) =>
       runner
         .run({
@@ -513,12 +521,39 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
                   new PinnedRuntimeInstallError({
                     step: "verifying the downloaded infinitus",
                     exitCode: Number(result.code),
+=======
+    validate: (runtime) =>
+      runStagedServicePreflight({
+        runner,
+        runtime,
+        targetVersion,
+        databasePath: input.databasePath,
+        // The target then runs under its own launcher, so only its database check matters. Older
+        // builds may predate protocol 4; every stable release since 0.0.43 accepts 3.
+        launcherProtocol:
+          compareExactServiceVersions(targetVersion, currentVersion) < 0
+            ? 3
+            : SERVICE_LAUNCHER_PROTOCOL,
+      }).pipe(
+        Effect.catchTags({
+          PinnedRuntimeInstallError: (error) =>
+            Effect.fail(
+              error.exitCode === undefined
+                ? error
+                : new PinnedRuntimePreflightBlockedError({
+                    version: targetVersion,
+                    reason: `t3@${targetVersion} could not confirm it supports this database (its check exited with code ${error.exitCode}), so t3 did not switch to it.`,
+>>>>>>> upstream-sync-9661141276-upstream-renamed
                   }),
-                ),
-          ),
-        ),
+            ),
+        }),
+      ),
   }).pipe(
     Effect.ensuring(Effect.sync(progress.finish)),
+    Effect.catchTags({
+      PinnedRuntimePreflightBlockedError: (error) =>
+        Effect.fail(new CliUpdateError({ reason: error.reason })),
+    }),
     Effect.catchIf(isUnpublishedRelease, () =>
       Effect.fail(
         new CliUpdateError({
@@ -570,7 +605,9 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   // A handed-off service install rewrites the unit later, while the old launcher may be stopped.
   if (servicePlan?.handedOff !== true) {
     // A stopped service's unit still names the launcher runtime it will start.
-    const unit = yield* fs.readFileString(status.unitPath).pipe(Effect.option);
+    const unit = yield* fs
+      .readFile(status.unitPath)
+      .pipe(Effect.map(decodeServiceUnit), Effect.option);
     yield* prunePinnedRuntimes({
       baseDir: input.baseDir,
       keep: [currentVersion, targetVersion],

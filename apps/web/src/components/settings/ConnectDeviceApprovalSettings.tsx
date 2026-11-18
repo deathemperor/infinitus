@@ -1,13 +1,16 @@
+import { thrownErrorMessage } from "@infinitus/client-runtime/errors";
 import type { AuthConnectDevice, EnvironmentId } from "@infinitus/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@infinitus/client-runtime/state/runtime";
 import * as DateTime from "effect/DateTime";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { useState } from "react";
 
 import type { ServerPairingLinkRecord } from "~/environments/primary";
 import { authEnvironment } from "~/state/auth";
+import { m } from "~/i18n/messages";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
@@ -27,7 +30,10 @@ function reportFailure(title: string, result: Parameters<typeof isAtomCommandInt
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      description:
+        error instanceof Error
+          ? (thrownErrorMessage(error, m) ?? error.message)
+          : m(msg("An error occurred.")),
     }),
   );
 }
@@ -46,6 +52,8 @@ export function ConnectDeviceApprovalSettings({
   /** Revokes now, or first asks to turn approval on when it is off. */
   readonly requestRevoke: (title: string, revoke: () => Promise<void>) => void;
 }) {
+  const gt = useGT();
+  const resolve = useMessages();
   const approve = useAtomCommand(authEnvironment.approveConnectDevice, { reportFailure: false });
   const deny = useAtomCommand(authEnvironment.revokePairingLink, { reportFailure: false });
   const revoke = useAtomCommand(authEnvironment.revokeConnectDevice, { reportFailure: false });
@@ -58,7 +66,11 @@ export function ConnectDeviceApprovalSettings({
   };
 
   return (
+<<<<<<< HEAD
     <SettingsSection id="connect-devices" title={`${CONNECT_NAME} devices`}>
+=======
+    <SettingsSection id="connect-devices" title={gt("T3 Connect devices")}>
+>>>>>>> upstream-sync-9661141276-upstream-renamed
       {requests.map((request) => {
         const connectRequest = request.connectDeviceRequest;
         if (!connectRequest) return null;
@@ -68,12 +80,18 @@ export function ConnectDeviceApprovalSettings({
             <div className={ITEM_ROW_INNER_CLASSNAME}>
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-sm font-medium text-foreground">
-                  Waiting for approval ·{" "}
-                  <span className="font-mono tabular-nums">{connectRequest.verificationCode}</span>
+                  <T>
+                    Waiting for approval ·{" "}
+                    <span className="font-mono tabular-nums">
+                      <Var>{connectRequest.verificationCode}</Var>
+                    </span>
+                  </T>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {describeConnectDeviceClient(connectRequest)}. Approve only if the device in front
-                  of you shows this code.
+                  <T>
+                    <Var>{describeConnectDeviceClient(connectRequest, resolve)}</Var>. Approve only
+                    if the device in front of you shows this code.
+                  </T>
                 </p>
               </div>
               <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
@@ -84,13 +102,13 @@ export function ConnectDeviceApprovalSettings({
                   onClick={() =>
                     void run(request.id, async () =>
                       reportFailure(
-                        "Could not deny the device",
+                        gt("Could not deny the device"),
                         await deny({ environmentId, input: { id: request.id } }),
                       ),
                     )
                   }
                 >
-                  Deny
+                  <T>Deny</T>
                 </Button>
                 <Button
                   size="xs"
@@ -98,13 +116,13 @@ export function ConnectDeviceApprovalSettings({
                   onClick={() =>
                     void run(request.id, async () =>
                       reportFailure(
-                        "Could not approve the device",
+                        gt("Could not approve the device"),
                         await approve({ environmentId, input: { pairingLinkId: request.id } }),
                       ),
                     )
                   }
                 >
-                  {busy ? "Saving…" : "Approve"}
+                  {busy ? gt("Saving…") : gt("Approve")}
                 </Button>
               </div>
             </div>
@@ -118,12 +136,15 @@ export function ConnectDeviceApprovalSettings({
             <div className={ITEM_ROW_INNER_CLASSNAME}>
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-sm font-medium text-foreground">
-                  {describeConnectDeviceClient(device)}
+                  {describeConnectDeviceClient(device, resolve)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   <span className="font-mono tabular-nums">{device.verificationCode}</span>
                   <span aria-hidden> · </span>
-                  Trusted since {formatAccessTimestamp(DateTime.formatIso(device.approvedAt))}
+                  <T>
+                    Trusted since{" "}
+                    <Var>{formatAccessTimestamp(DateTime.formatIso(device.approvedAt))}</Var>
+                  </T>
                 </p>
               </div>
               <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
@@ -132,20 +153,22 @@ export function ConnectDeviceApprovalSettings({
                   variant="destructive-outline"
                   disabled={!canWrite || busy}
                   onClick={() =>
-                    requestRevoke(`Revoke ${connectDeviceName(device)}?`, () =>
-                      run(device.proofKeyThumbprint, async () =>
-                        reportFailure(
-                          "Could not revoke the device",
-                          await revoke({
-                            environmentId,
-                            input: { proofKeyThumbprint: device.proofKeyThumbprint },
-                          }),
+                    requestRevoke(
+                      gt("Revoke {name}?", { name: connectDeviceName(device, resolve) }),
+                      () =>
+                        run(device.proofKeyThumbprint, async () =>
+                          reportFailure(
+                            gt("Could not revoke the device"),
+                            await revoke({
+                              environmentId,
+                              input: { proofKeyThumbprint: device.proofKeyThumbprint },
+                            }),
+                          ),
                         ),
-                      ),
                     )
                   }
                 >
-                  {busy ? "Revoking…" : "Revoke"}
+                  {busy ? gt("Revoking…") : gt("Revoke")}
                 </Button>
               </div>
             </div>
@@ -155,7 +178,11 @@ export function ConnectDeviceApprovalSettings({
       {devices.length === 0 && requests.length === 0 ? (
         <div className={ITEM_ROW_CLASSNAME}>
           <p className="text-xs text-muted-foreground/60">
+<<<<<<< HEAD
             No device has connected through {CONNECT_NAME} yet.
+=======
+            <T>No device has connected through T3 Connect yet.</T>
+>>>>>>> upstream-sync-9661141276-upstream-renamed
           </p>
         </div>
       ) : null}

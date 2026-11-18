@@ -1,6 +1,6 @@
 {
   "name": "t3",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -41,6 +41,7 @@
     "@effect/platform-node": "catalog:",
     "@effect/platform-node-shared": "catalog:",
     "@ff-labs/fff-node": "0.11.0",
+    "@infinitus/issue-tracker-linear": "workspace:*",
     "@infinitus/provider-acp": "workspace:*",
     "@infinitus/provider-acp-registry": "workspace:*",
     "@infinitus/provider-core": "workspace:*",
