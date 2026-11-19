@@ -14,7 +14,9 @@ set -eu
 # 0.3.3: #60 released.
 # + #63: a store-changing verb wakes the daemon from any process.
 # + #65: `list` splits banked resets by kind (`resets.kinds`: Claude's Fable and weekly resets), and `reset <slot> --kind <kind>` spends that kind.
+# + #67, #69: a banked reset spent early (claude.ai, the CLI's /reset, `swapd reset`) lifts a dated limit-hit report and the no-return bar; both had held the account spent until the old reset.
+# 0.3.4: #63, #65, #67, #69 released.
 cargo install --locked --git https://github.com/deathemperor/swapd \
-    --rev 040cdde83cff2f340e7b57bdad846b742cfe88d1 \
+    --rev 608f4e04401e28c7947f0dae75e731b9e364b1c4 \
     --root "$INFINITUS_ENGINE_BUILD_ROOT" swapd
 "$INFINITUS_ENGINE_BUILD_ROOT/bin/swapd" --version
