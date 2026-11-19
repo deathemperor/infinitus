@@ -1,8 +1,10 @@
 import { AuthPreviewOperateScope, type EnvironmentId } from "@infinitus/contracts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { AnyRouter } from "@tanstack/react-router";
+import { msg } from "gt-react";
 
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { m } from "~/i18n/messages";
 import { isPreviewAvailableFor } from "../browser/previewRuntime";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { useComposerDraftStore } from "../composerDraftStore";
@@ -163,8 +165,13 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
           toastManager.add(
             stackedThreadToast({
               type: "info",
+<<<<<<< HEAD
               title: "Preview is desktop-only",
               description: `Open ${PRODUCT_NAME} in the desktop app to use the in-app preview.`,
+=======
+              title: m(msg("Preview is desktop-only")),
+              description: m(msg("Open T3 Code in the desktop app to use the in-app preview.")),
+>>>>>>> upstream-sync-e8c4824b70-upstream-renamed
             }),
           );
           return;

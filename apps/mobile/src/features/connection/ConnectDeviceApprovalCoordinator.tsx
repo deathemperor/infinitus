@@ -1,3 +1,4 @@
+import { msg } from "gt-react-native";
 import {
   AuthAccessWriteScope,
   type AuthPairingLink,
@@ -6,6 +7,7 @@ import {
 import { useEffect, useEffectEvent } from "react";
 
 import * as Dialog from "../../components/ui/Dialog";
+import { m } from "../../i18n/messages";
 import { authEnvironment } from "../../state/auth";
 import { useEnvironments } from "../../state/environments";
 import { useEnvironmentQuery } from "../../state/query";
@@ -62,9 +64,9 @@ const approvalPrompts = createApprovalPromptQueue<QueuedApprovalPrompt>((prompt,
       }
       if (outcome === "gone") {
         return Dialog.alert(
-          "Request no longer waiting",
-          "It expired or was answered elsewhere.",
-          [{ text: "OK", onPress: () => answer("done") }],
+          m(msg("Request no longer waiting")),
+          m(msg("It expired or was answered elsewhere.")),
+          [{ text: m(msg("OK")), onPress: () => answer("done") }],
           { onDismiss: () => answer("done") },
         );
       }
@@ -72,8 +74,8 @@ const approvalPrompts = createApprovalPromptQueue<QueuedApprovalPrompt>((prompt,
         answer(watchedEnvironments.has(prompt.environmentId) ? "retry" : "done");
       Dialog.alert(
         failure,
-        "The request is still waiting. Try again.",
-        [{ text: "OK", onPress: retryIfWatched }],
+        m(msg("The request is still waiting. Try again.")),
+        [{ text: m(msg("OK")), onPress: retryIfWatched }],
         // Another dialog took the screen; offer the request again on the next update.
         { onDismiss: () => answer("later") },
       );
@@ -82,8 +84,14 @@ const approvalPrompts = createApprovalPromptQueue<QueuedApprovalPrompt>((prompt,
     prompt.title,
     prompt.message,
     [
-      { text: "Deny", onPress: respond(prompt.deny, "Could not deny the device") },
-      { text: "Approve", onPress: respond(prompt.approve, "Could not approve the device") },
+      {
+        text: m(msg("Deny")),
+        onPress: respond(prompt.deny, m(msg("Could not deny the device"))),
+      },
+      {
+        text: m(msg("Approve")),
+        onPress: respond(prompt.approve, m(msg("Could not approve the device"))),
+      },
     ],
     // Another dialog took the screen; offer the request again on the next update.
     { cancelable: false, onDismiss: () => answer("later") },

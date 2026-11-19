@@ -16,6 +16,7 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as SynchronizedRef from "effect/SynchronizedRef";
+import { msg } from "gt-i18n";
 
 import * as FileSystem from "effect/FileSystem";
 import { HttpClient } from "effect/http";
@@ -35,6 +36,7 @@ import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as ElectronApp from "../electron/ElectronApp.ts";
+import { m } from "../i18n/messages.ts";
 
 const { logWarning: logBackendPoolWarning } =
   DesktopObservability.makeComponentLogger("desktop-backend-pool");
@@ -190,8 +192,13 @@ export const layer = Layer.effect(
             { reason },
           );
           yield* electronDialog.showErrorBox(
+<<<<<<< HEAD
             "WSL backend is still unavailable",
             `${reason}\n\n${PRODUCT_NAME} will use the Windows backend for this launch and retry WSL the next time the app starts.`,
+=======
+            m(msg("WSL backend is still unavailable")),
+            `${reason}\n\n${m(msg("T3 Code will use the Windows backend for this launch and retry WSL the next time the app starts."))}`,
+>>>>>>> upstream-sync-e8c4824b70-upstream-renamed
           );
           yield* appSettings.applyWslWindowsFallbackInMemory;
           return true;
@@ -201,8 +208,13 @@ export const layer = Layer.effect(
           reason,
         });
         yield* electronDialog.showErrorBox(
+<<<<<<< HEAD
           "WSL backend couldn't start",
           `${reason}\n\nFalling back to the Windows backend so ${PRODUCT_NAME} can open. Re-enable the WSL backend from Settings > Sharing & access once the WSL distro is fixed.`,
+=======
+          m(msg("WSL backend couldn't start")),
+          `${reason}\n\n${m(msg("Falling back to the Windows backend so T3 Code can open. Re-enable the WSL backend from Settings > Sharing & access once the WSL distro is fixed."))}`,
+>>>>>>> upstream-sync-e8c4824b70-upstream-renamed
         );
         // Clear wslOnly too so enabling WSL cannot restore a failed mode.
         // Keep the in-memory fallback if persistence fails.
@@ -249,7 +261,11 @@ export const layer = Layer.effect(
         DesktopHomeOwner.readLiveHomeOwner().pipe(
           Effect.flatMap((owner) =>
             electronDialog.showErrorBox(
+<<<<<<< HEAD
               `This ${PRODUCT_NAME} home is unavailable`,
+=======
+              m(msg("This T3 home is unavailable")),
+>>>>>>> upstream-sync-e8c4824b70-upstream-renamed
               DesktopHomeOwner.homeOwnedMessage(owner),
             ),
           ),
