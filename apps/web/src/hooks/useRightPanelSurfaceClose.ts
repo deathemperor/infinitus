@@ -5,10 +5,11 @@ import {
   type ScopedThreadRef,
 } from "@infinitus/contracts";
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
-import { getTerminalLabel } from "@infinitus/shared/terminalLabels";
+import { getTerminalLabel } from "@infinitus/shared/terminalLabelsCopy";
 import { agentControlledBrowserCloseConfirmation } from "../components/ChatView.logic";
 import { closePreviewSession } from "../components/preview/closePreviewSession";
 import { useThreadTerminalActions } from "../components/terminal/useThreadTerminalActions";
+import { m } from "../i18n/messages";
 import { confirmTerminalClose } from "../lib/terminalCloseConfirm";
 import { focusPanelTerminalAfterClose } from "../lib/terminalFocus";
 import { readLocalApi } from "../localApi";
@@ -128,10 +129,24 @@ export function useRightPanelSurfaceClose(input: {
     focusPanelTerminalAfterClose(threadRef, activeId);
   };
   const labelFor = (terminalId: string) =>
-    terminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
+    terminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId, m);
   const closeSurfaces = (toClose: readonly RightPanelSurface[]) => {
     if (!threadRef) return;
-    closeAfterAgentBrowserConfirmation(toClose, () => finishClose(toClose));
+    closeAfterAgentBrowserConfirmation(toClose, () => {
+      const labels = readEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope)
+        ? toClose.flatMap((surface) =>
+            surface.kind === "terminal" ? surface.terminalIds.map(labelFor) : [],
+          )
+        : [];
+      const [first, ...rest] = labels;
+      if (first === undefined) {
+        finishClose(toClose);
+        return;
+      }
+      void confirmTerminalClose([first, ...rest]).then((confirmed) => {
+        if (confirmed) finishClose(toClose);
+      });
+    });
   };
 
   const closeSurface = useStableCallback((surface: RightPanelSurface) => {

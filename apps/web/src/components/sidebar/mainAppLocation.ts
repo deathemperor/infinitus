@@ -11,12 +11,16 @@ export function isAppModalPage(pathname: string) {
 
 export function isSidebarUtilityPage(pathname: string) {
   return (
+<<<<<<< HEAD
     pathname.startsWith("/projects/") ||
     pathname === "/pull-requests" ||
     // Fork: the Accounts, Stats and Utilization pages in the same row.
     pathname === "/accounts" ||
     pathname === "/stats" ||
     pathname === "/utilization"
+=======
+    pathname.startsWith("/projects/") || pathname === "/pull-requests" || pathname === "/issues"
+>>>>>>> upstream-sync-0317d4f4e5-upstream-renamed
   );
 }
 

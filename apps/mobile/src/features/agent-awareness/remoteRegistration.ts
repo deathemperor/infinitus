@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import { AppState, Platform } from "react-native";
+import { msg } from "gt-react-native";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
@@ -25,6 +26,7 @@ import {
   squashAtomCommandFailure,
 } from "@infinitus/client-runtime/state/runtime";
 
+import { m } from "../../i18n/messages";
 import { runtime } from "../../lib/runtime";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { environmentServerConfigsAtom } from "../../state/server";
@@ -38,7 +40,10 @@ import {
   saveAgentAwarenessRegistrationRecord,
 } from "../../persistence/imperative";
 import type { AgentActivityProps } from "../../widgets/AgentActivity";
-import type { AgentActivityWidgetSource } from "../../widgets/agentActivityWidgetTimeline";
+import {
+  agentActivityText,
+  type AgentActivityWidgetSource,
+} from "../../widgets/agentActivityWidgetTimeline";
 import { publishAgentActivityWidget } from "../../widgets/publishAgentActivityWidget";
 import {
   dismissEndedAgentLiveActivities,
@@ -520,8 +525,14 @@ function armAgentAwarenessLiveActivityForLocalWorkNow(input: {
     const nowIso = new Date(Date.now()).toISOString();
     const activity = startAgentLiveActivity(
       {
+<<<<<<< HEAD
         title: PRODUCT_NAME,
         subtitle: "Agent work in progress",
+=======
+        text: agentActivityText(1, m),
+        title: "T3 Code",
+        subtitle: m(msg("Agent work in progress")),
+>>>>>>> upstream-sync-0317d4f4e5-upstream-renamed
         activeCount: 1,
         updatedAt: nowIso,
         activities: [
@@ -532,7 +543,7 @@ function armAgentAwarenessLiveActivityForLocalWorkNow(input: {
             threadTitle: input.threadTitle,
             modelTitle: "",
             phase: "starting",
-            status: "Connecting",
+            status: m(msg("Connecting", { $context: "agent status" })),
             updatedAt: nowIso,
             deepLink: "/",
           },
@@ -732,6 +743,7 @@ const registerDevice = Effect.fn("remoteRegistration.registerDevice")(function* 
       deviceId,
       label:
         Constants.deviceName?.trim() ||
+        // oxlint-disable-next-line t3code/no-untranslated-copy -- device label stored on the relay and shown to every client
         (Platform.OS === "android" ? "Android device" : "iOS device"),
       ...(Platform.OS === "android"
         ? {
@@ -1112,6 +1124,10 @@ export const refreshActiveLiveActivityRemoteRegistration = Effect.fn(
           try: () =>
             startAgentLiveActivity(
               {
+                text: agentActivityText(
+                  Math.max(aggregate.activeCount, aggregate.activities.length),
+                  m,
+                ),
                 title: aggregate.title,
                 subtitle: aggregate.subtitle,
                 activeCount: aggregate.activeCount,

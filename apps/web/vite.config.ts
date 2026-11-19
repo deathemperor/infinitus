@@ -97,7 +97,11 @@ const unitTestProject = {
     setupFiles: [
       "../../packages/shared/src/testing/longTempDir.ts",
       "../../packages/shared/src/testing/providerEnv.ts",
+<<<<<<< HEAD
       "./src/test/animationFrame.ts",
+=======
+      "../../packages/shared/src/testing/gitEnv.ts",
+>>>>>>> upstream-sync-0317d4f4e5-upstream-renamed
     ],
   },
 } satisfies TestProjectInlineConfiguration;
@@ -125,7 +129,7 @@ const browserTestProject = {
       "fast-xml-parser",
       "entities",
       "dompurify",
-      "heic-to/next",
+      "heic-to/csp",
       "jszip",
       "pdfjs-dist",
       "sql.js",
