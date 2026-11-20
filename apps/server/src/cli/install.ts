@@ -1,5 +1,5 @@
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import { pathSetupCommand } from "@infinitus/shared/shell";
+import { pathSetupCommand, resolveCommandPath } from "@infinitus/shared/shell";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -156,7 +156,7 @@ export const installCli = Effect.fn("cli.install.install")(function* () {
       if (!path.isAbsolute(entry) || detectCliRunner(`${entry}/`) !== null) continue;
       for (const name of windows ? ["infinitus.cmd", "infinitus.exe"] : ["infinitus"]) {
         const candidate = path.join(entry, name);
-        if (yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false))) return candidate;
+        if (yield* resolveCommandPath(candidate, { env: environment })) return candidate;
       }
     }
     return undefined;

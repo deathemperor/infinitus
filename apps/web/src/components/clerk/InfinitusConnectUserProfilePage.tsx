@@ -1,4 +1,4 @@
-import { findErrorTraceId } from "@infinitus/client-runtime/errors";
+import { findErrorTraceId, thrownErrorMessage } from "@infinitus/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -6,6 +6,7 @@ import {
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { RelayClientEnvironmentRecord } from "@infinitus/contracts/relay";
 import { ServerIcon } from "lucide-react";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { useRef, useState } from "react";
 
 import {
@@ -27,22 +28,29 @@ import {
   ClerkUserProfileRefreshButton,
   ClerkUserProfileRow,
 } from "./ClerkUserProfilePage";
+<<<<<<< HEAD
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+=======
+import { m, type MessageResolver } from "../../i18n/messages";
+>>>>>>> upstream-sync-f2d4df0367-upstream-renamed
 import { useT3ChatLink } from "./useT3ChatLink";
 
 const linkedAtFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
-function linkedAtLabel(value: string): string {
+function linkedAtLabel(value: string, resolve: MessageResolver): string {
   const linkedAt = new Date(value);
   return Number.isNaN(linkedAt.getTime())
-    ? "Link date unavailable"
-    : `Linked ${linkedAtFormatter.format(linkedAt)}`;
+    ? resolve(msg("Link date unavailable"))
+    : resolve(msg("Linked {date}", { date: linkedAtFormatter.format(linkedAt) }));
 }
 
-function endpointLabel(environment: RelayClientEnvironmentRecord): string {
+function endpointLabel(
+  environment: RelayClientEnvironmentRecord,
+  resolve: MessageResolver,
+): string {
   return environment.endpoint.providerKind === "cloudflare_tunnel"
-    ? "Managed tunnel"
-    : "Activity publishing only";
+    ? resolve(msg("Managed tunnel"))
+    : resolve(msg("Activity publishing only"));
 }
 
 function InfinitusConnectEnvironmentRow(props: {
@@ -53,6 +61,8 @@ function InfinitusConnectEnvironmentRow(props: {
   readonly onDeregister: (environment: RelayClientEnvironmentRecord) => void;
 }) {
   const { environment } = props;
+  const gt = useGT();
+  const m = useMessages();
   return (
     <ClerkUserProfileRow icon={<ServerIcon className="size-4" />}>
       <Collapsible open={props.confirmationOpen} onOpenChange={props.onConfirmationChange}>
@@ -62,13 +72,13 @@ function InfinitusConnectEnvironmentRow(props: {
               {environment.label}
             </h3>
             <p className="mt-1 text-xs leading-4.5 text-muted-foreground">
-              {linkedAtLabel(environment.linkedAt)} · {endpointLabel(environment)}
+              {linkedAtLabel(environment.linkedAt, m)} · {endpointLabel(environment, m)}
             </p>
           </div>
           <CollapsibleTrigger
             render={
               <Button size="sm" variant="destructive-outline" disabled={props.mutationPending}>
-                Deregister
+                <T>Deregister</T>
               </Button>
             }
           />
@@ -79,17 +89,28 @@ function InfinitusConnectEnvironmentRow(props: {
             <div
               className="rounded-lg border border-input bg-muted/32 px-5 py-4 shadow-xs/5"
               role="group"
-              aria-label={`Confirm deregistration of ${environment.label}`}
+              aria-label={gt("Confirm deregistration of {environment}", {
+                environment: environment.label,
+              })}
             >
               <h4 className="text-sm leading-4.5 font-semibold text-foreground">
-                Deregister server
+                <T>Deregister server</T>
               </h4>
               <p className="mt-1 text-xs leading-4.5 text-muted-foreground">
-                “{environment.label}” will be removed from this account.
+                <T>
+                  “<Var>{environment.label}</Var>” will be removed from this account.
+                </T>
               </p>
               <p className="mt-4 max-w-xl text-xs leading-4.5 text-muted-foreground">
+<<<<<<< HEAD
                 {CONNECT_NAME} access will be revoked, any managed tunnel will be removed, and a
                 host space will become available. Local connections on your devices are not changed.
+=======
+                <T>
+                  T3 Connect access will be revoked, any managed tunnel will be removed, and a host
+                  space will become available. Local connections on your devices are not changed.
+                </T>
+>>>>>>> upstream-sync-f2d4df0367-upstream-renamed
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button
@@ -98,7 +119,7 @@ function InfinitusConnectEnvironmentRow(props: {
                   disabled={props.mutationPending}
                   onClick={() => props.onConfirmationChange(false)}
                 >
-                  Cancel
+                  <T>Cancel</T>
                 </Button>
                 <Button
                   size="sm"
@@ -106,7 +127,7 @@ function InfinitusConnectEnvironmentRow(props: {
                   disabled={props.mutationPending}
                   onClick={() => props.onDeregister(environment)}
                 >
-                  {props.mutationPending ? "Deregistering…" : "Deregister"}
+                  {props.mutationPending ? gt("Deregistering…") : gt("Deregister")}
                 </Button>
               </div>
             </div>
@@ -120,6 +141,8 @@ function InfinitusConnectEnvironmentRow(props: {
 function InfinitusConnectTunnelUsage() {
   const usage = useManagedTunnelUsage();
   const t3Chat = useT3ChatLink();
+  const gt = useGT();
+  const m = useMessages();
   if (usage.used === null || usage.limit === null) return null;
   return (
     <div className="border-t py-4">
@@ -127,7 +150,7 @@ function InfinitusConnectTunnelUsage() {
       {usage.upgrade ? (
         <p className="mt-2 text-xs leading-4.5 text-muted-foreground">
           {usage.upgrade === "link" && t3Chat.linkUrl ? (
-            <>
+            <T>
               Confirm on{" "}
               <a
                 className="underline"
@@ -138,13 +161,13 @@ function InfinitusConnectTunnelUsage() {
                 t3.chat
               </a>
               , then select Refresh.
-            </>
+            </T>
           ) : (
             <>
-              {tunnelUpgradeCopy(usage.upgrade)}{" "}
+              {tunnelUpgradeCopy(usage.upgrade, m)}{" "}
               {usage.upgrade === "link" ? (
                 <InlineButton disabled={t3Chat.pending !== null} onClick={() => void t3Chat.link()}>
-                  {t3Chat.pending === "link" ? "Opening…" : "Link T3 Chat"}
+                  {t3Chat.pending === "link" ? gt("Opening…") : gt("Link T3 Chat")}
                 </InlineButton>
               ) : (
                 <a
@@ -153,7 +176,7 @@ function InfinitusConnectTunnelUsage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Upgrade on T3 Chat
+                  <T>Upgrade on T3 Chat</T>
                 </a>
               )}
             </>
@@ -166,6 +189,7 @@ function InfinitusConnectTunnelUsage() {
 
 export function InfinitusConnectUserProfilePage() {
   const environmentsState = useManagedRelayEnvironments();
+  const gt = useGT();
   const deregisterEnvironment = useAtomCommand(deregisterManagedRelayEnvironmentCommand, {
     reportFailure: false,
   });
@@ -207,8 +231,13 @@ export function InfinitusConnectUserProfilePage() {
       void refreshRelayEnvironments();
       toastManager.add({
         type: "success",
+<<<<<<< HEAD
         title: "Server deregistered",
         description: `${CONNECT_NAME} access was revoked and a host space is now available.`,
+=======
+        title: gt("Server deregistered"),
+        description: gt("T3 Connect access was revoked and a host space is now available."),
+>>>>>>> upstream-sync-f2d4df0367-upstream-renamed
       });
       return;
     }
@@ -217,7 +246,7 @@ export function InfinitusConnectUserProfilePage() {
     // The relay may have removed it before failing.
     environmentsState.refresh();
     const cause = squashAtomCommandFailure(result);
-    const message = cause instanceof Error ? cause.message : "Could not deregister the server.";
+    const message = thrownErrorMessage(cause, m) ?? gt("Could not deregister the server.");
     const traceId = findErrorTraceId(cause);
     console.error("[t3-connect] Could not deregister environment", {
       environmentId: environment.environmentId,
@@ -228,12 +257,12 @@ export function InfinitusConnectUserProfilePage() {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not deregister server",
+        title: gt("Could not deregister server"),
         description: relayFailureReason(cause) ?? message,
         ...(traceId
           ? {
               actionProps: {
-                children: "Copy trace ID",
+                children: gt("Copy trace ID"),
                 onClick: () => void navigator.clipboard?.writeText(traceId),
               },
               actionVariant: "outline",
@@ -259,8 +288,15 @@ export function InfinitusConnectUserProfilePage() {
 
   return (
     <ClerkUserProfilePage
+<<<<<<< HEAD
       title={CONNECT_NAME}
       description="Environments registered to your account. Connections on this device are managed in Settings."
+=======
+      title="T3 Connect"
+      description={gt(
+        "Environments registered to your account. Connections on this device are managed in Settings.",
+      )}
+>>>>>>> upstream-sync-f2d4df0367-upstream-renamed
       action={
         <ClerkUserProfileRefreshButton
           disabled={deregisteringEnvironmentId !== null}
@@ -274,7 +310,11 @@ export function InfinitusConnectUserProfilePage() {
         {environmentsState.error ? (
           <div className="mb-4 border-t border-destructive/35 py-3 text-xs" role="alert">
             <p className="font-medium text-destructive-foreground">
+<<<<<<< HEAD
               Could not load {CONNECT_NAME} environments
+=======
+              <T>Could not load T3 Connect environments</T>
+>>>>>>> upstream-sync-f2d4df0367-upstream-renamed
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{environmentsState.error}</p>
           </div>
@@ -282,7 +322,7 @@ export function InfinitusConnectUserProfilePage() {
 
         {isInitialLoad ? (
           <p className="border-t py-4 text-xs text-muted-foreground" role="status">
-            Loading environments…
+            <T>Loading environments…</T>
           </p>
         ) : environments.length > 0 ? (
           <ul className="border-t">
@@ -306,10 +346,21 @@ export function InfinitusConnectUserProfilePage() {
                 <ServerIcon />
               </EmptyMedia>
               <EmptyHeader>
+<<<<<<< HEAD
                 <EmptyTitle>No {CONNECT_NAME} environments</EmptyTitle>
                 <EmptyDescription>
                   Link an environment from its local Settings to make it available through{" "}
                   {CONNECT_NAME}.
+=======
+                <EmptyTitle>
+                  <T>No T3 Connect environments</T>
+                </EmptyTitle>
+                <EmptyDescription>
+                  <T>
+                    Link an environment from its local Settings to make it available through T3
+                    Connect.
+                  </T>
+>>>>>>> upstream-sync-f2d4df0367-upstream-renamed
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

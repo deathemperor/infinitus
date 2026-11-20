@@ -5,9 +5,8 @@ import {
   managedCapabilityDenial,
 } from "@infinitus/contracts";
 
-import { isElectron } from "../env";
 import { useManagedPolicy } from "../state/managedPolicy";
-import { useEnvironmentScope } from "../state/session";
+import { useEnvironmentCanConfigureRelay, useEnvironmentScope } from "../state/session";
 import { useCloudLinkState } from "./cloudLinkState";
 import { hasCloudPublicConfig } from "./publicConfig";
 import { resolveInfinitusConnectTurnOn } from "./t3ConnectState";
@@ -16,15 +15,15 @@ import { resolveInfinitusConnectTurnOn } from "./t3ConnectState";
 export function useInfinitusConnectTurnOn(environmentId: EnvironmentId | null) {
   const canReadRelay = useEnvironmentScope(environmentId, AuthRelayReadScope);
   const canWriteRelay = useEnvironmentScope(environmentId, AuthRelayWriteScope);
+  const canConfigureRelay = useEnvironmentCanConfigureRelay(environmentId);
   const connectDenial = managedCapabilityDenial(useManagedPolicy(environmentId), "connect");
   const linkState = useCloudLinkState(environmentId).data;
   return resolveInfinitusConnectTurnOn({
-    desktopApp: isElectron,
     // Unknown while loading and on older servers, which keep today's switch in Settings.
     linkableHere: linkState?.linkableHere ?? true,
     cloudConfigured: hasCloudPublicConfig(),
     canReadRelay,
-    canWriteRelay,
+    canWriteRelay: canWriteRelay && canConfigureRelay,
     connectDenial,
   });
 }

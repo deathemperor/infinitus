@@ -26,6 +26,14 @@ export const editingQueuedMessageIdsAtom = Atom.make<Readonly<Record<MessageId, 
   Atom.withLabel("mobile:thread-outbox:editing-message-ids"),
 );
 
+<<<<<<< HEAD
+=======
+/** Messages being sent now: at most one per thread, the head of its queue. */
+export const dispatchingQueuedMessageIdsAtom = Atom.make<
+  Readonly<Partial<Record<MessageId, true>>>
+>({}).pipe(Atom.keepAlive, Atom.withLabel("mobile:thread-outbox:dispatching-message-ids"));
+
+>>>>>>> upstream-sync-f2d4df0367-upstream-renamed
 /** Messages waiting out a retry backoff, which can repeat for as long as the failure lasts. */
 export const retryingQueuedMessageIdsAtom = Atom.make<Readonly<Partial<Record<MessageId, true>>>>(
   {},
