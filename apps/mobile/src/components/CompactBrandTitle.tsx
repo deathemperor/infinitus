@@ -1,5 +1,6 @@
 import { NATIVE_WORKSPACE_COLUMNS_SUPPORTED } from "../native/NativeWorkspaceColumns";
 import Constants from "expo-constants";
+import { useGT } from "gt-react-native";
 import { useState } from "react";
 import { Platform, View } from "react-native";
 
@@ -10,6 +11,7 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAndroidControlSizing } from "./ui/useAndroidControlSizing";
 
 const BRAND_MAX_FONT_SCALE = 1.4;
+const WORDMARK_SUFFIX = "Code";
 
 export function brandTitleOffset(): number {
   if (Platform.OS !== "ios") return 0;
@@ -24,6 +26,7 @@ export function CompactBrandTitle(
     readonly fit?: boolean;
   } = {},
 ) {
+  const gt = useGT();
   const stageLabel = resolveMobileStageLabel(Constants.expoConfig?.extra?.appVariant);
   const titleOffset = brandTitleOffset();
   const { scale } = useAndroidControlSizing();
@@ -39,7 +42,11 @@ export function CompactBrandTitle(
         props.fit && showStage ? (event) => setFullWidth(event.nativeEvent.layout.width) : undefined
       }
       aria-level={1}
+<<<<<<< HEAD
       accessibilityLabel={props.accessibilityLabel ?? `${PRODUCT_NAME}, Threads`}
+=======
+      accessibilityLabel={props.accessibilityLabel ?? gt("T3 Code, Threads")}
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
       accessible
       role="heading"
       className="flex-row items-center gap-1.5"
@@ -55,7 +62,11 @@ export function CompactBrandTitle(
         className="font-infinitus-medium text-foreground"
         style={{ fontSize: 21 * scale, letterSpacing: -0.5 * scale }}
       >
+<<<<<<< HEAD
         {PRODUCT_NAME}
+=======
+        {WORDMARK_SUFFIX}
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
       </Text>
       {showStage ? (
         <View

@@ -1,3 +1,6 @@
+import { msg } from "gt-react-native";
+
+import { m } from "../../i18n/messages";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -68,8 +71,13 @@ export function buildShowcaseAgentActivity(
     });
   }
   return {
+<<<<<<< HEAD
     title: PRODUCT_NAME,
     subtitle: "Agent work in progress",
+=======
+    title: "T3 Code",
+    subtitle: m(msg("Agent work in progress")),
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
     activeCount: rows.filter((row) => ACTIVE_PHASES.has(row.phase)).length,
     updatedAt: new Date(now).toISOString(),
     activities: rows,

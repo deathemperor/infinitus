@@ -334,8 +334,16 @@ const config: ExpoConfig = {
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
       },
+<<<<<<< HEAD
       NSLocalNetworkUsageDescription: `Allow ${variant.appName} to connect to ${variant.appName} servers on your local network or tailnet.`,
       NSPhotoLibraryAddUsageDescription: `Allow ${variant.appName} to save images to your photo library.`,
+=======
+      NSLocalNetworkUsageDescription:
+        "Allow T3 Code to connect to T3 Code servers on your local network or tailnet.",
+      // Built with the iOS 27 SDK, only view controllers can hide or style the status bar.
+      UIViewControllerBasedStatusBarAppearance: true,
+      NSPhotoLibraryAddUsageDescription: "Allow T3 Code to save images to your photo library.",
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
       // System picture in picture needs background audio to start and survive outside the app.
       UIBackgroundModes: ["audio"],
       ITSAppUsesNonExemptEncryption: false,

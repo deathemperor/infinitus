@@ -7,10 +7,15 @@ import type {
 import type { ServerUpdateState } from "@infinitus/client-runtime/state/server";
 import { compareSemverVersions, parseSemver } from "@infinitus/shared/semver";
 import * as Schema from "effect/Schema";
+import { msg } from "gt-react";
 
 import { APP_VERSION } from "./branding";
 import { getLocalStorageItem, setLocalStorageItem } from "./hooks/useLocalStorage";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import { m, type MessageResolver } from "./i18n/messages";
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
 
 export interface VersionMismatch {
   readonly clientVersion: string;
@@ -48,6 +53,7 @@ function versionCore(version: string): string {
 export function resolveVersionMismatch(
   serverVersion: string | null | undefined,
   clientVersion: string = APP_VERSION,
+  resolve: MessageResolver = m,
 ): VersionMismatch | null {
   const normalizedClientVersion = normalizeVersion(clientVersion);
   const normalizedServerVersion = normalizeVersion(serverVersion);
@@ -74,14 +80,21 @@ export function resolveVersionMismatch(
   return {
     clientVersion: normalizedClientVersion,
     serverVersion: normalizedServerVersion,
+<<<<<<< HEAD
     hint: `Version mismatch. Try syncing the client and server to the same ${PRODUCT_NAME} version.`,
+=======
+    hint: resolve(
+      msg("Version mismatch. Try syncing the client and server to the same T3 Code version."),
+    ),
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
   };
 }
 
 export function resolveServerConfigVersionMismatch(
   serverConfig: Pick<ServerConfig, "environment"> | null | undefined,
+  resolve: MessageResolver = m,
 ): VersionMismatch | null {
-  return resolveVersionMismatch(serverConfig?.environment.serverVersion);
+  return resolveVersionMismatch(serverConfig?.environment.serverVersion, APP_VERSION, resolve);
 }
 
 export function resolveServerSelfUpdateCapability(

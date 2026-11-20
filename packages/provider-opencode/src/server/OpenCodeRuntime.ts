@@ -37,13 +37,16 @@ import { collectStreamAsString } from "@infinitus/provider-core/server/snapshotP
 import * as NetService from "@infinitus/shared/Net";
 import { AgentScope } from "@infinitus/shared/AgentScope";
 import * as HostProcess from "@infinitus/shared/HostProcess";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { compareSemverVersions, parseSemver } from "@infinitus/shared/semver";
+=======
+import { parseSemver } from "@infinitus/shared/semver";
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
 const encodeUnknownJsonStringExit = Schema.encodeUnknownExit(Schema.fromJsonString(Schema.Unknown));
 const OPENCODE_EMPTY_CONFIG_CONTENT = "{}";
 
-export const MINIMUM_OPENCODE_VERSION = "1.14.19";
 const OPENCODE_HEALTH_TIMEOUT_MS = 5_000;
 
 const OpenCodeHealthSchema = Schema.Struct({
@@ -163,7 +166,7 @@ export const runOpenCodeSdk = <A>(
       new OpenCodeRuntimeError({ operation, detail: openCodeRuntimeErrorDetail(cause), cause }),
   }).pipe(Effect.withSpan(`opencode.${operation}`));
 
-export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersion")(function* (
+const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersion")(function* (
   client: OpencodeClient,
   environment?: NodeJS.ProcessEnv,
 ) {
@@ -186,7 +189,11 @@ export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersio
       (cause) =>
         new OpenCodeRuntimeError({
           operation: "global.health",
+<<<<<<< HEAD
           detail: `OpenCode server returned an invalid health response. ${PRODUCT_NAME} requires OpenCode v${MINIMUM_OPENCODE_VERSION} or newer.`,
+=======
+          detail: "OpenCode server returned an invalid health response.",
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
           cause,
         }),
     ),
@@ -194,6 +201,7 @@ export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersio
   if (parseSemver(health.version) === null) {
     return yield* new OpenCodeRuntimeError({
       operation: "global.health",
+<<<<<<< HEAD
       detail: `OpenCode server returned an invalid version. ${PRODUCT_NAME} requires OpenCode v${MINIMUM_OPENCODE_VERSION} or newer.`,
     });
   }
@@ -201,6 +209,9 @@ export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersio
     return yield* new OpenCodeRuntimeError({
       operation: "global.health",
       detail: `OpenCode v${health.version} is too old. Upgrade to v${MINIMUM_OPENCODE_VERSION} or newer.`,
+=======
+      detail: "OpenCode server returned an invalid version.",
+>>>>>>> upstream-sync-df09ced768-upstream-renamed
     });
   }
   return health.version;
