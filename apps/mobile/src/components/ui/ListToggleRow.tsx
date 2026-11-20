@@ -1,3 +1,4 @@
+import { T, useGT } from "gt-react-native";
 import { Pressable } from "react-native";
 
 import { AppText } from "./AppText";
@@ -10,6 +11,7 @@ export function ListToggleRow(
     readonly onValueChange: (value: boolean) => void;
   },
 ) {
+  const gt = useGT();
   return (
     <ListRowLayout
       icon={props.icon}
@@ -19,7 +21,9 @@ export function ListToggleRow(
       accessory={
         props.value === null ? (
           <Pressable
-            accessibilityLabel={`Set ${props.label} on for selected environments`}
+            accessibilityLabel={gt("Set {label} on for selected environments", {
+              label: props.label,
+            })}
             accessibilityRole="button"
             accessibilityHint={props.description}
             accessibilityState={{ disabled: Boolean(props.disabled) }}
@@ -28,7 +32,7 @@ export function ListToggleRow(
             onPress={() => props.onValueChange(true)}
           >
             <AppText className="text-sm font-infinitus-medium text-foreground">
-              Mixed · Set on
+              <T>Mixed · Set on</T>
             </AppText>
           </Pressable>
         ) : (

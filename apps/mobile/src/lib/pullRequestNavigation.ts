@@ -1,7 +1,8 @@
 import { parsePullRequestAnchor } from "@infinitus/shared/pullRequestAnchor";
 import { resolveChangeRequestLinkTarget } from "@infinitus/client-runtime/change-request-links";
+import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
 import type { EnvironmentProject } from "@infinitus/client-runtime/state/shell";
-import { EnvironmentId, ProjectId } from "@infinitus/contracts";
+import { EnvironmentId, ProjectId, type IssueRef } from "@infinitus/contracts";
 
 /** The PullRequest route for a change request link from a project, or null for the browser. */
 export function nativePullRequestDestination(
@@ -27,5 +28,27 @@ export function nativePullRequestDestination(
     number: target.number,
     ...(parsePullRequestAnchor(url) ? { navigationUrl: url } : {}),
     ...(target.host === undefined ? {} : { host: target.host }),
+  };
+}
+
+/**
+ * The pull request an issue link may name instead, on a host that numbers both in one sequence
+ * and writes every `#12` through its issue route. Null elsewhere. Only a candidate to read.
+ */
+export function pullRequestCandidateForIssueLink(
+  url: string,
+  ref: Pick<IssueRef, "projectId" | "host" | "scope" | "key">,
+) {
+  const candidateUrl = sourceControlClients.changeRequestUrlFromReferenceAutolink(url);
+  const number = Number(ref.key);
+  if (candidateUrl === null || !Number.isInteger(number) || number <= 0) return null;
+  return {
+    target: {
+      projectId: ref.projectId,
+      ...(ref.host === undefined ? {} : { host: ref.host }),
+      repository: ref.scope,
+      number,
+    },
+    navigationUrl: parsePullRequestAnchor(candidateUrl) ? candidateUrl : undefined,
   };
 }
