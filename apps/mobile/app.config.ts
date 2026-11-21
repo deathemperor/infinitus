@@ -334,8 +334,16 @@ const config: ExpoConfig = {
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
       },
+<<<<<<< HEAD
       NSLocalNetworkUsageDescription: `Allow ${variant.appName} to connect to ${variant.appName} servers on your local network or tailnet.`,
       NSPhotoLibraryAddUsageDescription: `Allow ${variant.appName} to save images to your photo library.`,
+=======
+      NSLocalNetworkUsageDescription:
+        "Allow T3 Code to connect to T3 Code servers on your local network or tailnet.",
+      // Built with the iOS 27 SDK, only view controllers can hide or style the status bar.
+      UIViewControllerBasedStatusBarAppearance: true,
+      NSPhotoLibraryAddUsageDescription: "Allow T3 Code to save images to your photo library.",
+>>>>>>> upstream-sync-0775dc450f-upstream-renamed
       // System picture in picture needs background audio to start and survive outside the app.
       UIBackgroundModes: ["audio"],
       ITSAppUsesNonExemptEncryption: false,
@@ -414,7 +422,12 @@ const config: ExpoConfig = {
             },
             {
               fontFamily: "DMSans-Bold",
-              fontDefinitions: [{ path: dmSansFonts.bold, weight: 700 }],
+              // Android picks fallback glyphs (such as Vietnamese) at the requested weight, so bold text
+              // asks for 700; the 400 entry lets a relative bold step (Typeface.BOLD) land on 700 too.
+              fontDefinitions: [
+                { path: dmSansFonts.bold, weight: 400 },
+                { path: dmSansFonts.bold, weight: 700 },
+              ],
             },
           ],
         },

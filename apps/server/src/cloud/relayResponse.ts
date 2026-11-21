@@ -65,10 +65,21 @@ function recoveryHint(error: RelayProtectedError): string {
     case "RelayEnvironmentLinkLimitExceededError":
       return `Unlink an unused environment in ${CONNECT_NAME}, then restart ${PRODUCT_NAME} on this machine.`;
     case "RelayAuthInvalidError":
+<<<<<<< HEAD
       return `Run \`t3 connect login\` to check this machine's authorization. If the stored credential was revoked, sign out with \`t3 connect logout\`, then run \`t3 connect\` again. Restart ${PRODUCT_NAME} after signing in.`;
     case "RelayEnvironmentLinkProofExpiredError":
     case "RelayEnvironmentLinkProofInvalidError":
       return `Check this machine's date and time, update ${PRODUCT_NAME}, then restart it.`;
+=======
+      return "Run `t3 connect login` to check this machine's authorization. If the stored credential was revoked, sign out with `t3 connect logout`, then run `t3 connect` again. Restart T3 Code after signing in.";
+    case "RelayEnvironmentLinkProofInvalidError":
+      if (error.reason === "environment_key_mismatch") {
+        return "T3 Connect already has this environment linked with a different key. Unlink it in T3 Connect, then restart T3 Code on this machine.";
+      }
+      return "Check this machine's date and time, update T3 Code, then restart it.";
+    case "RelayEnvironmentLinkProofExpiredError":
+      return "Check this machine's date and time, update T3 Code, then restart it.";
+>>>>>>> upstream-sync-0775dc450f-upstream-renamed
     default:
       return "Retry when the relay is available. If this continues, include the trace ID when reporting it.";
   }

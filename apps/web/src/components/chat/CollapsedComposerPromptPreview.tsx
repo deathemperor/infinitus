@@ -2,7 +2,7 @@ import { isProviderSkillUserInvocable } from "@infinitus/client-runtime/provider
 import type { ServerProviderSkill } from "@infinitus/contracts";
 import { assistantCitationLabel } from "@infinitus/shared/assistantCitations";
 import { formatProviderSkillDisplayName } from "@infinitus/shared/inlineSkills";
-import { fileBasename } from "@infinitus/shared/path";
+import { fileDisplayName } from "@infinitus/shared/path";
 import {
   CircleDashedIcon,
   ImageIcon,
@@ -89,7 +89,7 @@ export function CollapsedComposerPromptPreview(props: {
             key={key}
             kind="mention"
             icon={<PierreEntryIcon pathValue={segment.path} kind="file" theme={props.theme} />}
-            label={fileBasename(segment.path)}
+            label={fileDisplayName(segment.path)}
           />
         );
       case "context-reference": {

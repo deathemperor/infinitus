@@ -28,7 +28,7 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const CURSOR_PRESENTATION = {
   displayName: "Cursor",
-  supportsConversationRollback: false,
+  supportsConversationRollback: true,
   showInteractionModeToggle: true,
 } as const;
 const EMPTY_CAPABILITIES: ModelCapabilities = createModelCapabilities({
