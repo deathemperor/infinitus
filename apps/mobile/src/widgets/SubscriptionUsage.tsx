@@ -55,9 +55,33 @@ function SubscriptionUsage(
       : undefined;
   const primary = palette?.foreground ?? "primary";
   const secondary = palette?.secondary ?? "secondary";
+  // English until the app publishes its first snapshot in the UI language.
+  const text = props.text ?? {
+    refresh: "Open T3 to refresh",
+    noSessionLimit: "No session limit reported",
+    noWeeklyLimit: "No weekly limit reported",
+    subscriptionRemaining: "Subscription remaining",
+    percentLeft: "{remaining}% left",
+    windowPercentLeft: "{window} · {remaining}% left",
+    notApplicable: "N/A",
+    openApp: "Open T3",
+    noLimits: "No subscription limits available.",
+    asOf: "As of {time}",
+    tapToConnect: "Tap to connect in T3",
+    providerAccessibility: "{provider}. {detail}.",
+    windowAccessibility: "{provider}, {window}, {remaining} percent remaining. {reset}. {detail}.",
+    moreInApp: {} as Record<string, string>,
+  };
   const providers = props.providers ?? [
+<<<<<<< HEAD
     { name: "Codex", detail: "Open Infinitus to connect", windows: [], expiresAt: 0 },
     { name: "Claude", detail: "Open Infinitus to connect", windows: [], expiresAt: 0 },
+=======
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
+    { name: "Codex", detail: "Open T3 to connect", windows: [], expiresAt: 0 },
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
+    { name: "Claude", detail: "Open T3 to connect", windows: [], expiresAt: 0 },
+>>>>>>> upstream-sync-9f9ebf61fb-upstream-renamed
   ];
   const columns = providers.map((provider) => {
     const stale = provider.windows.length > 0 && now >= provider.expiresAt;
@@ -90,10 +114,18 @@ function SubscriptionUsage(
               ].slice(0, limit)
             : windows.slice(0, limit);
     const detail = stale
+<<<<<<< HEAD
       ? "Open Infinitus to refresh"
+=======
+      ? text.refresh
+>>>>>>> upstream-sync-9f9ebf61fb-upstream-renamed
       : period !== "auto" && windows.length === 0 && provider.windows.length > 0
-        ? `No ${period} limit reported`
+        ? period === "session"
+          ? text.noSessionLimit
+          : text.noWeeklyLimit
         : provider.detail;
+    const hiddenCount =
+      (period === "auto" ? (provider.totalWindows ?? windows.length) : windows.length) - limit;
     const barModifiers = [
       progressViewStyle("linear"),
       frame({ height: 4 }),
@@ -109,8 +141,15 @@ function SubscriptionUsage(
             accessibilityElement("ignore"),
             accessibilityLabel(
               tightest
-                ? `${provider.name}, ${tightest.label}, ${tightest.remaining} percent remaining. ${tightest.reset}. ${provider.detail}.`
-                : `${provider.name}. ${detail}.`,
+                ? text.windowAccessibility
+                    .replace("{provider}", provider.name)
+                    .replace("{window}", tightest.label)
+                    .replace("{remaining}", String(tightest.remaining))
+                    .replace("{reset}", tightest.reset)
+                    .replace("{detail}", provider.detail)
+                : text.providerAccessibility
+                    .replace("{provider}", provider.name)
+                    .replace("{detail}", detail),
             ),
           ]}
         >
@@ -135,10 +174,15 @@ function SubscriptionUsage(
               ]}
             >
               {tightest
-                ? `${tightest.remaining}% left`
+                ? text.percentLeft.replace("{remaining}", String(tightest.remaining))
                 : period !== "auto" && !stale && provider.windows.length > 0
+<<<<<<< HEAD
                   ? "N/A"
                   : "Open Infinitus"}
+=======
+                  ? text.notApplicable
+                  : text.openApp}
+>>>>>>> upstream-sync-9f9ebf61fb-upstream-renamed
             </Text>
           </HStack>
           {tightest ? (
@@ -170,7 +214,7 @@ function SubscriptionUsage(
           <Text
             modifiers={[font({ textStyle: "caption2" }), foregroundStyle(secondary), lineLimit(1)]}
           >
-            {detail === "Subscription remaining" ? " " : detail}
+            {detail === text.subscriptionRemaining ? " " : detail}
           </Text>
         ) : null}
         {shown.map((window) => (
@@ -181,7 +225,12 @@ function SubscriptionUsage(
             modifiers={[
               accessibilityElement("ignore"),
               accessibilityLabel(
-                `${provider.name}, ${window.label}, ${window.remaining} percent remaining. ${window.reset}. ${provider.detail}.`,
+                text.windowAccessibility
+                  .replace("{provider}", provider.name)
+                  .replace("{window}", window.label)
+                  .replace("{remaining}", String(window.remaining))
+                  .replace("{reset}", window.reset)
+                  .replace("{detail}", provider.detail),
               ),
             ]}
           >
@@ -212,7 +261,7 @@ function SubscriptionUsage(
                   ),
                 ]}
               >
-                {window.remaining}% left
+                {text.percentLeft.replace("{remaining}", String(window.remaining))}
               </Text>
             </HStack>
             <ProgressView value={window.remaining / 100} modifiers={barModifiers} />
@@ -223,15 +272,18 @@ function SubscriptionUsage(
             ) : null}
           </VStack>
         ))}
-        {!compact &&
-        !stale &&
-        (period === "auto" ? (provider.totalWindows ?? windows.length) : windows.length) > limit ? (
+        {!compact && !stale && hiddenCount > 0 ? (
           <Text
             modifiers={[font({ textStyle: "caption2" }), foregroundStyle(secondary), lineLimit(1)]}
           >
+<<<<<<< HEAD
             {(period === "auto" ? (provider.totalWindows ?? windows.length) : windows.length) -
               limit}{" "}
             more in Infinitus
+=======
+            {/* oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text */}
+            {text.moreInApp[String(hiddenCount)] ?? `${hiddenCount} more in T3`}
+>>>>>>> upstream-sync-9f9ebf61fb-upstream-renamed
           </Text>
         ) : null}
       </VStack>
@@ -253,7 +305,7 @@ function SubscriptionUsage(
     >
       {providers.length === 0 ? (
         <Text modifiers={[font({ textStyle: "caption" }), foregroundStyle(secondary)]}>
-          No subscription limits available.
+          {text.noLimits}
         </Text>
       ) : compact ? (
         <VStack alignment="leading" spacing={accessory || dense ? 4 : 8}>
@@ -270,8 +322,21 @@ function SubscriptionUsage(
           modifiers={[font({ textStyle: "caption2" }), foregroundStyle(secondary), lineLimit(1)]}
         >
           {props.checkedAt
+<<<<<<< HEAD
             ? `As of ${new Date(props.checkedAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}`
             : "Tap to connect in Infinitus"}
+=======
+            ? text.asOf.replace(
+                "{time}",
+                new Date(props.checkedAt).toLocaleString(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  month: "short",
+                  day: "numeric",
+                }),
+              )
+            : text.tapToConnect}
+>>>>>>> upstream-sync-9f9ebf61fb-upstream-renamed
         </Text>
       ) : null}
     </VStack>

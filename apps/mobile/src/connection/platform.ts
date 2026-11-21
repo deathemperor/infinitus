@@ -10,6 +10,8 @@ import {
   managedRelaySessionAtom,
 } from "@infinitus/client-runtime/relay";
 import * as Clock from "effect/Clock";
+import { msg } from "gt-react-native";
+import { m } from "../i18n/messages";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -162,7 +164,13 @@ const layerCapabilities = Layer.effectContext(
           if (session === null) {
             return yield* new ConnectionBlockedError({
               reason: "authentication",
+<<<<<<< HEAD
               detail: `Sign in to ${CONNECT_NAME} to connect this environment.`,
+=======
+              detail: m(
+                msg("Sign in to {product} to connect this environment.", { product: "T3 Connect" }),
+              ),
+>>>>>>> upstream-sync-9f9ebf61fb-upstream-renamed
             });
           }
           const token = yield* session.readClerkToken().pipe(
@@ -177,7 +185,11 @@ const layerCapabilities = Layer.effectContext(
           if (token === null) {
             return yield* new ConnectionBlockedError({
               reason: "authentication",
+<<<<<<< HEAD
               detail: `The ${CONNECT_NAME} session is unavailable.`,
+=======
+              detail: m(msg("The {product} session is unavailable.", { product: "T3 Connect" })),
+>>>>>>> upstream-sync-9f9ebf61fb-upstream-renamed
             });
           }
           return token;
@@ -202,7 +214,11 @@ const layerCapabilities = Layer.effectContext(
               (cause) =>
                 new ConnectionTransientError({
                   reason: "remote-unavailable",
-                  detail: `Could not load the mobile device identity: ${String(cause)}`,
+                  detail: m(
+                    msg("Could not load the mobile device identity: {cause}", {
+                      cause: String(cause),
+                    }),
+                  ),
                 }),
             ),
             Effect.asSome,
@@ -222,7 +238,11 @@ const layerCapabilities = Layer.effectContext(
             Effect.fail(
               new ConnectionBlockedError({
                 reason: "unsupported",
-                detail: "SSH environments are only available in the desktop app.",
+                detail: m(
+                  msg("{feature} environments are only available in the desktop app.", {
+                    feature: "SSH",
+                  }),
+                ),
               }),
             ),
           ),
@@ -230,7 +250,11 @@ const layerCapabilities = Layer.effectContext(
             Effect.fail(
               new ConnectionBlockedError({
                 reason: "unsupported",
-                detail: "SSH environments are only available in the desktop app.",
+                detail: m(
+                  msg("{feature} environments are only available in the desktop app.", {
+                    feature: "SSH",
+                  }),
+                ),
               }),
             ),
           ),
