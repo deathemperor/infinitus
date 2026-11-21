@@ -1,3 +1,6 @@
+import { msg } from "gt-react";
+import { thrownErrorMessage } from "@infinitus/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import type {
   EnvironmentThreadShell,
   ThreadStructure,
@@ -112,19 +115,30 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!supportsConversationRollback) {
       setThreadError(
         activeThread.id,
-        "This provider does not support reverting conversation history. Start a new thread instead.",
+        m(
+          msg(
+            "This provider does not support reverting conversation history. Start a new thread instead.",
+          ),
+        ),
       );
       return;
     }
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
       setThreadError(
         activeThread.id,
-        `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+        m(
+          msg("Reconnect {environment} before reverting checkpoints.", {
+            environment: activeEnvironmentUnavailableLabel,
+          }),
+        ),
       );
       return;
     }
     if (phase === "running" || isSendBusy) {
-      setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+      setThreadError(
+        activeThread.id,
+        m(msg("Interrupt the current turn before reverting checkpoints.")),
+      );
       return;
     }
     if (restoreFiles === undefined) {
@@ -144,7 +158,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       turnCount,
       restoreFiles,
       // Keep the live checkpoint identity when command context refetches a bounded window.
-      checkpoint: findRevertCheckpoint(serverProjection?.checkpoints ?? [], turnCount),
+      checkpoint: findRevertCheckpoint(serverProjection, turnCount),
       draftTarget: composerDraftTarget,
       composerHasPendingAttachments: composerRef.current?.hasPendingAttachments() === true,
       createAssetUrl: createAttachmentAssetUrl,
@@ -195,7 +209,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to fork this response.",
+          thrownErrorMessage(error, m) ?? m(msg("Failed to fork this response.")),
         );
       }
       return;
@@ -204,7 +218,11 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!targetThreadReady) {
       setThreadError(
         activeThread.id,
-        "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
+        m(
+          msg(
+            "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
+          ),
+        ),
       );
       return;
     }

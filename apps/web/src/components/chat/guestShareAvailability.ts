@@ -1,4 +1,5 @@
-import { type EnvironmentId, managedCapabilityDenial } from "@infinitus/contracts";
+import { managedCapabilityDenial } from "@infinitus/client-runtime/contract-labels";
+import type { EnvironmentId } from "@infinitus/contracts";
 import { Atom } from "effect/reactivity";
 
 import { environmentPresentations } from "~/state/presentation";
