@@ -130,7 +130,7 @@ describe("buildCursorProviderSnapshot", () => {
       message: "Cursor SDK model discovery returned no built-in models.",
       models: [],
       slashCommands: [COMPACT_SLASH_COMMAND],
-      supportsConversationRollback: false,
+      supportsConversationRollback: true,
     });
   });
 });

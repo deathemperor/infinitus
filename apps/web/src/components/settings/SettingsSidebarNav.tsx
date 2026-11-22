@@ -55,12 +55,16 @@ import {
   isSettingsSectionActive,
   searchSettings,
   revealSettingsSearchTarget,
-  SETTINGS_NAV_GROUPS,
+  settingsNavGroups,
+  SETTINGS_NAV_LABELS,
   SETTINGS_SECTION_LABELS,
   type SettingsPath,
   type SettingsSearchItem,
 } from "./settingsSearch";
-import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
+import {
+  useAvailableSettingsSearchItems,
+  useHasSecretProvidersEnvironment,
+} from "./useAvailableSettingsSearchItems";
 import { handleSettingsSectionKeyDown } from "./settingsSectionNavigation";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
 
@@ -129,7 +133,7 @@ function scrollResultIntoView(row: HTMLElement | null) {
 
 function SettingsSectionIcon({ to }: { to: SettingsPath }) {
   const Icon = SETTINGS_SECTION_ICONS[to];
-  return <Icon className="size-4 shrink-0 text-(--sidebar-icon-color)" />;
+  return <Icon className="size-4 h-5 shrink-0 text-(--sidebar-icon-color)" />;
 }
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
@@ -146,6 +150,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const [compactSearchOpen, setCompactSearchOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems();
+  const navGroups = settingsNavGroups(useHasSecretProvidersEnvironment());
   const results = searchSettings(query, searchableItems, m);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
@@ -417,7 +422,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                                       !compactSearchOpen && "max-md:sr-only",
                                     )}
                                   >
-                                    {m(SETTINGS_SECTION_LABELS[to])}
+                                    {m(SETTINGS_NAV_LABELS[to])}
                                   </span>
                                 </SidebarMenuButton>
                               </SidebarMenuItem>

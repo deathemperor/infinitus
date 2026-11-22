@@ -1,10 +1,13 @@
+import { thrownErrorMessage } from "@infinitus/client-runtime/errors";
 import type { EnvironmentId, ProjectEntry } from "@infinitus/contracts";
 import { useAtomMount, useAtomSubscribe } from "@effect/atom-react";
 import { executeAtomQuery } from "@infinitus/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
+import { msg } from "gt-react";
 import { useEffect, useRef, useState } from "react";
 
 import { environmentCatalog } from "~/connection/catalog";
+import { m } from "~/i18n/messages";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { projectEnvironment } from "~/state/projects";
 
@@ -94,7 +97,7 @@ export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
           setErrors((previous) =>
             new Map(previous).set(
               directoryPath,
-              cause instanceof Error ? cause.message : "Unable to load folder.",
+              thrownErrorMessage(cause, m) ?? m(msg("Unable to load folder.")),
             ),
           );
         }

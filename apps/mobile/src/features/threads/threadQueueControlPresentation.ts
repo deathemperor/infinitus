@@ -1,11 +1,12 @@
 import type { EnvironmentId, RunId, ThreadId } from "@infinitus/contracts";
+import { msg } from "gt-react-native";
 import { assistantCitationsToPlainText } from "@infinitus/shared/assistantCitations";
 import {
   isAttachmentOnlyBootstrapPrompt,
   replaceComposerContextReferences,
 } from "@infinitus/shared/composerContextReferences";
 
-export const REMOVE_QUEUED_MESSAGE_ACCESSIBILITY_LABEL = "Remove queued message";
+export const REMOVE_QUEUED_MESSAGE_ACCESSIBILITY_LABEL = msg("Remove queued message");
 
 export interface ThreadQueueRowControls {
   readonly canDismiss: boolean;

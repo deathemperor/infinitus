@@ -1,5 +1,11 @@
 {
+<<<<<<< HEAD
   "claudeSystemAppendBytes": 5964,
   "codexAdditionalContextBytes": 7355,
   "mcpToolListJsonBytes": 49776
+=======
+  "claudeSystemAppendBytes": 6245,
+  "codexAdditionalContextBytes": 7639,
+  "mcpToolListJsonBytes": 59052
+>>>>>>> upstream-sync-11224f63d2-upstream-renamed
 }
