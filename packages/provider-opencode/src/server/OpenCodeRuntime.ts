@@ -1,7 +1,11 @@
 import { resolveProviderProbeTimeoutMs } from "@infinitus/provider-core/server/snapshotProbe";
 import * as NodeURL from "node:url";
 
-import type { ChatAttachment, ProviderApprovalDecision } from "@infinitus/contracts";
+import type {
+  ChatAttachment,
+  ModelSelection,
+  ProviderApprovalDecision,
+} from "@infinitus/contracts";
 import {
   createOpencodeClient,
   type Agent,
@@ -37,12 +41,15 @@ import { collectStreamAsString } from "@infinitus/provider-core/server/snapshotP
 import * as NetService from "@infinitus/shared/Net";
 import { AgentScope } from "@infinitus/shared/AgentScope";
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import { compareSemverVersions, parseSemver } from "@infinitus/shared/semver";
+import {
+  DEFAULT_VARIANT_CHOICE_ID,
+  getModelSelectionStringOptionValue,
+} from "@infinitus/shared/model";
+import { parseSemver } from "@infinitus/shared/semver";
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
 const encodeUnknownJsonStringExit = Schema.encodeUnknownExit(Schema.fromJsonString(Schema.Unknown));
 const OPENCODE_EMPTY_CONFIG_CONTENT = "{}";
 
-export const MINIMUM_OPENCODE_VERSION = "1.14.19";
 const OPENCODE_HEALTH_TIMEOUT_MS = 5_000;
 
 const OpenCodeHealthSchema = Schema.Struct({
@@ -162,7 +169,7 @@ export const runOpenCodeSdk = <A>(
       new OpenCodeRuntimeError({ operation, detail: openCodeRuntimeErrorDetail(cause), cause }),
   }).pipe(Effect.withSpan(`opencode.${operation}`));
 
-export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersion")(function* (
+const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersion")(function* (
   client: OpencodeClient,
   environment?: NodeJS.ProcessEnv,
 ) {
@@ -185,7 +192,7 @@ export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersio
       (cause) =>
         new OpenCodeRuntimeError({
           operation: "global.health",
-          detail: `OpenCode server returned an invalid health response. T3 Code requires OpenCode v${MINIMUM_OPENCODE_VERSION} or newer.`,
+          detail: "OpenCode server returned an invalid health response.",
           cause,
         }),
     ),
@@ -193,13 +200,7 @@ export const verifyOpenCodeServerVersion = Effect.fn("verifyOpenCodeServerVersio
   if (parseSemver(health.version) === null) {
     return yield* new OpenCodeRuntimeError({
       operation: "global.health",
-      detail: `OpenCode server returned an invalid version. T3 Code requires OpenCode v${MINIMUM_OPENCODE_VERSION} or newer.`,
-    });
-  }
-  if (compareSemverVersions(health.version, MINIMUM_OPENCODE_VERSION) < 0) {
-    return yield* new OpenCodeRuntimeError({
-      operation: "global.health",
-      detail: `OpenCode v${health.version} is too old. Upgrade to v${MINIMUM_OPENCODE_VERSION} or newer.`,
+      detail: "OpenCode server returned an invalid version.",
     });
   }
   return health.version;
@@ -394,6 +395,11 @@ export function parseOpenCodeModelSlug(
     providerID: trimmed.slice(0, separator),
     modelID: trimmed.slice(separator + 1),
   };
+}
+
+export function openCodeVariant(selection: ModelSelection): string | undefined {
+  const variant = getModelSelectionStringOptionValue(selection, "variant");
+  return variant === DEFAULT_VARIANT_CHOICE_ID ? undefined : variant;
 }
 
 export function openCodeQuestionId(

@@ -50,6 +50,7 @@
 
 @utility font-infinitus-bold {
   font-family: var(--font-bold);
+  font-weight: 700;
 }
 
 @utility font-infinitus-extrabold {
