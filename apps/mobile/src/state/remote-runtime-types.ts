@@ -1,9 +1,11 @@
 import { type EnvironmentConnectionPhase } from "@infinitus/client-runtime/connection";
+import type { MarkedText } from "@infinitus/client-runtime/errors";
 import { EnvironmentId, ThreadId, type ServerConfig } from "@infinitus/contracts";
 
 export interface EnvironmentRuntimeState {
   readonly connectionState: EnvironmentConnectionPhase;
   readonly connectionError: string | null;
+  readonly i18nConnectionError?: MarkedText;
   readonly connectionErrorTraceId: string | null;
   /** Reconnecting only because the host has not approved this device yet. */
   readonly connectionAwaitingApproval?: true;
@@ -18,6 +20,7 @@ export interface ConnectedEnvironmentSummary {
   readonly isEnabled: boolean;
   readonly connectionState: EnvironmentConnectionPhase;
   readonly connectionError: string | null;
+  readonly i18nConnectionError?: MarkedText;
   readonly connectionErrorTraceId: string | null;
 }
 
