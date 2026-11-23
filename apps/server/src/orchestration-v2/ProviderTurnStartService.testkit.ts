@@ -14,16 +14,30 @@ import * as SourceControlProviderRegistry from "../sourceControl/SourceControlPr
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProjectStore from "./ProjectStore.ts";
+import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
+<<<<<<< HEAD
 import { TurnStartGatePassthrough } from "./TurnStartGate.ts";
 
 export const layer = Layer.mergeAll(
   // Fork (#720, #1627): the turn-start gate the service requires; tests run every start at once.
   TurnStartGatePassthrough,
+=======
+import * as TaskFolders from "../workspace/TaskFolders.ts";
+
+// No project in these tests tracks a repository, so no thread works in a task folder.
+export const layerNoTaskFolders = Layer.mock(TaskFolders.TaskFolders)({
+  plan: () => Effect.succeed(null),
+  find: () => Effect.succeed(null),
+});
+
+export const layer = Layer.mergeAll(
+  layerNoTaskFolders,
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
   Layer.mock(GitWorkflow.GitWorkflowService)({
     pruneWorktrees: () => Effect.void,
     createWorktree: () => Effect.succeed({} as never),
@@ -55,6 +69,7 @@ export const layerRealGit = GitWorkflow.layer.pipe(
       Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({}),
       Layer.mock(ProjectionStore.ProjectionStoreV2)({}),
       Layer.mock(ProjectStore.ProjectStoreV2)({}),
+      Layer.mock(PullRequestService.PullRequestService)({}),
       ServerSettings.layerTest(),
     ),
   ),

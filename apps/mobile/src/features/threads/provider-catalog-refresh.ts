@@ -1,9 +1,13 @@
 import type { EnvironmentId } from "@infinitus/contracts";
+import { errorDisplayMessage } from "@infinitus/client-runtime/errors";
 import type { AtomCommandResult } from "@infinitus/client-runtime/state/runtime";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@infinitus/client-runtime/state/runtime";
+import { msg } from "gt-react-native";
+
+import { m } from "../../i18n/messages";
 
 type RefreshProvidersTarget = {
   readonly environmentId: EnvironmentId;
@@ -29,5 +33,5 @@ export function providerCatalogRefreshError(
 ): string | null {
   if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return null;
   const error = squashAtomCommandFailure(result);
-  return error instanceof Error ? error.message : "Provider discovery failed.";
+  return errorDisplayMessage(error, m) ?? m(msg("Provider discovery failed."));
 }

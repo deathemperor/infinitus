@@ -53,7 +53,12 @@ export function formatStartupCrashReport(
   records: ReadonlyArray<StartupCrashRecord>,
   app: { readonly version: string; readonly build: string },
 ): string {
+<<<<<<< HEAD
   const header = `${PRODUCT_NAME} ${app.version} (${app.build})`;
+=======
+  const header = `T3 Code ${app.version} (${app.build})`;
+  // oxlint-disable-next-line t3code/no-untranslated-copy -- crash report text shared with maintainers
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
   if (records.length === 0) return `${header}\nNo startup crashes recorded.`;
   return [
     header,

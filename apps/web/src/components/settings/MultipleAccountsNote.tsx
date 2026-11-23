@@ -1,6 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ProviderDriverKind } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import { T, Var } from "gt-react";
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
 import { InfoIcon } from "lucide-react";
 
 import { serverEnvironment } from "../../state/server";
@@ -35,6 +39,7 @@ export function MultipleAccountsNote({
       <InfoIcon aria-hidden />
       <AlertDescription>
         <p>
+<<<<<<< HEAD
           We do not recommend managing multiple {providerName} accounts in {PRODUCT_NAME}.{" "}
           <a
             href={MULTIPLE_ACCOUNTS_FAQ_URL}
@@ -44,6 +49,19 @@ export function MultipleAccountsNote({
           >
             More info
           </a>
+=======
+          <T>
+            We do not recommend managing multiple <Var>{providerName}</Var> accounts in T3 Code.{" "}
+            <a
+              href={MULTIPLE_ACCOUNTS_FAQ_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              More info
+            </a>
+          </T>
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
         </p>
       </AlertDescription>
     </Alert>

@@ -7,6 +7,8 @@ import {
   ProviderInstanceId,
   ThreadId,
 } from "@infinitus/contracts";
+import { attachmentUploadError } from "@infinitus/client-runtime/state/attachment-uploads";
+import * as Effect from "effect/Effect";
 import * as Cause from "effect/Cause";
 import { AsyncResult, type Atom } from "effect/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -26,6 +28,21 @@ const state = vi.hoisted(() => ({
   prepare: vi.fn(),
   storageRemove: vi.fn(async (_message: QueuedThreadMessage) => {}),
   checkout: vi.fn(),
+  // Delivery runs commands as Effects; tests steer them with the settled results the mocks return.
+  command: (Effect: typeof import("effect/Effect"), settle: (input: unknown) => unknown) => ({
+    label: "command",
+    run: (_registry: unknown, input: unknown) =>
+      Effect.promise(
+        async () =>
+          (await settle(input)) as
+            | import("effect/reactivity").AsyncResult.Success<unknown>
+            | import("effect/reactivity").AsyncResult.Failure<unknown, Error>,
+      ).pipe(
+        Effect.flatMap((result) =>
+          result._tag === "Failure" ? Effect.failCause(result.cause) : Effect.succeed(result.value),
+        ),
+      ),
+  }),
   modelUnavailable: vi.fn(() => false),
   familyMount: vi.fn(() => () => {}),
   threadShells: null as unknown as Atom.Writable<ReadonlyArray<unknown>>,
@@ -47,11 +64,6 @@ const state = vi.hoisted(() => ({
   },
 }));
 vi.mock("react-native", () => ({ Alert: { alert: vi.fn() } }));
-vi.mock("@infinitus/client-runtime/state/runtime", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@infinitus/client-runtime/state/runtime")>()),
-  runAtomCommand: (_registry: unknown, command: (input: unknown) => unknown, input: unknown) =>
-    command(input),
-}));
 vi.mock("./session", async () => {
   const { Atom } = await import("effect/reactivity");
   const { appAtomRegistry } = await import("./atom-registry");
@@ -87,13 +99,14 @@ vi.mock("./server", async () => {
 });
 vi.mock("./threads", async () => {
   const { Atom, AsyncResult } = await import("effect/reactivity");
+  const Effect = await import("effect/Effect");
   state.threadShells = Atom.make<ReadonlyArray<unknown>>([state.thread]).pipe(Atom.keepAlive);
   return {
     threadEnvironment: {
-      startTurn: state.start,
-      updateMetadata: state.metadata,
-      setRuntimeMode: state.runtime,
-      setInteractionMode: state.interaction,
+      startTurn: state.command(Effect, state.start),
+      updateMetadata: state.command(Effect, state.metadata),
+      setRuntimeMode: state.command(Effect, state.runtime),
+      setInteractionMode: state.command(Effect, state.interaction),
     },
     environmentThreadShells: { threadShellsAtom: state.threadShells },
     threadFamilies: {
@@ -104,16 +117,24 @@ vi.mock("./threads", async () => {
     environmentThreadDetails: { stateAtom: () => Atom.make(null) },
   };
 });
-vi.mock("./git", () => ({ gitEnvironment: { preparePullRequestThread: state.checkout } }));
+vi.mock("./git", async () => ({
+  gitEnvironment: {
+    preparePullRequestThread: state.command(await import("effect/Effect"), state.checkout),
+  },
+}));
 vi.mock("../lib/modelOptions", () => ({ isModelSelectionUnavailable: state.modelUnavailable }));
 vi.mock("../lib/uuid", () => ({ uuidv4: () => "uuid", randomHex: () => "abcd" }));
 vi.mock("../lib/attachmentUpload", () => ({ prepareTurnAttachments: state.prepare }));
+<<<<<<< HEAD
 // Infinitus (fork, #742): the delivery's pin-on-create reads the preferences atom, whose
 // real module loads `expo`; a never-loaded store means "off", so nothing here is pinned.
 vi.mock("./preferences", async () => {
   const { Atom, AsyncResult } = await import("effect/reactivity");
   return { mobilePreferencesAtom: Atom.make(AsyncResult.initial()) };
 });
+=======
+vi.mock("./composer-attachment-uploads", () => ({ uploadComposerAttachmentShared: vi.fn() }));
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
 vi.mock("./thread-outbox", async () => {
   const { createThreadOutboxManager } = await import("./thread-outbox-manager");
   const { appAtomRegistry } = await import("./atom-registry");
@@ -143,6 +164,7 @@ vi.mock("./use-thread-outbox", async () => {
   const { appAtomRegistry } = await import("./atom-registry");
   const editingQueuedMessageIdsAtom = Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive);
   return {
+<<<<<<< HEAD
     editingQueuedMessageIdsAtom,
     holdEditingQueuedMessage: (messageId: string) => {
       appAtomRegistry.set(editingQueuedMessageIdsAtom, {
@@ -154,6 +176,12 @@ vi.mock("./use-thread-outbox", async () => {
       const { [messageId]: _released, ...rest } = appAtomRegistry.get(editingQueuedMessageIdsAtom);
       appAtomRegistry.set(editingQueuedMessageIdsAtom, rest);
     },
+=======
+    editingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
+    dispatchingQueuedMessageIdsAtom: Atom.make<Readonly<Record<MessageId, true>>>({}).pipe(
+      Atom.keepAlive,
+    ),
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
     retryingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
     threadOutboxShellStatusesAtom: Atom.make(new Map([["secondary", "live"]])),
   };
@@ -164,7 +192,7 @@ vi.mock("./use-composer-drafts", async () => {
     composerDraftsAtom: Atom.make({}),
     removeDeliveredCloudQueuedMessage: async () => {},
     appendComposerDraftAttachments: vi.fn(),
-    flushComposerDrafts: vi.fn(),
+    flushComposerDrafts: vi.fn(async () => {}),
     getComposerDraftSnapshot: vi.fn(() => ({ text: state.draftText, attachments: [] })),
     mergeComposerDraftContent: vi.fn(async (_key: string, input: { text: string }) => {
       state.draftText += `\n${input.text}`;
@@ -179,11 +207,16 @@ vi.mock("./use-composer-drafts", async () => {
 
 import { appAtomRegistry } from "./atom-registry";
 import { environmentSession } from "./session";
+<<<<<<< HEAD
 import { deletePendingThreadMessage } from "./delete-pending-thread-message";
 import { dispatchingQueuedMessageAtom } from "./queued-message-dispatch";
 import { editingQueuedMessageIdsAtom } from "./use-thread-outbox";
+=======
+import { dispatchingQueuedMessageIdsAtom, editingQueuedMessageIdsAtom } from "./use-thread-outbox";
+
+const sendingMessageIds = () => Object.keys(appAtomRegistry.get(dispatchingQueuedMessageIdsAtom));
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
 import { createThreadOutboxDelivery } from "./threadOutboxDelivery";
-import { composerAttachmentUploadsAtom } from "./composer-attachment-upload-states";
 import { workspaceConnections } from "./workspace";
 
 const message = (overrides: Partial<QueuedThreadMessage> = {}): QueuedThreadMessage => ({
@@ -207,8 +240,13 @@ function setOperateGrant(environmentId: string, granted: boolean): void {
 
 function runDrain() {
   const settled = Promise.withResolvers<void>();
+<<<<<<< HEAD
   const release = appAtomRegistry.subscribe(dispatchingQueuedMessageAtom, (dispatching) => {
     if (dispatching === null) settled.resolve();
+=======
+  const release = appAtomRegistry.subscribe(dispatchingQueuedMessageIdsAtom, (ids) => {
+    if (Object.keys(ids).length === 0) settled.resolve();
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
   });
   startDelivery();
   return settled.promise.finally(release);
@@ -237,7 +275,11 @@ beforeEach(() => {
   state.familyMount.mockReset().mockReturnValue(() => {});
   appAtomRegistry.set(state.threadShells, [state.thread]);
   appAtomRegistry.set(state.manager.queuedMessagesByThreadKeyAtom, {});
+<<<<<<< HEAD
   appAtomRegistry.set(dispatchingQueuedMessageAtom, null);
+=======
+  appAtomRegistry.set(dispatchingQueuedMessageIdsAtom, {});
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
   appAtomRegistry.set(editingQueuedMessageIdsAtom, {});
   for (const command of [
     state.start,
@@ -249,6 +291,7 @@ beforeEach(() => {
     command.mockReset().mockResolvedValue(AsyncResult.success(undefined));
   }
   state.start.mockResolvedValue(AsyncResult.success({}));
+<<<<<<< HEAD
   state.prepare.mockReset().mockImplementation(async ({ attachments }) => ({
     status: "ready",
     attachments: [],
@@ -256,6 +299,16 @@ beforeEach(() => {
     pendingAttachmentIds: [],
   }));
   state.storageRemove.mockReset().mockResolvedValue(undefined);
+=======
+  state.prepare.mockReset().mockImplementation(({ attachments }) =>
+    Effect.succeed({
+      status: "ready",
+      attachments: [],
+      draftAttachments: attachments,
+      pendingAttachmentIds: [],
+    }),
+  );
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
 });
 
 describe("queued PR checkout", () => {
@@ -377,7 +430,11 @@ describe("queued task operation access", () => {
     expect(state.modelUnavailable).toHaveBeenCalledOnce();
     expect(state.prepare).not.toHaveBeenCalled();
     expect(state.start).not.toHaveBeenCalled();
+<<<<<<< HEAD
     expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toBeNull();
+=======
+    expect(sendingMessageIds()).toEqual([]);
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
     expect(remaining()).toEqual([queued]);
   });
 
@@ -394,17 +451,22 @@ describe("queued task operation access", () => {
     startDelivery();
     appAtomRegistry.set(editingQueuedMessageIdsAtom, { [queued.messageId]: true });
     await state.manager.enqueue(queued);
-    using confirm = vi.spyOn(state.manager, "confirmQueued");
     const delivered = Promise.withResolvers<void>();
+<<<<<<< HEAD
     const release = appAtomRegistry.subscribe(dispatchingQueuedMessageAtom, (dispatching) => {
       if (dispatching === null) delivered.resolve();
+=======
+    const release = appAtomRegistry.subscribe(dispatchingQueuedMessageIdsAtom, (ids) => {
+      if (Object.keys(ids).length === 0) delivered.resolve();
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
     });
-    // Ending the edit wakes the drain through a registry notification, the path on which the
-    // mount's synchronous row change notifies the drain again mid-pass.
+    // Ending the edit wakes the thread through a registry notification, the path on which the
+    // mount's synchronous row change wakes it again while it is deciding.
     appAtomRegistry.set(editingQueuedMessageIdsAtom, {});
-    expect(state.familyMount).toHaveBeenCalledOnce();
-    expect(confirm).toHaveBeenCalledOnce();
     await delivered.promise.finally(release);
+    expect(state.familyMount).toHaveBeenCalledOnce();
+    // One fiber took the message: a second would have prepared it again.
+    expect(state.prepare).toHaveBeenCalledOnce();
     expect(state.start).toHaveBeenCalledOnce();
     expect(remaining()).toEqual([]);
   });
@@ -506,16 +568,21 @@ describe("queued task operation access", () => {
           : {},
       );
       await state.manager.enqueue(queued);
-      state.prepare.mockImplementationOnce(async ({ attachments }) => {
-        setOperateGrant("secondary", false);
-        if (uploadFails) throw new Error("This connection cannot upload attachments.");
-        return {
-          status: "ready",
-          attachments: [],
-          draftAttachments: attachments,
-          pendingAttachmentIds: [],
-        };
-      });
+      state.prepare.mockImplementationOnce(({ attachments }) =>
+        Effect.suspend(() => {
+          setOperateGrant("secondary", false);
+          return uploadFails
+            ? Effect.fail(
+                attachmentUploadError(new Error("This connection cannot upload attachments.")),
+              )
+            : Effect.succeed({
+                status: "ready",
+                attachments: [],
+                draftAttachments: attachments,
+                pendingAttachmentIds: [],
+              });
+        }),
+      );
       await runDrain();
       expect(state.prepare).toHaveBeenCalledOnce();
       expect(state.start).not.toHaveBeenCalled();
@@ -645,8 +712,13 @@ describe("queued task whose launch reply is lost", () => {
 
   async function fireRetry(): Promise<void> {
     const settled = Promise.withResolvers<void>();
+<<<<<<< HEAD
     const release = appAtomRegistry.subscribe(dispatchingQueuedMessageAtom, (dispatching) => {
       if (dispatching === null) settled.resolve();
+=======
+    const release = appAtomRegistry.subscribe(dispatchingQueuedMessageIdsAtom, (ids) => {
+      if (Object.keys(ids).length === 0) settled.resolve();
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
     });
     vi.advanceTimersByTime(threadOutboxRetryDelayMs(1));
     await settled.promise.finally(release);
@@ -678,7 +750,11 @@ describe("queued task whose launch reply is lost", () => {
     await loseLaunchReply(queuedTask());
     setOperateGrant("secondary", false);
     vi.advanceTimersByTime(threadOutboxRetryDelayMs(1));
+<<<<<<< HEAD
     expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toBeNull();
+=======
+    expect(sendingMessageIds()).toEqual([]);
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
     expect(state.start).toHaveBeenCalledOnce();
     expect(remaining()).toHaveLength(1);
 
@@ -766,42 +842,99 @@ describe("compaction before a queued send", () => {
 describe("queued delivery timing", () => {
   /** Runs `change`, then resolves once the delivery it starts has settled. */
   async function deliveryAfter(change: () => void): Promise<void> {
+    const started = Promise.withResolvers<void>();
     const settled = Promise.withResolvers<void>();
+<<<<<<< HEAD
     const release = appAtomRegistry.subscribe(dispatchingQueuedMessageAtom, (dispatching) => {
       if (dispatching === null) settled.resolve();
     });
     change();
     expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).not.toBeNull();
+=======
+    const release = appAtomRegistry.subscribe(dispatchingQueuedMessageIdsAtom, (ids) => {
+      if (Object.keys(ids).length > 0) started.resolve();
+      else settled.resolve();
+    });
+    change();
+    await started.promise;
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
     await settled.promise.finally(release);
   }
 
-  it("waits for the composer's upload of a sent attachment instead of uploading it again", async () => {
+  it("starts a thread's next message only after its interrupted send has finished", async () => {
     setOperateGrant("secondary", true);
-    const photo = {
-      id: "photo-1",
-      type: "image" as const,
-      name: "photo.png",
-      mimeType: "image/png",
-      sizeBytes: 3,
-      previewUri: "file:///photo.png",
-      fileUri: "file:///photo.png",
-    };
-    appAtomRegistry.set(composerAttachmentUploadsAtom, {
-      "secondary:photo-1": { status: "uploading", progress: 0.5 },
+    const firstStarted = Promise.withResolvers<void>();
+    const finishFirst = Promise.withResolvers<AsyncResult.AsyncResult<object, never>>();
+    state.start.mockImplementationOnce(async () => {
+      firstStarted.resolve();
+      return finishFirst.promise;
     });
-    state.cleanups.push(() => appAtomRegistry.set(composerAttachmentUploadsAtom, {}));
-    await state.manager.enqueue(message({ attachments: [photo] }));
+    const first = message();
+    await state.manager.enqueue(first);
     startDelivery();
+<<<<<<< HEAD
     expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toBeNull();
+=======
+    await firstStarted.promise;
+    // The queue empties under the running send, then the thread gets its next message.
+    await state.manager.remove(first);
+    const allDelivered = Promise.withResolvers<void>();
+    const release = appAtomRegistry.subscribe(state.manager.queuedMessagesByThreadKeyAtom, () => {
+      if (remaining().length === 0) allDelivered.resolve();
+    });
+    await state.manager.enqueue(
+      message({ messageId: MessageId.make("next"), commandId: CommandId.make("next-command") }),
+    );
+    // The next message waits; only the interrupted send is still marked as sending.
+    expect(sendingMessageIds()).toEqual(["message"]);
+    expect(state.start).toHaveBeenCalledOnce();
+    finishFirst.resolve(AsyncResult.success({}));
+    await allDelivered.promise.finally(release);
+    expect(state.start).toHaveBeenCalledTimes(2);
+  });
+>>>>>>> upstream-sync-593885bd5d-upstream-renamed
 
-    await deliveryAfter(() =>
-      appAtomRegistry.set(composerAttachmentUploadsAtom, {
-        "secondary:photo-1": { status: "ready" },
+  it("sends another thread's message while one thread's send is still running", async () => {
+    setOperateGrant("secondary", true);
+    const other = { ...state.thread, id: "other" };
+    appAtomRegistry.set(state.threadShells, [state.thread, other]);
+    const slowStarted = Promise.withResolvers<void>();
+    const finishSlow = Promise.withResolvers<AsyncResult.AsyncResult<object, never>>();
+    state.start.mockImplementation(async ({ input }: { input: { threadId: string } }) => {
+      if (input.threadId !== "thread") return AsyncResult.success({});
+      slowStarted.resolve();
+      return finishSlow.promise;
+    });
+    /** Resolves once only these message ids are still queued. */
+    const queuedBecomes = (ids: ReadonlyArray<string>) => {
+      const reached = Promise.withResolvers<void>();
+      const release = appAtomRegistry.subscribe(state.manager.queuedMessagesByThreadKeyAtom, () => {
+        if (
+          remaining()
+            .map((queued) => queued.messageId)
+            .join() === ids.join()
+        ) {
+          reached.resolve();
+        }
+      });
+      return reached.promise.finally(release);
+    };
+    await state.manager.enqueue(message());
+    startDelivery();
+    await slowStarted.promise;
+    const otherDelivered = queuedBecomes(["message"]);
+    await state.manager.enqueue(
+      message({
+        threadId: ThreadId.make("other"),
+        messageId: MessageId.make("other-message"),
+        commandId: CommandId.make("other-command"),
       }),
     );
-    expect(state.prepare).toHaveBeenCalledOnce();
-    expect(state.start).toHaveBeenCalledOnce();
-    expect(remaining()).toEqual([]);
+    await otherDelivered;
+    const allDelivered = queuedBecomes([]);
+    finishSlow.resolve(AsyncResult.success({}));
+    await allDelivered;
+    expect(state.start).toHaveBeenCalledTimes(2);
   });
 
   it("sends at once when its environment reconnects instead of waiting out the backoff", async () => {

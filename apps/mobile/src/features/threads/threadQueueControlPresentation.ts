@@ -1,11 +1,13 @@
 import type { EnvironmentId, RunId, ThreadId } from "@infinitus/contracts";
+import { msg } from "gt-react-native";
 import { assistantCitationsToPlainText } from "@infinitus/shared/assistantCitations";
 import {
   isAttachmentOnlyBootstrapPrompt,
   replaceComposerContextReferences,
 } from "@infinitus/shared/composerContextReferences";
+import { composerFileLinksToPlainText } from "@infinitus/shared/composerInlineTokens";
 
-export const REMOVE_QUEUED_MESSAGE_ACCESSIBILITY_LABEL = "Remove queued message";
+export const REMOVE_QUEUED_MESSAGE_ACCESSIBILITY_LABEL = msg("Remove queued message");
 
 export interface ThreadQueueRowControls {
   readonly canDismiss: boolean;
@@ -42,7 +44,9 @@ export function resolveThreadQueueRowControls(input: {
     displayText: isAttachmentOnlyBootstrapPrompt(input.text)
       ? ""
       : assistantCitationsToPlainText(
-          replaceComposerContextReferences(input.text, (reference) => reference.label),
+          composerFileLinksToPlainText(
+            replaceComposerContextReferences(input.text, (reference) => reference.label),
+          ),
         ).trim(),
     isEditing,
   };
