@@ -6,7 +6,11 @@ import { DEFAULT_SERVER_SETTINGS } from "@infinitus/contracts";
 import { resolveNewThreadEnvMode, resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 
+<<<<<<< HEAD
 import { useProjectFileRead } from "../infinitus/useProjectFileRead";
+=======
+import { m } from "../../i18n/messages";
+>>>>>>> upstream-sync-780db269df-upstream-renamed
 import { useEnvironmentServerConfig } from "../../state/entities";
 import { useEnvironmentPresentation } from "../../state/presentation";
 import { useProjectHasThreads } from "../../state/project-has-threads";
@@ -28,12 +32,15 @@ export function useNewTaskProjectDefaults(project: EnvironmentProject | null) {
     hasWorkspace ? environmentSession.sessionStateAtom(project.environmentId) : null,
   );
   const fileEnvironment = useEnvironmentPresentation(project?.environmentId ?? null);
-  const fileAccess = resolveFilesystemReadAccess({
-    isCatalogReady: fileEnvironment.isReady,
-    connection: fileEnvironment.presentation?.connection ?? null,
-    session: fileAccessSession.data,
-    sessionError: fileAccessSession.error,
-  });
+  const fileAccess = resolveFilesystemReadAccess(
+    {
+      isCatalogReady: fileEnvironment.isReady,
+      connection: fileEnvironment.presentation?.connection ?? null,
+      session: fileAccessSession.data,
+      sessionError: fileAccessSession.error,
+    },
+    m,
+  );
   const fileAccessPending = hasWorkspace && fileAccess.isPending;
   // Fork (#823): both project file names, `infinitus.json` then `t3.json`.
   const t3ProjectFileQuery = useProjectFileRead(project, fileAccess.canReadFiles);

@@ -4,8 +4,12 @@ import { page, userEvent } from "vite-plus/test/browser";
 import { act, render } from "../../../test/render";
 import { SidebarProvider } from "../ui/sidebar";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
+<<<<<<< HEAD
 import { INFINITUS_NAV_PATHS } from "./infinitus/settingsSearchItems";
 import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS } from "./settingsSearch";
+=======
+import { settingsNavGroups, SETTINGS_SECTION_LABELS } from "./settingsSearch";
+>>>>>>> upstream-sync-780db269df-upstream-renamed
 
 // Fork: no environment here has the Infinitus capability, so its group is hidden.
 const VISIBLE_NAV_GROUPS = SETTINGS_NAV_GROUPS.filter(
@@ -16,6 +20,7 @@ vi.mock("./useAvailableSettingsSearchItems", () => ({
   useAvailableSettingsSearchItems: () => [
     { id: "theme", title: "Theme", to: "/settings/appearance" },
   ],
+  useHasSecretProvidersEnvironment: () => false,
 }));
 
 it("ignores composing keys in the search", async () => {
@@ -82,9 +87,15 @@ it("moves Tab through every settings section", async () => {
   await using _screen = await renderNav();
   await userEvent.click(page.getByRole("combobox", { name: "Search settings" }));
 
+<<<<<<< HEAD
   const sections = VISIBLE_NAV_GROUPS.flatMap((group) => group.paths).map(
     (to) => SETTINGS_SECTION_LABELS[to],
   );
+=======
+  const sections = settingsNavGroups(false)
+    .flatMap((group) => group.paths)
+    .map((to) => SETTINGS_SECTION_LABELS[to]);
+>>>>>>> upstream-sync-780db269df-upstream-renamed
   const tabbed: string[] = [];
   for (let step = 0; step < sections.length; step += 1) {
     await userEvent.tab();
@@ -109,7 +120,11 @@ it.each([1280, 390])("names each group by a heading outside it at %ipx wide", as
     );
   }
   const groups = page.getByRole("group").elements();
+<<<<<<< HEAD
   expect(groups).toHaveLength(VISIBLE_NAV_GROUPS.length);
+=======
+  expect(groups).toHaveLength(settingsNavGroups(false).length);
+>>>>>>> upstream-sync-780db269df-upstream-renamed
   for (const group of groups) {
     const first = group.querySelector("[data-settings-section]")?.textContent;
     const heading = document.getElementById(group.getAttribute("aria-labelledby") ?? "");
