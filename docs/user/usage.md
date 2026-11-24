@@ -20,6 +20,13 @@ record are missing from the totals.
 Text generation (thread titles, commit messages, PR text, branch names and review guides) is not in
 the totals for Codex or Claude Code 2.0.63 and newer, because those runs save no session history.
 
+The server keeps scanned usage history for 92 days by default. Claude Code deletes its own
+transcripts after 30 days, so for older Claude usage this history is the only record left. To keep
+it longer, set `usageHistoryRetentionDays` in `<T3 home>/userdata/settings.json` to a number of days
+such as `365`, or to `"unlimited"`. Usage views still show at most 90 days. Lowering the value
+prunes older history on the next refresh, and raising it again does not bring pruned history back.
+While `settings.json` cannot be read, nothing is pruned.
+
 OpenCode reads its SQLite database and older JSON history. Antigravity reads local conversation
 databases, including Infinitus-managed profiles. Set `OPENCODE_DATA_DIR` or `ANTIGRAVITY_DATA_DIR` on the
 server to read a different data directory; comma-separated paths read multiple directories.
@@ -176,9 +183,24 @@ using a proxy through `ANTHROPIC_AUTH_TOKEN`.
 
 ## Hubs and fleets
 
+<<<<<<< HEAD
 Accounts pooled behind a hub or an engine (CLIProxyAPI, 9Router, swapd) are read by the Infinitus
 app on their Mac and shown on the **Accounts** page, one group per machine, with each account's
 windows, banked resets and actions. There is no separate hub list under Settings → Providers.
+=======
+To see pooled accounts, open **Settings → Providers → Usage providers → Add hub**. Choose the
+environment that will connect to the hub and enter its URL and management key.
+
+The hub's Codex, Claude, xAI (shown as Grok) and Antigravity accounts appear under **Usage → Limits**;
+accounts for other providers are not read. Codex accounts show banked reset credits; select an
+account and choose **Use reset** to redeem one. No hub plugin is required.
+
+This connection supplies usage information; configure
+the provider separately to send agent requests through the hub. A thread uses the hub's limits and
+reset times only when its provider's endpoint has the same address as the hub, for example
+`http://127.0.0.1:8317` for both. Remove the hub from the same settings section when you no longer
+need it.
+>>>>>>> upstream-sync-fa9f154e1b-upstream-renamed
 
 ## Subscription usage widget
 
