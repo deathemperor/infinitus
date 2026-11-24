@@ -1,4 +1,5 @@
 import { UserButton, useAuth } from "@clerk/react";
+import { T, useMessages } from "gt-react";
 import { LogInIcon, RotateCwIcon } from "lucide-react";
 
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
@@ -22,6 +23,7 @@ export function InfinitusConnectSidebarAvatar() {
 
 function ConfiguredInfinitusConnectSidebarAvatar() {
   const { isLoaded, isSignedIn } = useAuth();
+  const m = useMessages();
 
   if (!isLoaded || !isSignedIn) return null;
 
@@ -38,7 +40,7 @@ function ConfiguredInfinitusConnectSidebarAvatar() {
       {T3_CONNECT_ACCOUNT_PAGES.map((page) => (
         <UserButton.UserProfilePage
           key={page.url}
-          label={page.label}
+          label={m(page.label)}
           labelIcon={page.icon}
           url={page.url}
         >
@@ -60,7 +62,13 @@ function ConfiguredInfinitusConnectSidebarSignIn() {
         <SidebarMenuItem>
           <SidebarMenuButton onClick={retryClerkLoad}>
             <RotateCwIcon />
+<<<<<<< HEAD
             <span>Retry {CONNECT_NAME}</span>
+=======
+            <span>
+              <T>Retry T3 Connect</T>
+            </span>
+>>>>>>> upstream-sync-0e34fe98f2-upstream-renamed
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
@@ -73,7 +81,13 @@ function ConfiguredInfinitusConnectSidebarSignIn() {
       <SidebarMenuItem>
         <SidebarMenuButton onClick={openAuthPrompt}>
           <LogInIcon />
+<<<<<<< HEAD
           <span>Sign in to {CONNECT_NAME}</span>
+=======
+          <span>
+            <T>Sign in to T3 Connect</T>
+          </span>
+>>>>>>> upstream-sync-0e34fe98f2-upstream-renamed
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>

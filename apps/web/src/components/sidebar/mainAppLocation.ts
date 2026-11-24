@@ -13,10 +13,15 @@ export function isSidebarUtilityPage(pathname: string) {
   return (
     pathname.startsWith("/projects/") ||
     pathname === "/pull-requests" ||
+<<<<<<< HEAD
     // Fork: the Accounts, Stats and Utilization pages in the same row.
     pathname === "/accounts" ||
     pathname === "/stats" ||
     pathname === "/utilization"
+=======
+    pathname === "/issues" ||
+    pathname === "/workflows"
+>>>>>>> upstream-sync-0e34fe98f2-upstream-renamed
   );
 }
 

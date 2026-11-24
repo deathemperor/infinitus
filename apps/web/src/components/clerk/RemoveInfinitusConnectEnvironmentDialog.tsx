@@ -1,6 +1,7 @@
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { Discovery } from "@infinitus/client-runtime/relay";
 import type { EnvironmentId } from "@infinitus/contracts";
+import { T, useGT, Var } from "gt-react";
 import { useState } from "react";
 
 import { useRelayEnvironmentDiscovery } from "../../state/environments";
@@ -28,6 +29,7 @@ export function RemoveInfinitusConnectEnvironmentDialog({
   readonly onConfirm: () => void;
 }) {
   const accountPage = useInfinitusConnectAccountPage();
+  const gt = useGT();
   const discovery = useRelayEnvironmentDiscovery();
   const registration = environmentId
     ? Discovery.relayEnvironmentRegistration(discovery, environmentId)
@@ -47,10 +49,17 @@ export function RemoveInfinitusConnectEnvironmentDialog({
         openAccountPage();
       }}
     >
+<<<<<<< HEAD
       {CONNECT_NAME} settings
     </InlineButton>
   ) : (
     `${CONNECT_NAME} settings`
+=======
+      <T>T3 Connect settings</T>
+    </InlineButton>
+  ) : (
+    gt("T3 Connect settings")
+>>>>>>> upstream-sync-0e34fe98f2-upstream-renamed
   );
 
   return (
@@ -63,12 +72,17 @@ export function RemoveInfinitusConnectEnvironmentDialog({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {shown.label} from this device?</AlertDialogTitle>
+            <AlertDialogTitle>
+              <T>
+                Remove <Var>{shown.label}</Var> from this device?
+              </T>
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This forgets its pairing, credentials, and cached threads here.
+              <T>This forgets its pairing, credentials, and cached threads here.</T>
             </AlertDialogDescription>
             <AlertDialogDescription>
               {shown.registration === "registered" ? (
+<<<<<<< HEAD
                 <>
                   It stays on your {CONNECT_NAME} account and keeps its host space. Deregister it in{" "}
                   {accountPageLink} to free it.
@@ -80,13 +94,28 @@ export function RemoveInfinitusConnectEnvironmentDialog({
                   This doesn't change your {CONNECT_NAME} account. To deregister it there, use{" "}
                   {accountPageLink}.
                 </>
+=======
+                <T>
+                  It stays on your T3 Connect account and keeps its host space. Deregister it in{" "}
+                  <Var>{accountPageLink}</Var> to free it.
+                </T>
+              ) : shown.registration === "unregistered" ? (
+                gt("It's no longer on your T3 Connect account.")
+              ) : (
+                <T>
+                  This doesn't change your T3 Connect account. To deregister it there, use{" "}
+                  <Var>{accountPageLink}</Var>.
+                </T>
+>>>>>>> upstream-sync-0e34fe98f2-upstream-renamed
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              <T>Cancel</T>
+            </AlertDialogClose>
             <Button variant="destructive" onClick={onConfirm}>
-              Remove from this device
+              <T>Remove from this device</T>
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

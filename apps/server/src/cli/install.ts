@@ -1,5 +1,5 @@
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import { pathSetupCommand } from "@infinitus/shared/shell";
+import { pathSetupCommand, resolveCommandPath } from "@infinitus/shared/shell";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -156,7 +156,7 @@ export const installCli = Effect.fn("cli.install.install")(function* () {
       if (!path.isAbsolute(entry) || detectCliRunner(`${entry}/`) !== null) continue;
       for (const name of windows ? ["infinitus.cmd", "infinitus.exe"] : ["infinitus"]) {
         const candidate = path.join(entry, name);
-        if (yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false))) return candidate;
+        if (yield* resolveCommandPath(candidate, { env: environment })) return candidate;
       }
     }
     return undefined;
@@ -324,8 +324,13 @@ export const offerCliInstall = Effect.fn("cli.install.offer")(function* <E, R, E
     .readFileString(path.join(runtimeDir, "launchers"))
     .pipe(Effect.orElseSucceed(() => ""));
   const candidates = [
+<<<<<<< HEAD
     ...launchers.split(/\r?\n/).filter(Boolean),
     path.join(path.dirname(runtimeDir), "bin", windows ? "infinitus.cmd" : "infinitus"),
+=======
+    ...launchers.split(/\r?\n/).filter((launcher) => path.isAbsolute(launcher)),
+    path.join(path.dirname(runtimeDir), "bin", windows ? "t3.cmd" : "t3"),
+>>>>>>> upstream-sync-0e34fe98f2-upstream-renamed
     ...(environment.PATH ?? environment.Path ?? "")
       .split(windows ? ";" : ":")
       .filter(
@@ -334,7 +339,7 @@ export const offerCliInstall = Effect.fn("cli.install.offer")(function* <E, R, E
       .flatMap((directory) => names.map((name) => path.join(directory, name))),
   ];
   for (const candidate of candidates) {
-    if (yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false))) return true;
+    if (yield* resolveCommandPath(candidate, { env: environment })) return true;
   }
 
   const declinedFile = path.join(runtimeDir, "install-prompt-declined");

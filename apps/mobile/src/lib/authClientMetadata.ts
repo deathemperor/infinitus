@@ -8,7 +8,12 @@ export function authClientMetadata(appVersion?: string): AuthClientPresentationM
   const deviceModel = Device.modelName?.trim();
 
   return {
+<<<<<<< HEAD
     label: `${PRODUCT_NAME} Mobile`,
+=======
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- product name
+    label: "T3 Code Mobile",
+>>>>>>> upstream-sync-0e34fe98f2-upstream-renamed
     deviceType:
       Device.deviceType === Device.DeviceType.TABLET
         ? "tablet"
