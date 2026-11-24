@@ -22,6 +22,7 @@ import {
 } from "../../speech/useEnvironmentSpeechInput";
 import { chooseAudioDestination, chooseTranscriptCleanup } from "../../speech/voiceConsent";
 import { useEnvironmentScope } from "../../state/session";
+import { AppRouteModal } from "../AppRouteModal";
 import { toastManager } from "../ui/toast";
 import { SettingsScopeProvider } from "./SettingsScopeContext";
 import { SpeechLanguageSelect } from "./SpeechLanguageSelect";
@@ -148,7 +149,7 @@ it.each([{ cpu: null, accelerated: 2.1 }, { cpu: 5, accelerated: null }, { accel
         secondsPer30s,
       },
     };
-    const cpuBenchmark = `Speed: ${secondsPer30s.cpu === undefined ? "update server" : secondsPer30s.cpu === null ? "not benchmarked" : `${secondsPer30s.cpu} s / 30 s`}`;
+    const cpuBenchmark = `Speed: ${secondsPer30s.cpu === undefined ? "update server for this benchmark" : secondsPer30s.cpu === null ? "not benchmarked" : `${secondsPer30s.cpu} s / 30 s`}`;
     const gpuBenchmark = `Speed: ${secondsPer30s.accelerated === null ? "not benchmarked" : `${secondsPer30s.accelerated} s / 30 s`}`;
     const fetch = globalThis.fetch;
     using _network = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
@@ -256,9 +257,9 @@ it("tests the selected model after download and preserves its transcript across 
     supportsStreaming: false,
     supportsTranslation: false,
     acceleration: "cpu",
+    benchmarkTier: "cpu",
     modelUnloadTimeout: "never",
     gpuDevices: [],
-    benchmarkTier: "cpu",
   } satisfies EnvironmentSpeechStatus;
   let installed = false;
   const fetch = globalThis.fetch;
@@ -290,7 +291,7 @@ it("tests the selected model after download and preserves its transcript across 
                         en: { grade: "A-", errorPercent: 4 },
                         fr: { grade: "B+", errorPercent: 5.5 },
                       },
-                      secondsPer30s: { cpu: 5, accelerated: 2.1 },
+                      secondsPer30s: { accelerated: 2.1, cpu: 5 },
                     },
                   }
                 : {}),
@@ -328,6 +329,7 @@ it("tests the selected model after download and preserves its transcript across 
           state: { phase: "idle", error: null, errorAction: null },
           preview: null,
           level: 0,
+          recordingStartedAt: null,
           preparing: false,
           blocksSubmission: false,
           freezesEditor: false,
@@ -386,81 +388,128 @@ it("tests the selected model after download and preserves its transcript across 
   );
 });
 
-it("loads the models of a relay-connected destination", async () => {
-  const target = new RelayConnectionTarget({
-    environmentId: EnvironmentId.make("voice-relay"),
-    label: "MacBook Pro",
-  });
-  const prepared = {
-    environmentId: target.environmentId,
-    label: target.label,
-    httpBaseUrl: window.location.origin,
-    socketUrl: "ws://localhost",
-    httpAuthorization: {
-      _tag: "Dpop" as const,
-      accessToken: "stale-access-token",
-      expiresAtEpochMs: 4_102_444_800_000,
-    },
-    target,
-  };
-  const model: EnvironmentSpeechModel = {
-    id: "tiny",
-    name: "Tiny",
-    description: "",
-    size: 100,
-    languages: ["en"],
-    accuracy: 1,
-    speed: 1,
-    recommended: false,
-    supportsStreaming: false,
-    supportsTranslation: false,
-    supportsLanguageDetection: false,
-    active: false,
-    state: "downloadable",
-  };
-  const status = {
-    supported: true,
-    state: "missing-model",
-    modelId: model.id,
-    model: model.name,
-    size: model.size,
-    supportsStreaming: false,
-    supportsTranslation: false,
-    acceleration: "cpu",
-    modelUnloadTimeout: "never",
-    gpuDevices: [],
-    benchmarkTier: "cpu",
-  } satisfies EnvironmentSpeechStatus;
-  const authorizations: Array<string | null> = [];
-  const fetch = globalThis.fetch;
-  using _network = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-    const url = new URL(input instanceof Request ? input.url : input, window.location.href);
-    if (url.pathname === "/api/voice/status") {
-      authorizations.push(new Headers(init?.headers).get("authorization"));
-      return Promise.resolve(Response.json(status));
+it.each([
+  { tier: "cpu", legacy: false },
+  { tier: "accelerated", legacy: false },
+  { tier: "cpu", legacy: true },
+] as const)(
+  "loads relay models using the server tier $tier (legacy: $legacy)",
+  async ({ tier, legacy }) => {
+    const target = new RelayConnectionTarget({
+      environmentId: EnvironmentId.make("voice-relay"),
+      label: "MacBook Pro",
+    });
+    const prepared = {
+      environmentId: target.environmentId,
+      label: target.label,
+      httpBaseUrl: window.location.origin,
+      socketUrl: "ws://localhost",
+      httpAuthorization: {
+        _tag: "Dpop" as const,
+        accessToken: "stale-access-token",
+        expiresAtEpochMs: 4_102_444_800_000,
+      },
+      target,
+    };
+    const model = {
+      id: "gpu",
+      name: "GPU pick",
+      description: "",
+      size: 100,
+      languages: ["en"],
+      benchmark: {
+        accuracy: { en: { grade: "A", errorPercent: 4 } },
+        secondsPer30s: { cpu: 20, accelerated: 1 },
+      },
+      accuracy: 1,
+      speed: 1,
+      recommended: false,
+      supportsStreaming: false,
+      supportsTranslation: false,
+      supportsLanguageDetection: false,
+      active: false,
+      state: "downloadable",
+    } satisfies EnvironmentSpeechModel;
+    const status = {
+      supported: true,
+      state: "missing-model",
+      modelId: model.id,
+      model: model.name,
+      size: model.size,
+      supportsStreaming: false,
+      supportsTranslation: false,
+      acceleration: "auto",
+      benchmarkTier: tier,
+      modelUnloadTimeout: "never",
+      gpuDevices: [{ id: "remote-gpu", name: "Remote GPU" }],
+    } satisfies EnvironmentSpeechStatus;
+    const cpuModel = {
+      ...model,
+      id: "cpu",
+      name: "CPU pick",
+      benchmark: {
+        accuracy: { en: { grade: "B+", errorPercent: 6 } },
+        secondsPer30s: { cpu: 1, accelerated: 8 },
+      },
+    };
+    const { benchmarkTier: _tier, ...legacyStatus } = status;
+    const models = [model, cpuModel];
+    const authorizations: Array<string | null> = [];
+    const fetch = globalThis.fetch;
+    using _network = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input, window.location.href);
+      if (url.pathname === "/api/voice/status") {
+        authorizations.push(new Headers(init?.headers).get("authorization"));
+        return Promise.resolve(
+          Response.json(legacy ? { ...legacyStatus, acceleration: "cpu", gpuDevices: [] } : status),
+        );
+      }
+      if (url.pathname === "/api/voice/models")
+        return Promise.resolve(
+          Response.json({
+            models: legacy
+              ? models.map(({ benchmark, ...entry }) => ({
+                  ...entry,
+                  benchmark: {
+                    accuracy: benchmark.accuracy,
+                    secondsPer30s: benchmark.secondsPer30s.accelerated,
+                  },
+                }))
+              : models,
+          }),
+        );
+      return fetch(input, init);
+    });
+    using notify = vi.spyOn(toastManager, "add").mockReturnValue("test");
+    // Restored even when an assertion fails, unlike `withImplementation`.
+    using _destination = vi.mocked(useVoiceTranscriptionDestination).mockImplementation(() => ({
+      environmentId: target.environmentId,
+      label: target.label,
+      grantId: "test",
+      prepared,
+    }));
+    await using screen = await render(
+      <SettingsScopeProvider search={{}} onChange={() => {}}>
+        <VoiceSettingsPanel />
+      </SettingsScopeProvider>,
+    );
+    await vi.waitFor(() => expect(authorizations.length + notify.mock.calls.length).not.toBe(0));
+    expect(notify).not.toHaveBeenCalled();
+    expect(authorizations).toEqual(["DPoP relay-access-token"]);
+    const region = screen.getByRole("region", { name: "Transcription models" });
+    await vi.waitFor(() => expect(region.element().textContent).toContain("CPU pick"));
+    if (legacy) {
+      expect(region.element().textContent).toContain("update server for this benchmark");
+      expect(region.element().textContent).not.toContain("Recommended");
+    } else {
+      const winner = tier === "cpu" ? "CPU pick" : "GPU pick";
+      await vi.waitFor(() =>
+        expect(region.element().firstElementChild?.textContent).toContain(winner + "Recommended"),
+      );
+      expect(region.element().textContent).toContain("Speed: 1 s / 30 s");
     }
-    if (url.pathname === "/api/voice/models")
-      return Promise.resolve(Response.json({ models: [model] }));
-    return fetch(input, init);
-  });
-  using notify = vi.spyOn(toastManager, "add").mockReturnValue("test");
-  // Restored even when an assertion fails, unlike `withImplementation`.
-  using _destination = vi.mocked(useVoiceTranscriptionDestination).mockImplementation(() => ({
-    environmentId: target.environmentId,
-    label: target.label,
-    grantId: "test",
-    prepared,
-  }));
-  await using screen = await render(
-    <SettingsScopeProvider search={{}} onChange={() => {}}>
-      <VoiceSettingsPanel />
-    </SettingsScopeProvider>,
-  );
-  await vi.waitFor(() => expect(authorizations.length + notify.mock.calls.length).not.toBe(0));
-  expect(notify).not.toHaveBeenCalled();
-  expect(authorizations).toEqual(["DPoP relay-access-token"]);
-  await expect.element(screen.getByText("Tiny", { exact: true })).toBeVisible();
-});
+  },
+);
 
 it("recovers from a failed download progress poll without notifying, but reports a failed initial load", async () => {
   const target = new PrimaryConnectionTarget({
@@ -494,9 +543,9 @@ it("recovers from a failed download progress poll without notifying, but reports
     supportsStreaming: false,
     supportsTranslation: false,
     acceleration: "cpu",
+    benchmarkTier: "cpu",
     modelUnloadTimeout: "never",
     gpuDevices: [],
-    benchmarkTier: "cpu",
   };
   const unavailable = () => new Response(null, { status: 503 });
   const readModels = vi
@@ -650,6 +699,43 @@ it("keeps a dictionary term and alias draft on the Enter that confirms an IME ca
   alias.element().dispatchEvent(composingEnter());
   expect(getClientSettings().speechCustomWords).toEqual([{ term: "日本語", aliases: [] }]);
   await expect.element(alias).toHaveValue("にほん");
+});
+
+it("cancels an alias draft on Esc without closing Settings", async () => {
+  const previous = getClientSettings();
+  using cleanup = new DisposableStack();
+  cleanup.defer(() => __setClientSettingsForTests(previous));
+  __setClientSettingsForTests({
+    ...previous,
+    speechCustomWords: [{ term: "Kubernetes", aliases: [] }],
+  });
+  await using screen = await render(
+    <AppRouteModal label="Settings">
+      <SettingsScopeProvider search={{}} onChange={() => {}}>
+        <VoiceSettingsPanel />
+      </SettingsScopeProvider>
+    </AppRouteModal>,
+    { router: "/settings/voice" },
+  );
+  const settings = screen.getByRole("dialog", { name: "Settings" });
+  const addAlias = screen.getByRole("button", { name: "Add an alias for Kubernetes" });
+  await expect.element(addAlias).toBeVisible();
+  (addAlias.element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+  const alias = screen.getByRole("textbox", { name: "Alias for Kubernetes" });
+  await expect.element(alias).toHaveFocus();
+  await userEvent.keyboard("cooper");
+
+  await userEvent.keyboard("{Escape}");
+
+  await expect.element(alias).not.toBeInTheDocument();
+  await expect.element(settings).toHaveAttribute("data-open");
+  await expect.element(settings).toHaveFocus();
+  expect(getClientSettings().speechCustomWords).toEqual([{ term: "Kubernetes", aliases: [] }]);
+
+  await userEvent.keyboard("{Escape}");
+
+  await expect.element(settings).not.toBeInTheDocument();
 });
 
 it("records from the first connected microphone in the saved order", async () => {
