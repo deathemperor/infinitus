@@ -428,7 +428,7 @@ jobs:
     name: Commit version override
     needs: production
     if: ${{ !cancelled() && needs.production.result == 'success' && needs.production.outputs.version_override == 'true' }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
