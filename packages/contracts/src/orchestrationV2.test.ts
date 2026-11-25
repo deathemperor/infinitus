@@ -666,7 +666,11 @@ describe("withMessageSenderNote", () => {
     senderThreadId: ThreadId.make("t"),
   } as const;
   it.each([
-    [thread, "Hi", '[Infinitus: the agent in Infinitus thread "t" sent this message, not the user.]\n\nHi'],
+    [
+      thread,
+      "Hi",
+      '[Infinitus: the agent in Infinitus thread "t" sent this message, not the user.]\n\nHi',
+    ],
     [thread, "", '[Infinitus: the agent in Infinitus thread "t" sent this message, not the user.]'],
     [thread, " /git/review staged", " /git/review staged"],
     [thread, "$deploy ship it", "$deploy ship it"],
