@@ -6494,7 +6494,7 @@ describe("AcpAdapterV2", () => {
         return yield* Effect.die("ACP runtime must register MCP-over-ACP handlers");
       }
       const { connectionId } = yield* mcpConnect(
-        { serverId: "t3-code" },
+        { serverId: "infinitus" },
         { requestId: "stop-mcp-connect", method: "mcp/connect" },
       );
       const call = yield* mcpMessage(

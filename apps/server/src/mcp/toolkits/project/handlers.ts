@@ -7,7 +7,7 @@ import {
   ProjectId,
   type Project as ProjectRecord,
   type ServerProvider,
-  T3_PROJECT_FILE_NAME,
+  T3_PROJECT_FILE_NAMES,
 } from "@infinitus/contracts";
 import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
@@ -102,14 +102,19 @@ const assertProjectWorktree = Effect.fn("mcp.assertProjectWorktree")(function* (
     });
 });
 
-/** The composer falls back to the project's t3.json when no setting picks the mode. */
+/** The composer falls back to the project file when no setting picks the mode. */
 const projectFileThreadEnvMode = Effect.fn("mcp.projectFileThreadEnvMode")(function* (
   workspaceRoot: string,
 ) {
   const fileSystem = yield* FileSystem.FileSystem;
-  const contents = yield* fileSystem
-    .readFileString(`${workspaceRoot}/${T3_PROJECT_FILE_NAME}`)
-    .pipe(Effect.orElseSucceed(() => null));
+  // The first project file that reads decides, in the server's order.
+  let contents: string | null = null;
+  for (const fileName of T3_PROJECT_FILE_NAMES) {
+    contents = yield* fileSystem
+      .readFileString(`${workspaceRoot}/${fileName}`)
+      .pipe(Effect.orElseSucceed(() => null));
+    if (contents !== null) break;
+  }
   return resolveProjectFileBackedSetting(
     "defaultThreadEnvMode",
     null,
