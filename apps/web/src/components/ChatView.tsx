@@ -56,7 +56,6 @@ import { usePendingThreadRequests } from "./chat/usePendingThreadRequests";
 import { isScratchProject } from "@infinitus/client-runtime/state/projects";
 import { visibleThreadPullRequests } from "@infinitus/shared/threadPullRequests";
 import { threadUsageFromProjection } from "@infinitus/shared/threadUsage";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { UsageLimitSourceSnapshots } from "@infinitus/contracts";
 import { feedbackBannerItem } from "./chat/ComposerFeedback";
 import { freshSessionBannerItem } from "./chat/ComposerFreshSession";

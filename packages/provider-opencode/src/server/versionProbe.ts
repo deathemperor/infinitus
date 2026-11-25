@@ -11,7 +11,6 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest";
 
 import * as OpenCodeRuntime from "./OpenCodeRuntime.ts";
 import { parseGenericCliVersion } from "@infinitus/provider-core/server/snapshotProbe";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export interface ProbedOpenCode {
   readonly generation: "v1" | "v2";

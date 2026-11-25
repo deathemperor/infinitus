@@ -604,6 +604,11 @@ export default defineConfig({
         rules: { "t3code/no-untranslated-copy": "error" },
       },
       {
+        // Fork (#1796): the fork's own copy is not wrapped yet, so it warns here instead.
+        files: ["apps/web/src/**", "apps/mobile/src/**", "packages/client-runtime/src/**"],
+        rules: { "t3code/no-untranslated-copy": "warn" },
+      },
+      {
         // React Compiler owns memoization; upstream rules do not ban redundant useMemo/useCallback.
         files: ["apps/web/src/**/*.{ts,tsx}"],
         rules: {

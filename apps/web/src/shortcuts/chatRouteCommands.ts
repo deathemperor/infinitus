@@ -1,5 +1,4 @@
 import { AuthPreviewOperateScope, type EnvironmentId } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { AnyRouter } from "@tanstack/react-router";
 import { msg } from "gt-react";
 

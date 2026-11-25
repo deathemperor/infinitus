@@ -278,7 +278,9 @@ export function applyRenames(text: string, path?: string): string {
   for (const rename of RENAMES) {
     if (!appliesTo(rename, path)) continue;
     if (rename.copy === true) {
-      out = out.replace(copySpans(path), (span) => span.replace(rename.pattern, rename.replacement));
+      out = out.replace(copySpans(path), (span) =>
+        span.replace(rename.pattern, rename.replacement),
+      );
       continue;
     }
     out = out.replace(rename.pattern, (...args: Array<unknown>) => {
@@ -297,7 +299,9 @@ export function remainingRenames(text: string, path?: string): ReadonlyArray<Ren
   return RENAMES.filter((rename) => {
     if (!appliesTo(rename, path)) return false;
     if (rename.copy === true) {
-      return [...text.matchAll(copySpans(path))].some((span) => span[0].search(rename.pattern) !== -1);
+      return [...text.matchAll(copySpans(path))].some(
+        (span) => span[0].search(rename.pattern) !== -1,
+      );
     }
     return [...text.matchAll(rename.pattern)].some((m) => !skips(rename, text, m.index));
   });

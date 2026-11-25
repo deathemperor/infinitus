@@ -137,7 +137,8 @@ describe("infinitus-rename", () => {
     expect(remainingRenames(out, path)).toEqual([]);
     expect(applyRenames(source, "apps/server/src/Example.ts")).toBe(source);
 
-    const catalog = '{ "a1": "T3 Code konnte nicht starten", "b2": "Dieses T3-Home", "c3": "T3 Chat" }';
+    const catalog =
+      '{ "a1": "T3 Code konnte nicht starten", "b2": "Dieses T3-Home", "c3": "T3 Chat" }';
     expect(applyRenames(catalog, "apps/desktop/src/i18n/translations/de.json")).toBe(
       '{ "a1": "Infinitus konnte nicht starten", "b2": "Dieses Infinitus-Home", "c3": "T3 Chat" }',
     );

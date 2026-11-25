@@ -56,7 +56,6 @@ import {
 import { getModelSelectionStringOptionValue, modelSelectionsEqual } from "@infinitus/shared/model";
 import { appendGeneratedImageEmbeds } from "@infinitus/shared/generatedImageMarkdown";
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { mcpToolResultOutput } from "@infinitus/shared/toolOutput";
 import type {
   ChatAttachment,

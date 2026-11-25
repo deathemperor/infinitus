@@ -52,7 +52,6 @@ import { stackedThreadToast, toastManager } from "../ui/toast";
 import { suggestAppAccessForRemote } from "../sourceControlAppAccessToast";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { placeLinkedPrompt, warnAboutHiddenCharacters } from "./linkedPrompt";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 type LinkState =
   | { readonly status: "opening" }

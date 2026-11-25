@@ -21,7 +21,6 @@ import { RelayConnectionTarget } from "../connection/model.ts";
 import * as ManagedRelay from "../relay/managedRelay.ts";
 import { executeAuthenticatedEnvironmentHttpRequest } from "./environmentHttpAuth.ts";
 import { createRuntimeCommand } from "./runtime.ts";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 

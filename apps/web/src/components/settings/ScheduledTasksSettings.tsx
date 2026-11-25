@@ -60,7 +60,6 @@ import { providerInstanceEntriesFor } from "../../providerInstances";
 import { usePrimaryCloudLinkState } from "../../cloud/cloudLinkState";
 import { requestConfirmDialog } from "../../confirmDialog";
 import { webhookAddress } from "@infinitus/client-runtime/webhook-address";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useNowMinute } from "../../hooks/useNowMinute";

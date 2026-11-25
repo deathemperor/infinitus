@@ -31,7 +31,6 @@ import {
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const DismissedEnvironmentIds = Schema.Array(Schema.String);
 const reclaimPermissionsAtom = environmentAtomList(

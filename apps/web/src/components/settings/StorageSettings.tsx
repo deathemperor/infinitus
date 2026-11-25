@@ -3,7 +3,6 @@ import type {
   StorageCleanupSettings,
   WorktreeCleanupRules,
 } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { resolvePastedPath } from "@infinitus/shared/path";
 import { resolveWorktreeCleanup } from "@infinitus/shared/projectSettings";
 import { useRef, useState } from "react";

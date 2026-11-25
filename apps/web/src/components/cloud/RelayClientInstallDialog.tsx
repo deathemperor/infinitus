@@ -20,7 +20,6 @@ import {
   DialogPopup,
   DialogTitle,
 } from "../ui/dialog";
-import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 const installSteps: ReadonlyArray<{
   readonly stage: RelayClientInstallProgressStage;
   readonly label: string;

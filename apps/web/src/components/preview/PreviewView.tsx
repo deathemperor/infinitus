@@ -3,7 +3,6 @@ import { m } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
 import { scopedThreadKey } from "@infinitus/client-runtime/environment";
 import { settlePromise } from "@infinitus/client-runtime/state/runtime";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { DesktopPreviewAnnotationVoiceConfig } from "@infinitus/contracts";
 import { previewStreamDownloadUrl } from "@infinitus/client-runtime/preview/server-browser-stream";
 import {

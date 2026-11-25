@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAuth } from "@clerk/react";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { Link } from "@tanstack/react-router";

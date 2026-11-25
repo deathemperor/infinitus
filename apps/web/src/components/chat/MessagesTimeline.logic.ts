@@ -1,7 +1,6 @@
 import * as DateTime from "effect/DateTime";
 import { msg } from "gt-react";
 import { worktreeSetupAgentStarted } from "@infinitus/client-runtime/worktree-setup";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { resolveUserMessagePresentation } from "@infinitus/client-runtime/user-message";
 import {
   isLiveSubagentTurnItem,

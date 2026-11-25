@@ -33,7 +33,6 @@ import {
   reportRelayClientInstallProgress,
   requestRelayClientInstallConfirmation,
 } from "./relayClientInstallDialog";
-import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 
 function relayUrl(): string | null {
   return resolveCloudPublicConfig().relayUrl;

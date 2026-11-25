@@ -1,4 +1,3 @@
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { Discovery } from "@infinitus/client-runtime/relay";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { T, useGT, Var } from "gt-react";

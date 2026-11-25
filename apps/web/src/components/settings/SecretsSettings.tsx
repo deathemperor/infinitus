@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { EnvironmentId, SecretProviderConfig, SecretProviderId } from "@infinitus/contracts";
 import { PlusIcon } from "lucide-react";
 import { useState } from "react";

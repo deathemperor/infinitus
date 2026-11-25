@@ -63,7 +63,6 @@ import {
   captureSetupShouldDisableOnClose,
   type CaptureSetupStep,
 } from "./SnapShotSetupDialog.logic";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const soundOptionRowClassName = "grid grid-cols-[1fr_auto]";
 

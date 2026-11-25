@@ -562,6 +562,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `getDesktopScheme`.
 - `apps/server/src/httpCors.ts` — `DESKTOP_RENDERER_ORIGINS` built from the
   same two scheme constants.
+- `vite.config.ts` — one lint block after upstream's `t3code/no-untranslated-copy` block turns it into a warning, because the fork's own copy is not wrapped yet (#1796). Remove the block when `vp run i18n:untranslated` reaches zero.
 - `scripts/build-desktop-artifact.ts` — the mac and Linux `protocols` blocks
   (name `Infinitus`, schemes `infinitus` / `infinitus-dev`);
   `resolveDesktopBuildIconAssets` / `resolveDesktopWebAssetBrand` return the

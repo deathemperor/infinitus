@@ -8,7 +8,6 @@ import {
   type ServerSelfUpdateResult,
   WS_METHODS,
 } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

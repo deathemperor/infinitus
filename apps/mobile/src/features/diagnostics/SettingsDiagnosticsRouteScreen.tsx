@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import * as Application from "expo-application";

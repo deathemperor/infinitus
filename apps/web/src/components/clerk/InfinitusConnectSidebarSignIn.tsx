@@ -7,7 +7,6 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { retryClerkLoad, useClerkLoadFailed } from "./clerkLoadFailure";
 import { T3_CONNECT_ACCOUNT_PAGES } from "./InfinitusConnectAccountPages";
 import { useInfinitusConnectAuthPrompt } from "./useInfinitusConnectAuthPrompt";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export function InfinitusConnectSidebarSignIn() {
   if (!hasCloudPublicConfig()) return null;

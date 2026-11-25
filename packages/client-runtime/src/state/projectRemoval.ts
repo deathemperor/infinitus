@@ -1,5 +1,4 @@
 import { isListedThreadLineage } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import type { EnvironmentProject, EnvironmentThreadShell } from "./models.ts";
 import { mFallback, msg } from "gt-i18n";

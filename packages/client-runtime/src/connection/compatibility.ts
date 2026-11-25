@@ -9,7 +9,6 @@ import {
 } from "@infinitus/contracts";
 
 import { ConnectionBlockedError } from "./model.ts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export function orchestrationProtocolCompatibilityError(
   descriptor: ExecutionEnvironmentDescriptor,

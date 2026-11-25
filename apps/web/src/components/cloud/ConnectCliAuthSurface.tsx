@@ -12,7 +12,6 @@ import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
 import { resolveClerkSignInProps } from "../clerk/authRedirect";
 import { retryClerkLoad, useClerkLoadFailed } from "../clerk/clerkLoadFailure";
 import { Button } from "../ui/button";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const invalidLinkMessage = {
   context: msg("Authorization request"),

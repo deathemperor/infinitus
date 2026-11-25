@@ -35,7 +35,6 @@ import { connectionAtomRuntime } from "../../connection/runtime";
 import { uuidv4 } from "../../lib/uuid";
 import { createEnvironmentTranscriber } from "./environmentTranscriber";
 import { readVoiceGrant, writeVoiceGrant, type VoiceGrant } from "./voiceGrantStorage";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const storedGrant = Atom.make(Effect.promise(readVoiceGrant)).pipe(Atom.keepAlive);
 const choice = Atom.make<VoiceGrant | null | undefined>(undefined).pipe(Atom.keepAlive);

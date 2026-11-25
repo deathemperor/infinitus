@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
 import {
   isAtomCommandInterrupted,

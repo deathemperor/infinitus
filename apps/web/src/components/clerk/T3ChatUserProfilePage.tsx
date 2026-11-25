@@ -1,4 +1,3 @@
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { T3CHAT_PLAN_TUNNEL_LIMITS, type RelayT3ChatLink } from "@infinitus/contracts/relay";
 import { MessageSquareIcon } from "lucide-react";
 import { T, useGT, Var } from "gt-react";

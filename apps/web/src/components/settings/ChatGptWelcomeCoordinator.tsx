@@ -14,7 +14,6 @@ import {
   DialogFooter,
 } from "../ui/dialog";
 import { ChatGptUsageButton } from "./ChatGptUsageButton";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const STORAGE_KEY = "t3:chatgpt-sharing-welcome:v1";
 function readAcknowledgedProfiles(): string[] {

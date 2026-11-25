@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { type EnvironmentContextRecord, resolveEnvironmentMachineKind } from "@infinitus/contracts";
 
 import { useGT } from "gt-react";

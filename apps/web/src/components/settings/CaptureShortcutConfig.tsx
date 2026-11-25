@@ -20,7 +20,6 @@ import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { shortcutToKeybindingInput } from "./KeybindingsSettings.logic";
 import { useSnapShotShortcutRecorder } from "./useSnapShotShortcutRecorder";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const DEFAULT_SHORTCUT = parseKeybindingShortcut("Ctrl+Shift+2")!;
 

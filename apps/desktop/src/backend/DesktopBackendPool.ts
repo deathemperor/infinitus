@@ -34,7 +34,6 @@ import * as DesktopBrowserHost from "../preview/DesktopBrowserHost.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
 import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import { m } from "../i18n/messages.ts";
 

@@ -5,7 +5,6 @@ import {
   type PullRequestDiffInput,
   type PullRequestDiffResult,
 } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

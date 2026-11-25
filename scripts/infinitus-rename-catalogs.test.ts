@@ -10,7 +10,11 @@ describe("infinitus-rename-catalogs", () => {
     );
     const english = { moved: "Restart Infinitus.", kept: "Retry", added: "New copy" };
     expect(
-      carryTranslations(english, { moved: "Restart Infinitus.", kept: "Erneut", added: "New copy" }, before),
+      carryTranslations(
+        english,
+        { moved: "Restart Infinitus.", kept: "Erneut", added: "New copy" },
+        before,
+      ),
     ).toEqual({ moved: "Infinitus neu starten.", kept: "Erneut", added: "New copy" });
   });
 });

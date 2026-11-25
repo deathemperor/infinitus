@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { type EnvironmentId, SourceControlProviderKind } from "@infinitus/contracts";
 import { runAtomCommand } from "@infinitus/client-runtime/state/runtime";
 import * as Schema from "effect/Schema";

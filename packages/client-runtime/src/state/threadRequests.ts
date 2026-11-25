@@ -16,7 +16,6 @@ import { parseThreadKey, threadKey } from "./entities.ts";
 import { getProjectionArrayReplacementIndex } from "./orchestrationV2Projection.ts";
 import type { EnvironmentThreadShell } from "./models.ts";
 import * as DateTime from "effect/DateTime";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { AtomCommandResult } from "./runtime.ts";
 import type { ThreadStructure, ThreadStructureVisibleTurnItem } from "./models.ts";
 import { mFallback, msg } from "gt-i18n";

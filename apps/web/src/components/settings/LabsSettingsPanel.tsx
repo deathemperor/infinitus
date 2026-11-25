@@ -130,6 +130,7 @@ function GuestLinksRow() {
       settingKeys={["guestSharingEnabled"]}
       // Turning guest links off still works without T3 Connect.
       managed={settings.guestSharingEnabled ? undefined : connectDenial}
+      // oxlint-disable-next-line t3code/max-settings-description-length -- upstream's copy, longer by the fork's Connect name
       description={
         <T>
           Share a thread with a guest who watches it live in a browser and sends messages you

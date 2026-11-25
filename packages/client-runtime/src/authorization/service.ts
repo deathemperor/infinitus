@@ -10,7 +10,6 @@ import {
 import { RelayEnvironmentConnectScope } from "@infinitus/contracts/relay";
 import * as KeyedLock from "@infinitus/shared/KeyedLock";
 import { withRelayClientTracing } from "@infinitus/shared/relayTracing";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 import {
   exchangeRemoteDpopAccessToken,
   type RemoteEnvironmentAuthError,

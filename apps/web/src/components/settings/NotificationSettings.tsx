@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { settlePromise } from "@infinitus/client-runtime/state/runtime";
 import { useGT, useMessages } from "gt-react";
 import { useState } from "react";

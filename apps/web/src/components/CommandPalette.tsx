@@ -4,7 +4,6 @@ import { m, type MessageResolver } from "../i18n/messages";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
 import { threadPullRequestLinkMode } from "@infinitus/client-runtime/thread-pull-request-compatibility";
 import { visibleThreadPullRequests } from "@infinitus/shared/threadPullRequests";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import {
   scopedThreadKey,

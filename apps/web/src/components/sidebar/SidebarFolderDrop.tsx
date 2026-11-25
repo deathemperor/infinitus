@@ -14,7 +14,6 @@ import { splitTransferredFiles } from "../chat/workspaceFileDrop";
 import { setFileDragActive } from "../Sidebar.logic";
 import { toastManager } from "../ui/toast";
 import { stackedThreadToast } from "../ui/toastHelpers";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const isActivationPlatform = Schema.is(DesktopAppActivationPlatform);
 

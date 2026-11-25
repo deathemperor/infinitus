@@ -12,7 +12,6 @@ import {
 } from "@infinitus/client-runtime/state/runtime";
 import { resolveUserMessagePresentation } from "@infinitus/client-runtime/user-message";
 import type { ChatAttachment, EnvironmentId, RunId, ThreadId } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { Atom } from "effect/reactivity";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";

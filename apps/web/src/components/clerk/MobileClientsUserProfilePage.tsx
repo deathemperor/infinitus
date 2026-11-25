@@ -17,7 +17,6 @@ import {
   ClerkUserProfileRefreshButton,
   ClerkUserProfileRow,
 } from "./ClerkUserProfilePage";
-import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const MOBILE_CLIENT_SKELETON_ROWS = ["primary", "secondary"] as const;
 

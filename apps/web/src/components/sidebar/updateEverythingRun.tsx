@@ -1,4 +1,3 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAtomValue } from "@effect/atom-react";
 import { AVAILABLE_CONNECTION_STATE } from "@infinitus/client-runtime/connection";
 import {
