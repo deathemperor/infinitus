@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @effect-diagnostics nodeBuiltinImport:off - A plain CLI regenerating catalogs; no Effect runtime here.
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
