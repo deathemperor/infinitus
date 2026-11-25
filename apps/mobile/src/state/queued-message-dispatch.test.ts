@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { appAtomRegistry } from "./atom-registry";
 import {
   beginDispatchingQueuedMessage,
-  dispatchingQueuedMessageAtom,
+  dispatchingQueuedMessagesAtom,
   finishDispatchingQueuedMessage,
   markDispatchingQueuedMessageSending,
   reclaimQueuedMessageFromDispatch,
@@ -14,23 +14,21 @@ const messageId = MessageId.make("message-1");
 const otherId = MessageId.make("message-2");
 
 afterEach(() => {
-  appAtomRegistry.set(dispatchingQueuedMessageAtom, null);
+  appAtomRegistry.set(dispatchingQueuedMessagesAtom, {});
 });
 
 describe("queued message dispatch phases", () => {
   it("publishes the upload phase, then the send phase, then nothing", () => {
     const signal = beginDispatchingQueuedMessage(messageId);
-    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toEqual({
-      messageId,
-      phase: "uploading",
+    expect(appAtomRegistry.get(dispatchingQueuedMessagesAtom)).toEqual({
+      [messageId]: "uploading",
     });
     expect(markDispatchingQueuedMessageSending(messageId)).toBe(true);
-    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toEqual({
-      messageId,
-      phase: "sending",
+    expect(appAtomRegistry.get(dispatchingQueuedMessagesAtom)).toEqual({
+      [messageId]: "sending",
     });
     finishDispatchingQueuedMessage(messageId);
-    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toBeNull();
+    expect(appAtomRegistry.get(dispatchingQueuedMessagesAtom)).toEqual({});
     expect(signal.aborted).toBe(false);
   });
 
@@ -38,9 +36,8 @@ describe("queued message dispatch phases", () => {
     const signal = beginDispatchingQueuedMessage(messageId);
     expect(reclaimQueuedMessageFromDispatch(otherId)).toBe(true);
     expect(signal.aborted).toBe(false);
-    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toEqual({
-      messageId,
-      phase: "uploading",
+    expect(appAtomRegistry.get(dispatchingQueuedMessagesAtom)).toEqual({
+      [messageId]: "uploading",
     });
   });
 
@@ -49,9 +46,8 @@ describe("queued message dispatch phases", () => {
     expect(reclaimQueuedMessageFromDispatch(messageId)).toBe(true);
     expect(signal.aborted).toBe(true);
     expect(markDispatchingQueuedMessageSending(messageId)).toBe(false);
-    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toEqual({
-      messageId,
-      phase: "uploading",
+    expect(appAtomRegistry.get(dispatchingQueuedMessagesAtom)).toEqual({
+      [messageId]: "uploading",
     });
   });
 
@@ -62,13 +58,26 @@ describe("queued message dispatch phases", () => {
     expect(signal.aborted).toBe(false);
   });
 
-  it("only the current dispatch may finish or flip to sending", () => {
+  it("reclaims one of two concurrent dispatches without touching the other", () => {
+    const signal = beginDispatchingQueuedMessage(messageId);
+    const otherSignal = beginDispatchingQueuedMessage(otherId);
+    expect(reclaimQueuedMessageFromDispatch(otherId)).toBe(true);
+    expect(otherSignal.aborted).toBe(true);
+    expect(signal.aborted).toBe(false);
+    expect(markDispatchingQueuedMessageSending(messageId)).toBe(true);
+    expect(markDispatchingQueuedMessageSending(otherId)).toBe(false);
+    expect(appAtomRegistry.get(dispatchingQueuedMessagesAtom)).toEqual({
+      [messageId]: "sending",
+      [otherId]: "uploading",
+    });
+  });
+
+  it("only a dispatching message may finish or flip to sending", () => {
     beginDispatchingQueuedMessage(messageId);
     expect(markDispatchingQueuedMessageSending(otherId)).toBe(false);
     finishDispatchingQueuedMessage(otherId);
-    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toEqual({
-      messageId,
-      phase: "uploading",
+    expect(appAtomRegistry.get(dispatchingQueuedMessagesAtom)).toEqual({
+      [messageId]: "uploading",
     });
   });
 });

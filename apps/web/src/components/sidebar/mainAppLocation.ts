@@ -13,6 +13,7 @@ export function isSidebarUtilityPage(pathname: string) {
   return (
     pathname.startsWith("/projects/") ||
     pathname === "/pull-requests" ||
+    pathname === "/issues" ||
     // Fork: the Accounts, Stats and Utilization pages in the same row.
     pathname === "/accounts" ||
     pathname === "/stats" ||
