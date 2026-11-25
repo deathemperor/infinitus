@@ -64,17 +64,17 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
     moreInApp: {} as Record<string, string>,
   };
   const providers = props.providers ?? [
-    // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
     {
       name: "Codex",
+      // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
       detail: `Open ${PRODUCT_NAME} to connect`,
       windows: [],
       expiresAt: 0,
       totalWindows: 0,
     },
-    // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
     {
       name: "Claude",
+      // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
       detail: `Open ${PRODUCT_NAME} to connect`,
       windows: [],
       expiresAt: 0,
