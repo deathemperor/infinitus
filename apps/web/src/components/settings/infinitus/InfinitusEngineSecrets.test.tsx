@@ -15,6 +15,17 @@ const { fake } = vi.hoisted(() => ({
   },
 }));
 
+// GT's real hooks need its browser runtime; English passes through as the app renders it.
+vi.mock("gt-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("gt-react")>()),
+  useGT:
+    () =>
+    (text: string, values: Record<string, unknown> = {}) =>
+      text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key])),
+  useMessages: () => (text: string) => text,
+  T: ({ children }: { children: ReactNode }) => children,
+  Var: ({ children }: { children: ReactNode }) => children,
+}));
 vi.mock("../../../state/environments", () => ({
   usePrimaryEnvironmentId: () => "env-1",
   usePrimaryEnvironment: () => ({

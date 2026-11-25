@@ -2,7 +2,7 @@ import type { CaptureItem } from "@infinitus/contracts/captures";
 import { CheckIcon, CopyIcon, ListTodoIcon, SendIcon, XIcon } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 
-import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { namedClipboardTarget, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
 import { captures } from "~/state/captures";
 import { useEnvironmentQuery } from "~/state/query";
@@ -85,7 +85,7 @@ export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
 
   const copy = async (item: CaptureItem) => {
     try {
-      await writeTextToClipboard(item.text, "capture");
+      await writeTextToClipboard(item.text, namedClipboardTarget("capture"));
     } catch (cause) {
       toastManager.add({
         type: "error",

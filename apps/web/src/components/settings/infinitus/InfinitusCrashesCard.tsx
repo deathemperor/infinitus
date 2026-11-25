@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 
-import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { namedClipboardTarget, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
@@ -78,7 +78,7 @@ export function InfinitusCrashesCard() {
       return;
     }
     try {
-      await writeTextToClipboard(transcript, "crash report");
+      await writeTextToClipboard(transcript, namedClipboardTarget("crash report"));
       setError(null);
       setCopied(id);
     } catch (cause) {

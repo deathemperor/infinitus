@@ -1,3 +1,4 @@
+import { useGT } from "gt-react-native";
 import { AppBar } from "../../components/ui/AppBar";
 import { Button } from "../../components/ui/Button";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -17,7 +18,7 @@ import { splitEnvironmentSections } from "../connection/environmentSections";
 import { useConnectionController } from "../connection/useConnectionController";
 import { optOutOfConnectOnboarding } from "./connectOnboardingOptOut";
 import { hasCloudPublicConfig } from "./publicConfig";
-import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 // Only reachable with cloud config: onboarding is requested after a T3 Connect
 // sign-in, and appLinking drops the deep link otherwise.
@@ -26,6 +27,7 @@ export function ConnectOnboardingRouteScreen() {
 }
 
 function ConfiguredConnectOnboardingRouteScreen() {
+  const gt = useGT();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
@@ -61,10 +63,10 @@ function ConfiguredConnectOnboardingRouteScreen() {
   return (
     <View collapsable={false} className="flex-1 bg-sheet">
       <AppBar
-        title={`Set up ${CONNECT_NAME}`}
+        title={gt("Set up {product}", { product: CONNECT_NAME })}
         onClose={handleClose}
         refresh={{
-          accessibilityLabel: "Refresh environments",
+          accessibilityLabel: gt("Refresh environments"),
           disabled: isRefreshing,
           onPress: handleRefresh,
         }}
@@ -75,11 +77,11 @@ function ConfiguredConnectOnboardingRouteScreen() {
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         className="flex-1"
-        contentInset={{ bottom: Math.max(insets.bottom, 18) + 18 }}
         contentContainerStyle={{
           gap: 16,
           paddingHorizontal: 20,
           paddingTop: 16,
+          paddingBottom: Math.max(insets.bottom, 18) + 18,
         }}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
       >
@@ -93,13 +95,15 @@ function ConfiguredConnectOnboardingRouteScreen() {
         ) : (
           <View collapsable={false} className="rounded-[24px] bg-grouped-card p-5">
             <Text className="text-sm leading-normal text-foreground-muted">
-              Sign in to your {PRODUCT_NAME} account to set up {CONNECT_NAME}.
+              {gt("Sign in to your Infinitus account to set up {product}.", {
+                product: CONNECT_NAME,
+              })}
             </Text>
           </View>
         )}
 
         {userId ? (
-          <Button label={"Don't show this again"} tone="text" onPress={handleDontShowAgain} />
+          <Button label={gt("Don't show this again")} tone="text" onPress={handleDontShowAgain} />
         ) : null}
       </ScrollView>
     </View>

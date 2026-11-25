@@ -1,6 +1,6 @@
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { Discovery } from "@infinitus/client-runtime/relay";
 import type { EnvironmentId } from "@infinitus/contracts";
+import { T, useGT, Var } from "gt-react";
 import { useState } from "react";
 
 import { useRelayEnvironmentDiscovery } from "../../state/environments";
@@ -28,6 +28,7 @@ export function RemoveInfinitusConnectEnvironmentDialog({
   readonly onConfirm: () => void;
 }) {
   const accountPage = useInfinitusConnectAccountPage();
+  const gt = useGT();
   const discovery = useRelayEnvironmentDiscovery();
   const registration = environmentId
     ? Discovery.relayEnvironmentRegistration(discovery, environmentId)
@@ -47,10 +48,10 @@ export function RemoveInfinitusConnectEnvironmentDialog({
         openAccountPage();
       }}
     >
-      {CONNECT_NAME} settings
+      <T>Infinitus Connect settings</T>
     </InlineButton>
   ) : (
-    `${CONNECT_NAME} settings`
+    gt("Infinitus Connect settings")
   );
 
   return (
@@ -63,30 +64,36 @@ export function RemoveInfinitusConnectEnvironmentDialog({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {shown.label} from this device?</AlertDialogTitle>
+            <AlertDialogTitle>
+              <T>
+                Remove <Var>{shown.label}</Var> from this device?
+              </T>
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This forgets its pairing, credentials, and cached threads here.
+              <T>This forgets its pairing, credentials, and cached threads here.</T>
             </AlertDialogDescription>
             <AlertDialogDescription>
               {shown.registration === "registered" ? (
-                <>
-                  It stays on your {CONNECT_NAME} account and keeps its host space. Deregister it in{" "}
-                  {accountPageLink} to free it.
-                </>
+                <T>
+                  It stays on your Infinitus Connect account and keeps its host space. Deregister it
+                  in <Var>{accountPageLink}</Var> to free it.
+                </T>
               ) : shown.registration === "unregistered" ? (
-                `It's no longer on your ${CONNECT_NAME} account.`
+                gt("It's no longer on your Infinitus Connect account.")
               ) : (
-                <>
-                  This doesn't change your {CONNECT_NAME} account. To deregister it there, use{" "}
-                  {accountPageLink}.
-                </>
+                <T>
+                  This doesn't change your Infinitus Connect account. To deregister it there, use{" "}
+                  <Var>{accountPageLink}</Var>.
+                </T>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              <T>Cancel</T>
+            </AlertDialogClose>
             <Button variant="destructive" onClick={onConfirm}>
-              Remove from this device
+              <T>Remove from this device</T>
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

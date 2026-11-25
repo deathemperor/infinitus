@@ -1,9 +1,10 @@
+import { msg } from "gt-i18n";
+import { type MarkedText, markedTextEnglish } from "../errors/translatable.ts";
 import {
   EnvironmentAuthInvalidError,
   type PullRequestDiffInput,
   type PullRequestDiffResult,
 } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -29,7 +30,15 @@ export class PullRequestDiffCredentialRejectedError extends Schema.TaggedError<P
   },
 ) {
   override get message(): string {
-    return `This environment session is no longer valid (invalid_credential). Refresh the page or quit and reopen ${PRODUCT_NAME}.`;
+    return markedTextEnglish(this.i18nMessage);
+  }
+
+  get i18nMessage(): MarkedText {
+    return [
+      msg(
+        "This environment session is no longer valid (invalid_credential). Refresh the page or quit and reopen Infinitus.",
+      ),
+    ];
   }
 }
 

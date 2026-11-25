@@ -27,6 +27,11 @@ vi.mock("~/state/infinitus", () => ({
 }));
 vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => fake.run }));
 vi.mock("~/hooks/useCopyToClipboard", () => ({
+  namedClipboardTarget: (name: string) => ({
+    target: name,
+    unavailableMessage: "",
+    failureMessage: "",
+  }),
   writeTextToClipboard: (text: string) => {
     if (fake.copyThrows) return Promise.reject(new Error("the clipboard said no"));
     fake.copied.push(text);

@@ -11,8 +11,6 @@ import {
 import { useAtomValue } from "@effect/atom-react";
 import { normalizeProviderAccentColor } from "@infinitus/client-runtime/state/provider-instance-display";
 import {
-  formatDuration,
-  formatResetsIn,
   type LimitPace,
   paceOf,
   paceRemainingPercent,
@@ -20,6 +18,7 @@ import {
 } from "@infinitus/shared/usageLimits";
 import { resetKindTitle } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { Fragment, useLayoutEffect, useState } from "react";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
@@ -41,12 +40,20 @@ import {
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { UsageLimitsPooled } from "./UsageLimitsPooled";
+import { formatDuration, formatResetsIn } from "@infinitus/shared/usageLimitsCopy";
+import { m as resolveMessage, type MessageResolver } from "../../i18n/messages";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
 
 const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof GaugeIcon }> = {
-  ahead: { label: "Ahead of pace: spending faster than the window elapses", icon: TrendingUpIcon },
-  on: { label: "On pace with the window", icon: GaugeIcon },
-  under: { label: "Under pace: headroom left for the rest of the window", icon: TrendingDownIcon },
+  ahead: {
+    label: msg("Ahead of pace: spending faster than the window elapses"),
+    icon: TrendingUpIcon,
+  },
+  on: { label: msg("On pace with the window"), icon: GaugeIcon },
+  under: {
+    label: msg("Under pace: headroom left for the rest of the window"),
+    icon: TrendingDownIcon,
+  },
 };
 
 export function barColor(driver: ServerProvider["driver"]): string {
@@ -58,20 +65,21 @@ export function barColor(driver: ServerProvider["driver"]): string {
 
 export function PaceIcon({ pace }: { readonly pace: LimitPace }) {
   const Icon = PACE[pace].icon;
+  const m = useMessages();
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <span
             role="img"
-            aria-label={PACE[pace].label}
+            aria-label={m(PACE[pace].label)}
             className="inline-flex text-muted-foreground"
           />
         }
       >
         <Icon className="size-3.5" aria-hidden />
       </TooltipTrigger>
-      <TooltipPopup side="top">{PACE[pace].label}</TooltipPopup>
+      <TooltipPopup side="top">{m(PACE[pace].label)}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -124,16 +132,33 @@ function WindowBar({
   readonly now: number;
 }) {
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
+  const gt = useGT();
+  const m = useMessages();
   const remaining = remainingPercent(window);
   const timeLeft = paceRemainingPercent(window, now);
   const [barRef, paceMark] = usePaceMark(timeLeft);
-  const resetsIn = formatResetsIn(window, now);
+  const resetsIn = formatResetsIn(window, now, m);
   const resetsAt = window.resetsAt
-    ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)
+    ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now, undefined, m)
     : null;
-  const summary = `${window.label}: ${remaining}% left${
-    timeLeft === null ? "" : `, ${timeLeft}% of the window left`
-  }${resetsIn ? `, ${resetsIn}` : ""}`;
+  const label = window.label;
+  const summary =
+    timeLeft === null
+      ? resetsIn
+        ? gt("{label}: {remaining}% left, {resetsIn}", { label, remaining, resetsIn })
+        : gt("{label}: {remaining}% left", { label, remaining })
+      : resetsIn
+        ? gt("{label}: {remaining}% left, {timeLeft}% of the window left, {resetsIn}", {
+            label,
+            remaining,
+            timeLeft,
+            resetsIn,
+          })
+        : gt("{label}: {remaining}% left, {timeLeft}% of the window left", {
+            label,
+            remaining,
+            timeLeft,
+          });
 
   return (
     <Tooltip>
@@ -169,15 +194,20 @@ function WindowBar({
       <TooltipPopup side="top">
         <div className="flex flex-col gap-0.5">
           <span className="text-foreground">
-            {remaining}% left{timeLeft !== null ? ` · ${timeLeft}% of the window left` : ""}
+            {timeLeft !== null
+              ? gt("{remaining}% left · {timeLeft}% of the window left", { remaining, timeLeft })
+              : gt("{remaining}% left", { remaining })}
           </span>
           {timeLeft !== null ? (
-            <span className="text-muted-foreground">The line is where even spending would be.</span>
+            <span className="text-muted-foreground">
+              <T>The line is where even spending would be.</T>
+            </span>
           ) : null}
           {resetsAt ? (
             <span className="text-muted-foreground">
-              Resets {resetsAt}
-              {resetsIn ? ` · ${resetsIn}` : ""}
+              {resetsIn
+                ? gt("Resets {resetsAt} · {resetsIn}", { resetsAt, resetsIn })
+                : gt("Resets {resetsAt}", { resetsAt })}
             </span>
           ) : null}
         </div>
@@ -200,6 +230,8 @@ export function LimitWindows({
   readonly compact?: boolean;
 }) {
   const color = normalizeProviderAccentColor(accentColor) ?? barColor(driver);
+  const gt = useGT();
+  const m = useMessages();
   return (
     <div
       className={
@@ -210,13 +242,13 @@ export function LimitWindows({
     >
       {windows.map((window) => {
         const pace = paceOf(window, now);
-        const resetsIn = formatResetsIn(window, now);
+        const resetsIn = formatResetsIn(window, now, m);
         return (
           <Fragment key={window.id}>
             <span className="flex min-w-0 items-center gap-2 text-xs">
               <span className="truncate text-muted-foreground">{window.label}</span>
               <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
-                {remainingPercent(window)}% left
+                {gt("{remaining}% left", { remaining: remainingPercent(window) })}
               </span>
             </span>
             <WindowBar color={color} window={window} now={now} />
@@ -232,13 +264,13 @@ export function LimitWindows({
 }
 
 const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
-  reset: "Reset applied. Your windows have cleared.",
-  nothingToReset: "Nothing to reset right now.",
-  noCredit: "No reset credit left.",
-  alreadyRedeemed: "That credit was already redeemed.",
+  reset: msg("Reset applied. Your windows have cleared."),
+  nothingToReset: msg("Nothing to reset right now."),
+  noCredit: msg("No reset credit left."),
+  alreadyRedeemed: msg("That credit was already redeemed."),
 };
 /** A Fable reset gives back what Fable used of the week; it clears no window. */
-const FABLE_RESET_TEXT = "Reset applied. What Fable used is back in your weekly limit.";
+const FABLE_RESET_TEXT = msg("Reset applied. What Fable used is back in your weekly limit.");
 
 export function useResetCredit(
   environmentId: EnvironmentId,
@@ -247,6 +279,7 @@ export function useResetCredit(
 ) {
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const consume = useAtomCommand(serverEnvironment.consumeResetCredit, { reportFailure: false });
+  const m = useMessages();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -261,16 +294,18 @@ export function useResetCredit(
     if (result._tag === "Success") {
       setStatus(
         result.value.warning ??
-          (kind === "fable" && result.value.outcome === "reset"
-            ? FABLE_RESET_TEXT
-            : OUTCOME_TEXT[result.value.outcome]),
+          m(
+            kind === "fable" && result.value.outcome === "reset"
+              ? FABLE_RESET_TEXT
+              : OUTCOME_TEXT[result.value.outcome],
+          ),
       );
       return;
     }
     setStatus(
       "error" in result.cause && result.cause.error instanceof Error
         ? result.cause.error.message
-        : "Could not use the reset credit.",
+        : m(msg("Could not use the reset credit.")),
     );
   };
 
@@ -293,19 +328,27 @@ export function ResetCreditDialog({
   /** The kind being redeemed; a Fable reset refills differently. */
   readonly kind?: string;
 }) {
+  const gt = useGT();
+  const m = useMessages();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {kind ? `Use a ${resetKindTitle(kind)} reset?` : "Use a reset credit?"}
+            {kind ? (
+              gt("Use a {kind} reset?", { kind: resetKindTitle(kind) })
+            ) : (
+              <T>Use a reset credit?</T>
+            )}
           </AlertDialogTitle>
-          <AlertDialogDescription>{resetCreditEffect(kind)}</AlertDialogDescription>
+          <AlertDialogDescription>{resetCreditEffect(kind, m)}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            <T>Cancel</T>
+          </AlertDialogClose>
           <Button disabled={disabled} onClick={onConfirm}>
-            Use credit
+            <T>Use credit</T>
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -317,34 +360,52 @@ export function resetCreditsSummary(
   credits: ServerProviderResetCredits,
   now: number,
   compact = false,
+  resolve: MessageResolver = resolveMessage,
 ): string {
+  const count = credits.availableCount;
   const expiresIn = credits.nextExpiresAt
-    ? formatDuration(Date.parse(credits.nextExpiresAt) - now)
+    ? formatDuration(Date.parse(credits.nextExpiresAt) - now, resolve)
     : null;
-  if (credits.availableCount === 0) return "No reset credits banked";
+  if (count === 0) return resolve(msg("No reset credits banked"));
   if (compact)
-    return `${credits.availableCount} banked${expiresIn ? ` · expires in ${expiresIn}` : ""}`;
-  return `${credits.availableCount} ${credits.availableCount === 1 ? "reset credit" : "reset credits"} banked${
-    expiresIn ? ` · next expires in ${expiresIn}` : ""
-  }`;
+    return expiresIn
+      ? resolve(msg("{count} banked · expires in {expiresIn}", { count, expiresIn }))
+      : resolve(msg("{count} banked", { count }));
+  return expiresIn
+    ? resolve(
+        msg(
+          "{count, plural, one {{count} reset credit banked · next expires in {expiresIn}} other {{count} reset credits banked · next expires in {expiresIn}}}",
+          { count, expiresIn },
+        ),
+      )
+    : resolve(
+        msg(
+          "{count, plural, one {{count} reset credit banked} other {{count} reset credits banked}}",
+          { count },
+        ),
+      );
 }
 
 /**
  * Why the next credit waits, for the held button: Claude's resets work only
  * at a limit and cool down between claims. Null when it can be used now.
  */
-function resetHoldText(credits: ServerProviderResetCredits, now: number): string | null {
+function resetHoldText(
+  credits: ServerProviderResetCredits,
+  now: number,
+  resolve: MessageResolver,
+): string | null {
   const hold = credits.nextHold;
   if (!hold || credits.availableCount === 0) return null;
   switch (hold.reason) {
     case "notAtLimit":
-      return "Usable once you hit a limit";
+      return resolve(msg("Usable once you hit a limit"));
     case "cooldown": {
-      const left = hold.until ? formatDuration(Date.parse(hold.until) - now) : null;
-      return left ? `Cooling down · ${left}` : "Cooling down";
+      const left = hold.until ? formatDuration(Date.parse(hold.until) - now, resolve) : null;
+      return left ? resolve(msg("Cooling down · {left}", { left })) : resolve(msg("Cooling down"));
     }
     case "blocked":
-      return "Not usable right now";
+      return resolve(msg("Not usable right now"));
   }
 }
 
@@ -402,13 +463,15 @@ function ResetCreditLine({
     input,
     kind,
   );
+  const gt = useGT();
+  const m = useMessages();
   if (credits.availableCount === 0 && status === null) return null;
-  const hold = resetHoldText(credits, now);
+  const hold = resetHoldText(credits, now, m);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="tabular-nums">
         {kind ? `${resetKindTitle(kind)} · ` : ""}
-        {resetCreditsSummary(credits, now)}
+        {resetCreditsSummary(credits, now, false, m)}
       </span>
       {credits.availableCount > 0 ? (
         <Button
@@ -419,7 +482,7 @@ function ResetCreditLine({
             if (readEnvironmentScope(environmentId, AuthProvidersManageScope)) setConfirming(true);
           }}
         >
-          {busy ? "Using…" : "Use reset"}
+          {busy ? gt("Using…") : gt("Use reset")}
         </Button>
       ) : null}
       {hold ? <span>{hold}</span> : null}
@@ -440,10 +503,18 @@ function ResetCreditLine({
 }
 
 /** What redeeming does; a Fable reset gives back what Fable used of the week (Claude's wording). */
-function resetCreditEffect(kind: string | undefined): string {
+function resetCreditEffect(kind: string | undefined, resolve: MessageResolver): string {
   return kind === "fable"
-    ? "This redeems one Fable reset and returns what Fable used to your weekly limit. It cannot be undone."
-    : "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.";
+    ? resolve(
+        msg(
+          "This redeems one Fable reset and returns what Fable used to your weekly limit. It cannot be undone.",
+        ),
+      )
+    : resolve(
+        msg(
+          "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
+        ),
+      );
 }
 
 /** Advance now only on explicit refresh to avoid page repaints from ticking. */

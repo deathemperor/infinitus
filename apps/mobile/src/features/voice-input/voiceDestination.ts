@@ -1,3 +1,6 @@
+import { msg } from "gt-react-native";
+
+import { m } from "../../i18n/messages";
 import {
   AuthOrchestrationOperateScope,
   type CloudSpeechModelId,
@@ -32,7 +35,6 @@ import { connectionAtomRuntime } from "../../connection/runtime";
 import { uuidv4 } from "../../lib/uuid";
 import { createEnvironmentTranscriber } from "./environmentTranscriber";
 import { readVoiceGrant, writeVoiceGrant, type VoiceGrant } from "./voiceGrantStorage";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const storedGrant = Atom.make(Effect.promise(readVoiceGrant)).pipe(Atom.keepAlive);
 const choice = Atom.make<VoiceGrant | null | undefined>(undefined).pipe(Atom.keepAlive);
@@ -125,7 +127,7 @@ export function runSpeech<A, E>(
             if (signal?.aborted || !canSend())
               throw new VoiceTranscriptionError({
                 code: "cancelled",
-                message: "Your transcription choice changed.",
+                message: m(msg("Your transcription choice changed.")),
               });
             return expoFetch(url, { ...options, redirect: "error" });
           }),
@@ -156,8 +158,11 @@ function environmentTranscriber(
       if (status.state === "missing-model")
         throw new VoiceTranscriptionError({
           code: "unavailable",
-          message:
-            "Install a transcription model for this environment in Settings → Voice, then try again.",
+          message: m(
+            msg(
+              "Install a transcription model for this environment in Settings → Voice, then try again.",
+            ),
+          ),
         });
       return status.languages
         ? effectiveSpeechLanguage(
@@ -173,7 +178,7 @@ function environmentTranscriber(
       if (!native?.decodeRecording)
         throw new VoiceTranscriptionError({
           code: "unavailable",
-          message: `Update ${PRODUCT_NAME} to transcribe on an environment.`,
+          message: m(msg("Update Infinitus to transcribe on an environment.")),
         });
       return native.decodeRecording(uri);
     },

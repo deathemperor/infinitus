@@ -1,6 +1,6 @@
 import { updateClientSettings, useClientSettings } from "../../hooks/useSettings";
 import { Switch } from "../ui/switch";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 
 /**
@@ -10,6 +10,7 @@ import { SettingsRow, SettingsSection } from "./settingsLayout";
  */
 export function DesktopBadgeSettings() {
   const enabled = useClientSettings((settings) => settings.desktopBadgeAttention);
+  const searchableSetting = useSearchableSetting();
   if (window.desktopBridge?.setBadgeCount === undefined) return null;
   const { id, title } = searchableSetting("desktop-badge");
   return (

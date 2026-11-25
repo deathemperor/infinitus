@@ -1,9 +1,10 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useAtomValue } from "@effect/atom-react";
 import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/reactivity";
 import { useMemo } from "react";
 
-import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
+import { mobilePreferencesAtom, saveMobilePreferences } from "../../state/preferences";
+import { useAtomCommand } from "../../state/use-atom-command";
 import { environmentPresentations } from "../../state/presentation";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
@@ -30,7 +31,7 @@ export function useInfinitusFleetRows() {
 
 export function InfinitusAlarmsRow() {
   const preferences = useAtomValue(mobilePreferencesAtom);
-  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const savePreferences = useAtomCommand(saveMobilePreferences);
   const present = useInfinitusMacPresent();
   const loaded = AsyncResult.isSuccess(preferences);
   const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
@@ -43,7 +44,7 @@ export function InfinitusAlarmsRow() {
       disabled={!loaded}
       value={alarmsEnabled}
       onValueChange={(value) => {
-        savePreferences({ infinitusAlarmsEnabled: value });
+        void savePreferences({ infinitusAlarmsEnabled: value });
         if (value)
           void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
       }}

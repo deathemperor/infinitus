@@ -108,6 +108,42 @@ describe("infinitus-rename", () => {
     expect(remainingRenames(out, "docs/internals/glossary.md")).toEqual([]);
   });
 
+  it("renames the product name in translatable copy, and nowhere else", () => {
+    const source = [
+      'gt("T3 Code could not open a T3 thread in this T3 home.")',
+      "msg(",
+      '  "Sign in to T3 Connect, a T3 Code feature. Link T3 Chat after.",',
+      ")",
+      "<T>Sent by T3 Code</T>",
+      'const V1_PROFILE_NAMES = ["T3 Code (Alpha)", "t3code"]; // the T3 Code app',
+      "function first<T>(items: T[]) { return items[0]; }",
+      '["Interrupt a T3 thread", msg("Interrupt a T3 thread")],',
+    ].join("\n");
+    const path = "apps/web/src/components/Example.tsx";
+    const out = applyRenames(source, path);
+    expect(out).toBe(
+      [
+        'gt("Infinitus could not open an Infinitus thread in this Infinitus home.")',
+        "msg(",
+        '  "Sign in to Infinitus Connect, an Infinitus feature. Link T3 Chat after.",',
+        ")",
+        "<T>Sent by Infinitus</T>",
+        'const V1_PROFILE_NAMES = ["T3 Code (Alpha)", "t3code"]; // the T3 Code app',
+        "function first<T>(items: T[]) { return items[0]; }",
+        '["Interrupt a T3 thread", msg("Interrupt an Infinitus thread")],',
+      ].join("\n"),
+    );
+    expect(applyRenames(out, path)).toBe(out);
+    expect(remainingRenames(out, path)).toEqual([]);
+    expect(applyRenames(source, "apps/server/src/Example.ts")).toBe(source);
+
+    const catalog =
+      '{ "a1": "T3 Code konnte nicht starten", "b2": "Dieses T3-Home", "c3": "T3 Chat" }';
+    expect(applyRenames(catalog, "apps/desktop/src/i18n/translations/de.json")).toBe(
+      '{ "a1": "Infinitus konnte nicht starten", "b2": "Dieses Infinitus-Home", "c3": "T3 Chat" }',
+    );
+  });
+
   it("leaves the compat-read identifiers alone", () => {
     // The names a user's disk, a shipped build or an external service holds
     // (#1368's checklist) are not the table's to rewrite.

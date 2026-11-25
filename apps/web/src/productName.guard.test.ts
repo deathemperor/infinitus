@@ -38,15 +38,19 @@ describe("product name", () => {
   it("routes every user-facing T3 Code through PRODUCT_NAME", () => {
     const leftovers = sourceFiles(SRC).flatMap((file) => {
       const relative = NodePath.relative(SRC, file);
-      return withoutComments(NodeFS.readFileSync(file, "utf8"))
-        .split("\n")
-        .filter(
-          (line) => line.includes("T3 Code") || line.includes("T3 Connect") || BARE_T3.test(line),
-        )
-        .filter(
-          (line) => !LITERAL_ALLOWED.some(([f, text]) => relative === f && line.includes(text)),
-        )
-        .map((line) => `${relative}: ${line.trim()}`);
+      return (
+        withoutComments(NodeFS.readFileSync(file, "utf8"))
+          .split("\n")
+          .filter(
+            (line) => line.includes("T3 Code") || line.includes("T3 Connect") || BARE_T3.test(line),
+          )
+          .filter(
+            (line) => !LITERAL_ALLOWED.some(([f, text]) => relative === f && line.includes(text)),
+          )
+          // A gt `$context` is a note to translators and part of the catalog key, never shown.
+          .filter((line) => !line.includes("$context:"))
+          .map((line) => `${relative}: ${line.trim()}`)
+      );
     });
     expect(leftovers).toEqual([]);
   });

@@ -95,13 +95,6 @@ const MAX_HOURLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** Fork: Stats compares calendar years, so retain two years plus boundary slack. */
 const CACHE_RETENTION_DAYS = 800;
-
-/**
- * The longest window the UI offers, 90 days, plus its `MTIME_SLACK_MS`, rounded
- * up: how far back the scan readers (Cursor account history, Antigravity) are
- * asked to keep (upstream's cache retention).
- */
-const SCAN_READER_RETENTION_DAYS = 92;
 const STALE_TEMP_DIRECTORY_MS = 60 * 60 * 1000;
 
 const TRANSCRIPT_READ_CONCURRENCY = 4;
@@ -902,12 +895,6 @@ export const make = Effect.gen(function* () {
     fromMemory: boolean,
     withStats = false,
   ) {
-    // Fork: the long transcript retention is for Stats; the scan readers
-    // (an account API's history) keep upstream's window.
-    const scanRetentionCutoffMs = Math.max(
-      retentionCutoffMs,
-      (yield* Clock.currentTimeMillis) - SCAN_READER_RETENTION_DAYS * 24 * 60 * 60 * 1000,
-    );
     const scans = Effect.forEach(
       scanReaders,
       ({ driver, reader }) =>
@@ -917,7 +904,7 @@ export const make = Effect.gen(function* () {
               instances,
               settings,
               windowStartMs,
-              retentionCutoffMs: scanRetentionCutoffMs,
+              retentionCutoffMs,
               awaitRefresh,
             }),
           ),
@@ -1013,7 +1000,10 @@ export const make = Effect.gen(function* () {
     const swapWindowEndMs =
       hourlyWindow?.untilTimeMs ?? Date.parse(`${input.untilDay}T00:00:00Z`) + 36 * 60 * 60 * 1000;
 
-    const retentionCutoffMs = startedAtMs - CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const retentionCutoffMs =
+      settings.usageHistoryRetentionDays === "unlimited"
+        ? 0
+        : Math.max(0, startedAtMs - settings.usageHistoryRetentionDays * 24 * 60 * 60 * 1000);
 
     const awaitRefresh = input.awaitRefresh === true;
     const collect = Effect.gen(function* () {
@@ -1291,14 +1281,26 @@ export const make = Effect.gen(function* () {
       });
     }
 
-    const pruned = pruneScanCache(fileCache, retentionCutoffMs);
-    if (pruned > 0) {
-      cacheDirty = true;
-      // Pruned files are no longer saved, so nothing before the cutoff stays covered.
-      for (const [key, since] of coveredSince) {
-        if (since < retentionCutoffMs) coveredSince.set(key, retentionCutoffMs);
-      }
-    }
+    yield* settingsService
+      .withSettingsSnapshot((currentSettings) =>
+        Effect.sync(() => {
+          if (settings.usageHistoryRetentionDays === currentSettings.usageHistoryRetentionDays) {
+            const pruned = pruneScanCache(fileCache, retentionCutoffMs);
+            if (pruned > 0) {
+              cacheDirty = true;
+              // Pruned files are no longer saved, so nothing before the cutoff stays covered.
+              for (const [key, since] of coveredSince) {
+                if (since < retentionCutoffMs) coveredSince.set(key, retentionCutoffMs);
+              }
+            }
+          }
+        }),
+      )
+      .pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("failed to read settings before pruning the usage cache", { cause }),
+        ),
+      );
 
     const aggregated = aggregator.finish();
     const readAt = yield* DateTime.now;

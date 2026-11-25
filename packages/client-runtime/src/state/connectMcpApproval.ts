@@ -2,6 +2,8 @@
  * The hosted app's side of an agent sign-in on a T3 Connect environment: it reads the request
  * and sends the decision with the owner's own Connect session there, so no code is needed.
  */
+import { msg } from "gt-i18n";
+import { type MarkedText, markedTextEnglish } from "../errors/translatable.ts";
 import type {
   AuthMcpApprovalDecisionRequest,
   AuthMcpApprovalDetails,
@@ -19,7 +21,6 @@ import { RelayConnectionTarget } from "../connection/model.ts";
 import * as ManagedRelay from "../relay/managedRelay.ts";
 import { executeAuthenticatedEnvironmentHttpRequest } from "./environmentHttpAuth.ts";
 import { createRuntimeCommand } from "./runtime.ts";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -29,7 +30,11 @@ export class ConnectMcpApprovalUnavailableError extends Schema.TaggedError<Conne
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return `Could not reach that environment through ${CONNECT_NAME} with this account.`;
+    return markedTextEnglish(this.i18nMessage);
+  }
+
+  get i18nMessage(): MarkedText {
+    return [msg("Could not reach that environment through Infinitus Connect with this account.")];
   }
 }
 

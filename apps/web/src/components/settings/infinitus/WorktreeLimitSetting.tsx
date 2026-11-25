@@ -9,13 +9,14 @@ import {
 } from "../../ui/number-field";
 import { SettingResetButton, SettingsRow } from "../settingsLayout";
 import { normalizeIntervalSeconds } from "../SettingsPanels.logic";
-import { searchableSetting } from "../settingsSearch";
+import { useSearchableSetting } from "../settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "../useScopedSettings";
 
 /** Fork (#269 H): the worktree limit, a server setting, mounted by Settings › Worktrees. */
 export function WorktreeLimitSetting() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
+  const searchableSetting = useSearchableSetting();
   return (
     <SettingsRow
       serverScoped
@@ -25,7 +26,7 @@ export function WorktreeLimitSetting() {
       resetAction={
         settings.worktreeMaxCount !== DEFAULT_UNIFIED_SETTINGS.worktreeMaxCount ? (
           <SettingResetButton
-            label="worktree limit"
+            ariaLabel="Reset worktree limit to default"
             onClick={() =>
               updateSettings({ worktreeMaxCount: DEFAULT_UNIFIED_SETTINGS.worktreeMaxCount })
             }

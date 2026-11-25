@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ProviderDriverKind } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { T, Var } from "gt-react";
 import { InfoIcon } from "lucide-react";
 
 import { serverEnvironment } from "../../state/server";
@@ -35,15 +35,17 @@ export function MultipleAccountsNote({
       <InfoIcon aria-hidden />
       <AlertDescription>
         <p>
-          We do not recommend managing multiple {providerName} accounts in {PRODUCT_NAME}.{" "}
-          <a
-            href={MULTIPLE_ACCOUNTS_FAQ_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
-          >
-            More info
-          </a>
+          <T>
+            We do not recommend managing multiple <Var>{providerName}</Var> accounts in Infinitus.{" "}
+            <a
+              href={MULTIPLE_ACCOUNTS_FAQ_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              More info
+            </a>
+          </T>
         </p>
       </AlertDescription>
     </Alert>

@@ -188,7 +188,7 @@ describe("Infinitus environment atoms", () => {
         } as unknown as WsRpcProtocolClient;
         const { atoms, registry } = yield* makeTestRuntime(client);
 
-        const result = yield* Effect.promise(() =>
+        const result = yield* Effect.exit(
           atoms.command.run(registry, {
             environmentId: TARGET.environmentId,
             input: { command: "swap", args: ["claude", "2"], options: { yes: "true" } },
@@ -263,7 +263,7 @@ describe("Infinitus pairing atoms", () => {
         } as unknown as WsRpcProtocolClient;
         const { atoms, registry } = yield* makeTestRuntime(client);
 
-        const result = yield* Effect.promise(() =>
+        const result = yield* Effect.exit(
           atoms.pairingDecide.run(registry, {
             environmentId: TARGET.environmentId,
             input: { id: "req-1", approve: false },
@@ -290,7 +290,7 @@ describe("Infinitus pairing atoms", () => {
           } as unknown as WsRpcProtocolClient;
           const { atoms, registry } = yield* makeTestRuntime(client);
 
-          const result = yield* Effect.promise(() =>
+          const result = yield* Effect.exit(
             atoms.secret.run(registry, {
               environmentId: TARGET.environmentId,
               input: {

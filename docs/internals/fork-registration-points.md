@@ -295,10 +295,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/server/src/usage/UsageService.ts` — `readStats` (#659, the Stats
   page's fold over the transcript and repository scanners in
   `apps/server/src/stats/`), the `UsageAttribution` hook (#779), and
-  `CACHE_RETENTION_DAYS = 800` (Stats compares calendar years) with
-  upstream's 92 kept as `SCAN_READER_RETENTION_DAYS`, the floor on the
-  `retentionCutoffMs` handed to the provider packages' `scan` readers
-  (Cursor accounts, Antigravity); only the transcript scans keep 800 days.
+  `CACHE_RETENTION_DAYS = 800` for the Stats and session-usage reads
+  (Stats compares calendar years); the main scan and its `scan` readers
+  follow upstream's `usageHistoryRetentionDays` setting.
   `readSessionUsage` (#834): one Claude session's transcript by file name
   under the configured Claude homes, through the scan's file cache, deduped
   and priced, for the usage backfill (`docs/internals/turn-usage.md`).
@@ -562,6 +561,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `getDesktopScheme`.
 - `apps/server/src/httpCors.ts` — `DESKTOP_RENDERER_ORIGINS` built from the
   same two scheme constants.
+- `vite.config.ts` — one lint block after upstream's `t3code/no-untranslated-copy` block turns it into a warning, because the fork's own copy is not wrapped yet (#1796). Remove the block when `vp run i18n:untranslated` reaches zero.
 - `scripts/build-desktop-artifact.ts` — the mac and Linux `protocols` blocks
   (name `Infinitus`, schemes `infinitus` / `infinitus-dev`);
   `resolveDesktopBuildIconAssets` / `resolveDesktopWebAssetBrand` return the

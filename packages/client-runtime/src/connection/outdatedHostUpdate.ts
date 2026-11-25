@@ -1,3 +1,5 @@
+import { msg } from "gt-i18n";
+import { MarkedText, translatableMessage } from "../errors/translatable.ts";
 import {
   ORCHESTRATION_PROTOCOL_VERSION,
   type EnvironmentId,
@@ -6,7 +8,6 @@ import {
   type ServerSelfUpdateResult,
   WS_METHODS,
 } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -44,6 +45,7 @@ export class OutdatedHostUpdateError extends Schema.TaggedError<OutdatedHostUpda
   {
     environmentId: Schema.String,
     message: Schema.String,
+    i18nMessage: Schema.optionalKey(MarkedText),
   },
 ) {}
 
@@ -110,7 +112,11 @@ export const updateOutdatedHost = Effect.fn("clientRuntime.connection.updateOutd
     ) {
       return yield* new OutdatedHostUpdateError({
         environmentId,
-        message: `Update ${PRODUCT_NAME} on ${descriptor.label} manually; it cannot update itself.`,
+        ...translatableMessage(
+          msg("Update Infinitus on {host} manually; it cannot update itself.", {
+            host: descriptor.label,
+          }),
+        ),
       });
     }
 
@@ -231,7 +237,11 @@ export const updateOutdatedHost = Effect.fn("clientRuntime.connection.updateOutd
     if (Option.isNone(resumed)) {
       return yield* new OutdatedHostUpdateError({
         environmentId,
-        message: `${descriptor.label} did not come back on a compatible ${PRODUCT_NAME} version.`,
+        ...translatableMessage(
+          msg("{host} did not come back on a compatible Infinitus version.", {
+            host: descriptor.label,
+          }),
+        ),
       });
     }
 

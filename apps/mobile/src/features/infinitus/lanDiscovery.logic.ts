@@ -50,9 +50,6 @@ export function pickedHostNeedsCode(input: {
   );
 }
 
-export const PICKED_HOST_HINT =
-  "Now type the pairing code from the Mac's Devices card, or ask the Mac to approve.";
-
 const PRIVATE_IPV4 = /^(10\.\d+|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d+\.\d+$/;
 
 /**

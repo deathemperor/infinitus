@@ -66,8 +66,12 @@ function recoveryHint(error: RelayProtectedError): string {
       return `Unlink an unused environment in ${CONNECT_NAME}, then restart ${PRODUCT_NAME} on this machine.`;
     case "RelayAuthInvalidError":
       return `Run \`t3 connect login\` to check this machine's authorization. If the stored credential was revoked, sign out with \`t3 connect logout\`, then run \`t3 connect\` again. Restart ${PRODUCT_NAME} after signing in.`;
-    case "RelayEnvironmentLinkProofExpiredError":
     case "RelayEnvironmentLinkProofInvalidError":
+      if (error.reason === "environment_key_mismatch") {
+        return `${CONNECT_NAME} already has this environment linked with a different key. Unlink it in ${CONNECT_NAME}, then restart ${PRODUCT_NAME} on this machine.`;
+      }
+      return `Check this machine's date and time, update ${PRODUCT_NAME}, then restart it.`;
+    case "RelayEnvironmentLinkProofExpiredError":
       return `Check this machine's date and time, update ${PRODUCT_NAME}, then restart it.`;
     default:
       return "Retry when the relay is available. If this continues, include the trace ID when reporting it.";

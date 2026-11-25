@@ -1,8 +1,9 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@infinitus/contracts";
 
 import { ComposerInlineControl } from "../../components/ComposerToolbar";
-import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
+import { mobilePreferencesAtom, saveMobilePreferences } from "../../state/preferences";
+import { useAtomCommand } from "../../state/use-atom-command";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { PIN_AT_CREATION_HINT, pinAtCreationEnabled } from "./pinAtCreation.logic";
 
@@ -16,7 +17,7 @@ export function InfinitusPinAtCreationControl(props: {
   readonly disabled?: boolean;
 }) {
   const preferences = useAtomValue(mobilePreferencesAtom);
-  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const savePreferences = useAtomCommand(saveMobilePreferences);
   const configs = useAtomValue(environmentServerConfigsAtom);
   const supported =
     props.environmentId !== null &&
@@ -31,7 +32,7 @@ export function InfinitusPinAtCreationControl(props: {
       emphasized={on}
       icon={on ? { ios: "pin.fill", android: "push_pin" } : { ios: "pin", android: "push_pin" }}
       label="Pin"
-      onPress={() => savePreferences({ infinitusPinAtCreation: !on })}
+      onPress={() => void savePreferences({ infinitusPinAtCreation: !on })}
       showChevron={false}
     />
   );

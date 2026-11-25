@@ -80,6 +80,11 @@ jobs:
             # The scope is in the lockfile's peer-set hashes too, and fmt wants node_modules.
             vp i --no-frozen-lockfile
             git diff --name-only | xargs vp fmt
+            # Renamed copy moves its catalog keys (a hash of the English), and fmt can re-wrap
+            # a <T> element's text, so the catalogs are re-keyed after fmt, not before.
+            git show main:scripts/infinitus-rename-catalogs.ts > /tmp/infinitus-rename-catalogs.ts
+            node /tmp/infinitus-rename-catalogs.ts
+            git diff --name-only -- '*/i18n/translations/*.json' | xargs -r vp fmt
             git add -A
             # The renamed commit's first parent is the previous renamed commit
             # already in main, not upstream's tip alone: the merge base of the

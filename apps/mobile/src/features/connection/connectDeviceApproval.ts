@@ -1,4 +1,7 @@
 import type { AuthClientMetadata, AuthPairingLink } from "@infinitus/contracts";
+import { msg } from "gt-react-native";
+
+import { m } from "../../i18n/messages";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export interface ConnectDeviceApprovalPrompt {
@@ -10,8 +13,8 @@ export interface ConnectDeviceApprovalPrompt {
 export function describeConnectDevice(device: AuthClientMetadata | undefined): string {
   const { label, browser, os } = device ?? {};
   if (label) return label;
-  if (browser && os) return `${browser} on ${os}`;
-  return browser ?? os ?? "A new device";
+  if (browser && os) return m(msg("{browser} on {os}", { browser, os }));
+  return browser ?? os ?? m(msg("A new device"));
 }
 
 /** Requests waiting on approval that have not been shown yet, oldest first. */
@@ -32,8 +35,18 @@ export function connectDeviceApprovalPrompts(input: {
     )
     .map(({ link, verificationCode, client: device }) => ({
       pairingLinkId: link.id,
-      title: "Approve this device?",
-      message: `${describeConnectDevice(device)} wants to connect to ${input.environmentLabel} through ${CONNECT_NAME}. It shows code ${verificationCode}. Approve it only if that code matches.`,
+      title: m(msg("Approve this device?")),
+      message: m(
+        msg(
+          "{device} wants to connect to {environment} through {product}. It shows code {code}. Approve it only if that code matches.",
+          {
+            device: describeConnectDevice(device),
+            environment: input.environmentLabel,
+            product: CONNECT_NAME,
+            code: verificationCode,
+          },
+        ),
+      ),
     }));
 }
 

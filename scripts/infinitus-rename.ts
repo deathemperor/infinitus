@@ -21,6 +21,12 @@ export interface Rename {
   readonly within?: string;
   /** Prose: a match opening or inside quotes or backticks, or after "real"/"upstream's", is a literal and stays. */
   readonly prose?: true;
+  /**
+   * Translatable copy: only the English text of a `msg()` or `gt()` call or a `<T>` element in
+   * the roots the gt CLI scans, and the strings of their catalogs. The catalogs are keyed by a
+   * hash of that text, so `scripts/infinitus-rename-catalogs.ts` re-keys them afterwards.
+   */
+  readonly copy?: true;
 }
 
 /**
@@ -110,6 +116,42 @@ export const RENAMES: ReadonlyArray<Rename> = [
     within: "docs/user/",
     prose: true,
   },
+  {
+    what: "the product name's article in translatable copy (a T3 Code server → an Infinitus server)",
+    pattern: /\b([Aa])(\s+)T3\s+Code\b/g,
+    replacement: "$1n$2Infinitus",
+    copy: true,
+  },
+  {
+    what: "the product name in translatable copy (T3 Code)",
+    pattern: /\bT3\s+Code\b/g,
+    replacement: "Infinitus",
+    copy: true,
+  },
+  {
+    what: "Connect's article in translatable copy (a T3 Connect link → an Infinitus Connect link)",
+    pattern: /\b([Aa])(\s+)T3\s+Connect\b/g,
+    replacement: "$1n$2Infinitus Connect",
+    copy: true,
+  },
+  {
+    what: "Connect's name in translatable copy (T3 Connect)",
+    pattern: /\bT3\s+Connect\b/g,
+    replacement: "Infinitus Connect",
+    copy: true,
+  },
+  {
+    what: "a bare T3's article in translatable copy (a T3 thread → an Infinitus thread)",
+    pattern: /\b([Aa])(\s+)T3(?!\s+(?:Chat|Tools)\b)(?!\w)/g,
+    replacement: "$1n$2Infinitus",
+    copy: true,
+  },
+  {
+    what: "a bare T3 as the product noun in translatable copy (T3 home, T3's)",
+    pattern: /\bT3(?!\s+(?:Chat|Tools)\b)(?!\w)/g,
+    replacement: "Infinitus",
+    copy: true,
+  },
 ];
 
 /**
@@ -193,8 +235,30 @@ export function isCandidate(path: string): boolean {
   return TEXT_EXTENSIONS.has(NodePath.extname(base));
 }
 
+/** The roots each app's `gt.config.json` scans for copy. */
+export const COPY_ROOTS: ReadonlyArray<string> = [
+  "apps/web/src/",
+  "apps/mobile/src/",
+  "apps/desktop/src/",
+  "packages/client-runtime/src/",
+  "packages/shared/src/",
+];
+
 function appliesTo(rename: Rename, path: string | undefined): boolean {
+  if (rename.copy === true) {
+    return path !== undefined && COPY_ROOTS.some((root) => path.startsWith(root));
+  }
   return rename.within === undefined || (path?.startsWith(rename.within) ?? false);
+}
+
+const CATALOG = /\/i18n\/translations\/[^/]+\.json$/;
+/** Every string of a catalog; in source, a `msg()`/`gt()` call's English and a `<T>` element. */
+const CATALOG_SPANS = /"(?:[^"\\\n]|\\.)*"/g;
+const SOURCE_SPANS =
+  /(?<![\w$.])(?:msg|gt)\(\s*(?:"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`)|(?<![\w$.])<T(?:\s[^<>]*)?>[\s\S]*?<\/T>/g;
+
+function copySpans(path: string | undefined): RegExp {
+  return path !== undefined && CATALOG.test(path) ? CATALOG_SPANS : SOURCE_SPANS;
 }
 
 /** A prose entry's match that is quoted, code-formatted, or named as the other product. */
@@ -213,6 +277,12 @@ export function applyRenames(text: string, path?: string): string {
   let out = text;
   for (const rename of RENAMES) {
     if (!appliesTo(rename, path)) continue;
+    if (rename.copy === true) {
+      out = out.replace(copySpans(path), (span) =>
+        span.replace(rename.pattern, rename.replacement),
+      );
+      continue;
+    }
     out = out.replace(rename.pattern, (...args: Array<unknown>) => {
       const match = args[0] as string;
       const offset = args.at(-2) as number;
@@ -226,11 +296,15 @@ export function applyRenames(text: string, path?: string): string {
 
 /** Which entries still match, for `--check`'s report. */
 export function remainingRenames(text: string, path?: string): ReadonlyArray<Rename> {
-  return RENAMES.filter(
-    (rename) =>
-      appliesTo(rename, path) &&
-      [...text.matchAll(rename.pattern)].some((m) => !skips(rename, text, m.index)),
-  );
+  return RENAMES.filter((rename) => {
+    if (!appliesTo(rename, path)) return false;
+    if (rename.copy === true) {
+      return [...text.matchAll(copySpans(path))].some(
+        (span) => span[0].search(rename.pattern) !== -1,
+      );
+    }
+    return [...text.matchAll(rename.pattern)].some((m) => !skips(rename, text, m.index));
+  });
 }
 
 function trackedFiles(root: string): ReadonlyArray<string> {

@@ -1,5 +1,6 @@
 import { useAuth, useClerk } from "@clerk/react";
 import { readConnectAuthorizeRequest } from "@infinitus/shared/connectAuth";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
@@ -11,17 +12,19 @@ import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
 import { resolveClerkSignInProps } from "../clerk/authRedirect";
 import { retryClerkLoad, useClerkLoadFailed } from "../clerk/clerkLoadFailure";
 import { Button } from "../ui/button";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const invalidLinkMessage = {
-  context: "Authorization request",
-  title: "This connect link is incomplete",
-  description:
+  context: msg("Authorization request"),
+  title: msg("This connect link is incomplete"),
+  description: msg(
     "The link is missing its authorization request. Re-run `t3 connect` in your terminal and open the freshly printed URL.",
+  ),
 } as const;
 
 export function ConnectCliAuthorizeSurface() {
   const [request] = useState(() => readConnectAuthorizeRequest(new URL(window.location.href)));
+  const gt = useGT();
+  const m = useMessages();
   const clerk = useClerk();
   const { isLoaded, isSignedIn } = useAuth();
   const loadFailed = useClerkLoadFailed();
@@ -64,7 +67,11 @@ export function ConnectCliAuthorizeSurface() {
   if (!request) {
     return (
       <StandalonePage>
-        <StandalonePageHeader {...invalidLinkMessage} />
+        <StandalonePageHeader
+          context={m(invalidLinkMessage.context)}
+          title={m(invalidLinkMessage.title)}
+          description={m(invalidLinkMessage.description)}
+        />
       </StandalonePage>
     );
   }
@@ -72,24 +79,24 @@ export function ConnectCliAuthorizeSurface() {
   return (
     <StandalonePage>
       <StandalonePageHeader
-        context="Browser authorization"
-        title="Connecting your terminal"
+        context={gt("Browser authorization")}
+        title={gt("Connecting your terminal")}
         description={
           isSignedIn
-            ? `Redirecting to authorize ${CONNECT_NAME} for your CLI…`
-            : `Sign in to continue authorizing ${CONNECT_NAME} for your CLI.`
+            ? gt("Redirecting to authorize Infinitus Connect for your CLI…")
+            : gt("Sign in to continue authorizing Infinitus Connect for your CLI.")
         }
       />
       {loadFailed ? (
         <div className="mt-6">
           <Button type="button" onClick={retryClerkLoad}>
-            Retry sign-in
+            <T>Retry sign-in</T>
           </Button>
         </div>
       ) : isLoaded && !isSignedIn ? (
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>
-            Sign in
+            <T>Sign in</T>
           </Button>
         </div>
       ) : null}

@@ -1,3 +1,5 @@
+import { msg } from "gt-i18n";
+import { MarkedText, messageFromError, translatableMessage } from "../errors/translatable.ts";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { decodeRelayJwt } from "@infinitus/shared/relayJwt";
 import * as Cause from "effect/Cause";
@@ -10,8 +12,7 @@ import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 
 import { findErrorTraceId } from "../errors/errorTrace.ts";
 import * as ManagedRelay from "./managedRelay.ts";
-import { relayProtectedErrorMessage } from "./errorPresentation.ts";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
+import { relayProtectedErrorText } from "./errorPresentation.ts";
 
 const DEFAULT_STALE_TIME_MS = 15_000;
 const DEFAULT_IDLE_TTL_MS = 5 * 60_000;
@@ -42,6 +43,8 @@ interface ManagedRelaySessionControl {
 export interface ManagedRelaySnapshotState<A> {
   readonly data: A | null;
   readonly error: string | null;
+  /** `error` as marked text, when the failure carries it. */
+  readonly i18nError?: MarkedText;
   readonly errorTraceId: string | null;
   readonly isPending: boolean;
 }
@@ -60,6 +63,7 @@ export class ManagedRelaySessionError extends Schema.TaggedError<ManagedRelaySes
   "ManagedRelaySessionError",
   {
     message: Schema.String,
+    i18nMessage: Schema.optionalKey(MarkedText),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {}
@@ -134,18 +138,22 @@ export function createManagedRelaySession(input: ManagedRelaySessionInput): Mana
           catch: (cause) => {
             const reason = cause instanceof Error ? cause.message.trim() : "";
             return new ManagedRelaySessionError({
-              message: reason
-                ? `Could not obtain the ${CONNECT_NAME} session token: ${reason}`
-                : `Could not obtain the ${CONNECT_NAME} session token.`,
+              ...translatableMessage(
+                reason
+                  ? msg("Could not obtain the Infinitus Connect session token: {reason}", {
+                      reason,
+                    })
+                  : msg("Could not obtain the Infinitus Connect session token."),
+              ),
               cause,
             });
           },
         }).pipe(Effect.timeoutOption(CLERK_TOKEN_READ_TIMEOUT_MS));
         if (Option.isSome(token)) return token.value;
       }
-      return yield* new ManagedRelaySessionError({
-        message: `Timed out obtaining the ${CONNECT_NAME} session token.`,
-      });
+      return yield* new ManagedRelaySessionError(
+        translatableMessage(msg("Timed out obtaining the Infinitus Connect session token.")),
+      );
     }),
   };
   managedRelaySessionControls.set(session, {
@@ -198,23 +206,27 @@ function readSessionClerkToken(
     Effect.filterOrFail(
       (token): token is string => Boolean(token),
       () =>
-        new ManagedRelaySessionError({
-          message: `The ${CONNECT_NAME} session token is unavailable.`,
-        }),
+        new ManagedRelaySessionError(
+          translatableMessage(msg("The Infinitus Connect session token is unavailable.")),
+        ),
     ),
   );
 }
 
+const SIGN_IN_BEFORE = {
+  deregister: msg("Sign in to Infinitus Connect before deregistering an environment."),
+  "link-t3chat": msg("Sign in to Infinitus Connect before linking T3 Chat."),
+  "unlink-t3chat": msg("Sign in to Infinitus Connect before unlinking T3 Chat."),
+};
+
 function requireSessionClerkToken(
   registry: AtomRegistry.AtomRegistry,
   accountId: string,
-  action: string,
+  action: "deregister" | "link-t3chat" | "unlink-t3chat",
 ): Effect.Effect<string, ManagedRelaySessionError> {
   const session = registry.get(managedRelaySessionAtom);
   if (!session || session.accountId !== accountId) {
-    return Effect.fail(
-      new ManagedRelaySessionError({ message: `Sign in to ${CONNECT_NAME} before ${action}.` }),
-    );
+    return Effect.fail(new ManagedRelaySessionError(translatableMessage(SIGN_IN_BEFORE[action])));
   }
   return readSessionClerkToken(session);
 }
@@ -225,11 +237,7 @@ export const deregisterManagedRelayEnvironment = Effect.fn(
   registry: AtomRegistry.AtomRegistry,
   input: { readonly accountId: string; readonly environmentId: EnvironmentId },
 ) {
-  const clerkToken = yield* requireSessionClerkToken(
-    registry,
-    input.accountId,
-    "deregistering an environment",
-  );
+  const clerkToken = yield* requireSessionClerkToken(registry, input.accountId, "deregister");
   const relay = yield* ManagedRelay.ManagedRelayClient;
   yield* relay.unlinkEnvironment({ clerkToken, environmentId: input.environmentId });
 });
@@ -238,18 +246,14 @@ export const deregisterManagedRelayEnvironment = Effect.fn(
 export const createManagedRelayT3ChatLinkRequest = Effect.fn(
   "clientRuntime.managedRelaySession.createT3ChatLinkRequest",
 )(function* (registry: AtomRegistry.AtomRegistry, input: { readonly accountId: string }) {
-  const clerkToken = yield* requireSessionClerkToken(registry, input.accountId, "linking T3 Chat");
+  const clerkToken = yield* requireSessionClerkToken(registry, input.accountId, "link-t3chat");
   const relay = yield* ManagedRelay.ManagedRelayClient;
   return (yield* relay.createT3ChatLinkRequest({ clerkToken })).url;
 });
 
 export const unlinkManagedRelayT3Chat = Effect.fn("clientRuntime.managedRelaySession.unlinkT3Chat")(
   function* (registry: AtomRegistry.AtomRegistry, input: { readonly accountId: string }) {
-    const clerkToken = yield* requireSessionClerkToken(
-      registry,
-      input.accountId,
-      "unlinking T3 Chat",
-    );
+    const clerkToken = yield* requireSessionClerkToken(registry, input.accountId, "unlink-t3chat");
     const relay = yield* ManagedRelay.ManagedRelayClient;
     yield* relay.unlinkT3Chat({ clerkToken });
   },
@@ -262,9 +266,9 @@ function requireClerkToken(
   const session = get(managedRelaySessionAtom);
   if (!session || session.accountId !== accountId) {
     return Effect.fail(
-      new ManagedRelaySessionError({
-        message: `Sign in to ${CONNECT_NAME} before loading relay data.`,
-      }),
+      new ManagedRelaySessionError(
+        translatableMessage(msg("Sign in to Infinitus Connect before loading relay data.")),
+      ),
     );
   }
   return readSessionClerkToken(session);
@@ -272,18 +276,17 @@ function requireClerkToken(
 
 function describeManagedRelayFailure(cause: Cause.Cause<unknown>): {
   readonly message: string;
+  readonly i18nMessage?: MarkedText;
   readonly traceId: string | null;
 } {
   const error = Cause.squash(cause);
-  return {
-    message:
-      isManagedRelayRequestFailedError(error) && error.relayError
-        ? relayProtectedErrorMessage(error.relayError)
-        : error instanceof Error
-          ? error.message
-          : `Could not load ${CONNECT_NAME} data.`,
-    traceId: findErrorTraceId(error),
-  };
+  const traceId = findErrorTraceId(error);
+  if (isManagedRelayRequestFailedError(error) && error.relayError) {
+    return { ...translatableMessage(...relayProtectedErrorText(error.relayError)), traceId };
+  }
+  return error instanceof Error
+    ? { ...messageFromError(error), traceId }
+    : { ...translatableMessage(msg("Could not load Infinitus Connect data.")), traceId };
 }
 
 export function readManagedRelaySnapshotState<A>(
@@ -293,6 +296,7 @@ export function readManagedRelaySnapshotState<A>(
   return {
     data: AsyncResult.getOrElse(result, () => null),
     error: failure?.message ?? null,
+    ...(failure?.i18nMessage !== undefined ? { i18nError: failure.i18nMessage } : {}),
     errorTraceId: failure?.traceId ?? null,
     isPending: result.waiting,
   };

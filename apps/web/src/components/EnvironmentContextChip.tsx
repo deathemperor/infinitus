@@ -1,5 +1,6 @@
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { type EnvironmentContextRecord, resolveEnvironmentMachineKind } from "@infinitus/contracts";
+
+import { useGT } from "gt-react";
 
 import { useEnvironment } from "~/state/environments";
 import { ContextChip, ContextChipLabel } from "./ContextChip";
@@ -14,6 +15,7 @@ export function EnvironmentContextChip(props: {
   record: Pick<EnvironmentContextRecord, "environmentId" | "label">;
   copyMarkdown?: string;
 }) {
+  const gt = useGT();
   const environment = useEnvironment(props.record.environmentId);
   const label = environment?.label.trim() || props.record.label;
   return (
@@ -23,7 +25,7 @@ export function EnvironmentContextChip(props: {
           <ContextChip
             kind="environment"
             tabIndex={0}
-            aria-label={`Machine, ${label}`}
+            aria-label={gt("Machine, {label}", { label })}
             data-markdown-copy={props.copyMarkdown}
           >
             <EnvironmentMachineIcon
@@ -34,7 +36,7 @@ export function EnvironmentContextChip(props: {
         }
       />
       <TooltipPopup side="top">
-        {environment ? `${PRODUCT_NAME} environment` : "Machine not in this app"}
+        {environment ? gt("Infinitus environment") : gt("Machine not in this app")}
       </TooltipPopup>
     </Tooltip>
   );
