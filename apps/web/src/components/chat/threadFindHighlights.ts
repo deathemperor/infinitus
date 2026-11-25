@@ -1,6 +1,6 @@
 import { findThreadSearchOccurrences } from "@infinitus/shared/threadSearch";
 import { useEffect, useEffectEvent, useRef } from "react";
-import { THREAD_FIND_BLOCK_TAGS } from "@infinitus/shared/threadFindText";
+import { THREAD_FIND_BLOCK_TAGS } from "@infinitus/shared/threadFindBlockTags";
 
 import { observeResize } from "~/lib/observeResize";
 
