@@ -10,6 +10,30 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.48
+
+### Mac
+- An account whose banked reset you spent on claude.ai or with /reset is usable again on swapd's next usage check, instead of reading spent until its old reset and leaving the fleet "all dead".
+
+### Desktop
+- The app is translated into every language it offers; Infinitus's own screens follow in a later release.
+- An Issues page lists GitHub, GitLab, Azure DevOps, Forgejo and Linear issues, links them to threads, and lets agents read and file them.
+- Agents read, open, update and merge pull requests, read failing CI logs and re-run checks.
+- Usage limit rows show your pace and open the usage page.
+- Another environment's localhost tabs and ports open on this machine.
+- A side chat can be added to its main thread with Add to chat or @.
+- How long usage history is kept is now a setting.
+- Dictation keeps recording into its thread when you switch away.
+- A Claude steer the agent had not read yet no longer hangs the turn or gets lost.
+- Default keyboard shortcuts can be unassigned.
+
+### Phone
+- An Issues tab lists and opens issues.
+- Localhost tabs open on the phone with a Safari-style browser bar.
+- Assistant text can be selected, cited and commented on.
+- A thread can be shared with a guest from the phone.
+- The Android usage limits widget is redesigned.
+
 ## 0.5.0-alpha.47
 
 ### Desktop
