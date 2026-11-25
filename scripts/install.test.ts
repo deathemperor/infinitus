@@ -545,7 +545,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("concurrent ins
   it("publishes one runtime without nesting the other install's staging directory", async () => {
     const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-install-concurrent-"));
     const version = "1.2.3";
-    const stem = `t3-${version}-linux-${HostProcess.Architecture.defaultValue()}`;
+    const stem = `infinitus-${version}-linux-${HostProcess.Architecture.defaultValue()}`;
     const archiveName = `${stem}.tar.gz`;
     const target = NodePath.join(root, "home/runtime/versions", version);
     const waiting = new Map<string, NodeHttp.ServerResponse>();
@@ -554,9 +554,11 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("concurrent ins
       const tools = NodePath.join(root, "tools");
       await NodeFSP.mkdir(tools);
       await NodeFSP.mkdir(NodePath.join(root, stem));
-      await NodeFSP.writeFile(NodePath.join(root, stem, "t3"), "#!/bin/sh\necho 't3 v1.2.3'\n", {
-        mode: 0o755,
-      });
+      await NodeFSP.writeFile(
+        NodePath.join(root, stem, "infinitus"),
+        "#!/bin/sh\necho 'infinitus v1.2.3'\n",
+        { mode: 0o755 },
+      );
       const archivePath = NodePath.join(root, archiveName);
       NodeChildProcess.execFileSync("tar", ["-czf", archivePath, "-C", root, stem]);
       const archive = await NodeFSP.readFile(archivePath);
