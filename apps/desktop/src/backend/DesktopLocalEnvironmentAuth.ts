@@ -103,6 +103,7 @@ export const make = Effect.gen(function* () {
         if (!credential) {
           return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
         }
+<<<<<<< HEAD
         const session = yield* bootstrapRemoteBearerSession({
           httpBaseUrl: config.httpBaseUrl.href,
           credential,
@@ -112,16 +113,34 @@ export const make = Effect.gen(function* () {
           },
         }).pipe(
           Effect.provideService(HttpClient.HttpClient, httpClient),
+=======
+        const exchange = Effect.gen(function* () {
+          // Each attempt goes only to a backend that is currently ready.
+          if (!(yield* primary.waitForReady(Duration.infinity))) {
+            return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
+          }
+          return yield* bootstrapRemoteBearerSession({
+            httpBaseUrl: config.httpBaseUrl.href,
+            credential,
+            clientMetadata: {
+              label: "T3 Code Desktop",
+              deviceType: "desktop",
+            },
+          }).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
+        });
+        const session = yield* exchange.pipe(
+>>>>>>> upstream-sync-341864854b-upstream-renamed
           Effect.retry({
-            while: isTransientBearerBootstrapError,
+            while: (error) =>
+              error._tag !== "DesktopLocalEnvironmentAuthBackendNotConfiguredError" &&
+              isTransientBearerBootstrapError(error),
             schedule: Schedule.spaced(BOOTSTRAP_TRANSIENT_RETRY_INTERVAL),
           }),
           Effect.timeout(BOOTSTRAP_TRANSIENT_RETRY_TIMEOUT),
-          Effect.mapError(
-            (cause) =>
-              new DesktopLocalEnvironmentAuthSessionBootstrapError({
-                cause,
-              }),
+          Effect.mapError((cause) =>
+            cause._tag === "DesktopLocalEnvironmentAuthBackendNotConfiguredError"
+              ? cause
+              : new DesktopLocalEnvironmentAuthSessionBootstrapError({ cause }),
           ),
         );
         yield* Ref.set(tokenRef, Option.some(session.access_token));

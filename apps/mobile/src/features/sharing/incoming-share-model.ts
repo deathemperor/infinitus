@@ -94,6 +94,34 @@ export function isShareFileUriUnderOwnedRoots(
   });
 }
 
+/**
+ * On Android only the native resolver's `expo-sharing/<uuid>` copies are this app's to delete; other
+ * shared URIs are not copies.
+ */
+export function isOwnedShareFileUri(
+  uri: string,
+  owned: {
+    readonly platform: string;
+    readonly cacheUri: string;
+    readonly otherRootUris: ReadonlyArray<string>;
+  },
+): boolean {
+  if (owned.platform !== "android") {
+    return isShareFileUriUnderOwnedRoots(uri, [owned.cacheUri, ...owned.otherRootUris]);
+  }
+  // The resolver reports its copy by canonical path, where `/data/user/0` is `/data/data`.
+  const canonical = (fileUri: string) =>
+    normalizedFileUriPath(fileUri)?.replace(/^\/data\/user\/0\//, "/data/data/");
+  const path = canonical(uri);
+  const cachePath = canonical(owned.cacheUri)?.replace(/\/*$/, "/");
+  return (
+    path !== undefined &&
+    cachePath !== undefined &&
+    path.startsWith(cachePath) &&
+    /^expo-sharing\/[\da-f-]{36}\/[^/]+$/i.test(path.slice(cachePath.length))
+  );
+}
+
 export interface IncomingShareFileReader {
   readonly readBase64: (uri: string) => Promise<string>;
   readonly removeOwnedFile: (uri: string) => Promise<void> | void;
@@ -422,6 +450,7 @@ export async function buildIncomingShareDraft(input: {
       continue;
     }
 
+<<<<<<< HEAD
     let renderedUri: string | undefined;
     try {
       let image: { readonly base64: string; readonly mimeType: string; readonly name: string };
@@ -453,25 +482,78 @@ export async function buildIncomingShareDraft(input: {
         warnings.push(
           m(msg("''{name}'' exceeds the 10 MB attachment limit.", { name: imageName })),
         );
+=======
+    const name = resolved?.originalName ?? fallbackName(uri, index, mimeType);
+    let persistedImageUri: string | undefined;
+    let retainedImageUri: string | undefined;
+    try {
+      const sharedBase64 = await input.fileReader.readBase64(uri);
+      // Use already-read bytes because native image loaders may not read the provider's file.
+      const fitted = await fitComposerImage({
+        uri: `data:${mimeType};base64,${sharedBase64}`,
+        mimeType,
+        base64: sharedBase64,
+      });
+      const base64 = fitted?.base64 ?? sharedBase64;
+      const decodedSize = estimateBase64ByteSize(base64);
+      if (decodedSize <= 0 || decodedSize > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {
+        warnings.push(m(msg("''{name}'' exceeds the 10 MB attachment limit.", { name })));
+        continue;
+      }
+      if (input.fileReader.persistFile) {
+        persistedImageUri = await input.fileReader.persistFile(fitted?.uri ?? uri, name);
+        const sizeBytes = (await input.fileReader.readSize?.(persistedImageUri)) ?? null;
+        if (sizeBytes === null || sizeBytes <= 0) {
+          warnings.push(m(msg("''{name}'' is empty or could not be read.", { name })));
+          continue;
+        }
+        if (sizeBytes > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {
+          warnings.push(fileAttachmentTooLargeMessage(name, PROVIDER_SEND_TURN_MAX_IMAGE_BYTES, m));
+          continue;
+        }
+        attachments.push({
+          id: `${input.id}-image-${index}`,
+          type: "image",
+          name,
+          mimeType,
+          sizeBytes,
+          fileUri: persistedImageUri,
+          previewUri: persistedImageUri,
+        });
+        retainedImageUri = persistedImageUri;
+>>>>>>> upstream-sync-341864854b-upstream-renamed
         continue;
       }
       const dataUrl = `data:${image.mimeType};base64,${image.base64}`;
       attachments.push({
         id: `${input.id}-image-${index}`,
         type: "image",
+<<<<<<< HEAD
         name: image.name,
         mimeType: image.mimeType,
         sizeBytes,
+=======
+        name,
+        mimeType,
+        sizeBytes: decodedSize,
+>>>>>>> upstream-sync-341864854b-upstream-renamed
         dataUrl,
         // Data-backed previews outlive temporary share files and App Group entries.
         previewUri: dataUrl,
       });
     } catch {
-      warnings.push(
-        m(msg("Could not read ''{name}''.", { name: fallbackName(uri, index, mimeType) })),
-      );
+      warnings.push(m(msg("Could not read ''{name}''.", { name })));
     } finally {
+<<<<<<< HEAD
       await releaseOwnedFiles(input.fileReader, [uri, payload.value, renderedUri]);
+=======
+      await releaseOwnedFiles(
+        input.fileReader,
+        [uri, payload.value, persistedImageUri].filter(
+          (candidate) => candidate !== retainedImageUri,
+        ),
+      );
+>>>>>>> upstream-sync-341864854b-upstream-renamed
     }
   }
 
