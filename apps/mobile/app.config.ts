@@ -416,7 +416,12 @@ const config: ExpoConfig = {
             },
             {
               fontFamily: "DMSans-Bold",
-              fontDefinitions: [{ path: dmSansFonts.bold, weight: 700 }],
+              // Android picks fallback glyphs (such as Vietnamese) at the requested weight, so bold text
+              // asks for 700; the 400 entry lets a relative bold step (Typeface.BOLD) land on 700 too.
+              fontDefinitions: [
+                { path: dmSansFonts.bold, weight: 400 },
+                { path: dmSansFonts.bold, weight: 700 },
+              ],
             },
           ],
         },
@@ -536,6 +541,7 @@ const config: ExpoConfig = {
   ],
   extra: {
     appVariant: APP_VARIANT,
+<<<<<<< HEAD
     // One product, one version (#823): the root VERSION file, shown in
     // Settings. `version` above stays the store's dotted-integer marketing
     // version (EAS owns the build numbers, `appVersionSource: remote`).
@@ -543,6 +549,8 @@ const config: ExpoConfig = {
     secretsFeatureEnabled: ["1", "true"].includes(
       process.env.T3CODE_FEATURE_SECRETS?.trim().toLowerCase() ?? "",
     ),
+=======
+>>>>>>> upstream-sync-b61af8a5d2-upstream-renamed
     iosPersonalTeamBuild: isIosPersonalTeamBuild,
     // Fork: `sandbox` for a build Xcode signs onto a device (its APNs token
     // is a sandbox one); unset everywhere else, where the variant decides.

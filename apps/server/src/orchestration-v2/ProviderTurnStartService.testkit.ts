@@ -20,11 +20,27 @@ import * as Layer from "effect/Layer";
 
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
+<<<<<<< HEAD
 import { TurnStartGatePassthrough } from "./TurnStartGate.ts";
 
 export const layer = Layer.mergeAll(
   // Fork (#720, #1627): the turn-start gate the service requires; tests run every start at once.
   TurnStartGatePassthrough,
+=======
+import * as TaskFolders from "../workspace/TaskFolders.ts";
+
+// No project in these tests tracks a repository, so no thread works in a task folder.
+export const layerNoTaskFolders = Layer.mock(TaskFolders.TaskFolders)({
+  plan: () => Effect.succeed(null),
+  find: () => Effect.succeed(null),
+});
+
+export const layer = Layer.mergeAll(
+  Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({
+    runForThread: () => Effect.succeed({ status: "no-script" }),
+  }),
+  layerNoTaskFolders,
+>>>>>>> upstream-sync-b61af8a5d2-upstream-renamed
   Layer.mock(GitWorkflow.GitWorkflowService)({
     pruneWorktrees: () => Effect.void,
     createWorktree: () => Effect.succeed({} as never),
