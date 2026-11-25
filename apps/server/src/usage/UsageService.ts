@@ -95,13 +95,6 @@ const MAX_HOURLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** Fork: Stats compares calendar years, so retain two years plus boundary slack. */
 const CACHE_RETENTION_DAYS = 800;
-
-/**
- * The longest window the UI offers, 90 days, plus its `MTIME_SLACK_MS`, rounded
- * up: how far back the scan readers (Cursor account history, Antigravity) are
- * asked to keep (upstream's cache retention).
- */
-const SCAN_READER_RETENTION_DAYS = 92;
 const STALE_TEMP_DIRECTORY_MS = 60 * 60 * 1000;
 
 const TRANSCRIPT_READ_CONCURRENCY = 4;
@@ -902,12 +895,6 @@ export const make = Effect.gen(function* () {
     fromMemory: boolean,
     withStats = false,
   ) {
-    // Fork: the long transcript retention is for Stats; the scan readers
-    // (an account API's history) keep upstream's window.
-    const scanRetentionCutoffMs = Math.max(
-      retentionCutoffMs,
-      (yield* Clock.currentTimeMillis) - SCAN_READER_RETENTION_DAYS * 24 * 60 * 60 * 1000,
-    );
     const scans = Effect.forEach(
       scanReaders,
       ({ driver, reader }) =>
@@ -917,7 +904,7 @@ export const make = Effect.gen(function* () {
               instances,
               settings,
               windowStartMs,
-              retentionCutoffMs: scanRetentionCutoffMs,
+              retentionCutoffMs,
               awaitRefresh,
             }),
           ),

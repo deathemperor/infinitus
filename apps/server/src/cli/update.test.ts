@@ -657,7 +657,7 @@ it.layer(NodeServices.layer)("t3 update checks the database before switching", (
       launcherProtocol: 3,
       preflight: preflightOutput("", 1),
       failure:
-        "t3@0.1.8 could not confirm it supports this database (its check exited with code 1), so t3 did not switch to it.",
+        "t3@0.1.8 could not confirm it supports this database (its check exited with code 1), so infinitus did not switch to it.",
     },
     {
       // Newer builds keep accepting the current launcher protocol, which may drop 3.
