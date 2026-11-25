@@ -3363,7 +3363,9 @@ describe("orchestration v2 provider switching", () => {
   );
 
   // regression: #32891 a steer that Stop already reached is refused, not queued
-  it.live("refuses a provider switch steered into a Claude turn that Stop reached", () =>
+  // Fork (#1318): an explicit steer queues for the next tool boundary, so one that Stop reached
+  // waits behind the stopping turn instead of being refused.
+  it.live("queues a provider switch steered into a Claude turn that Stop reached", () =>
     Effect.gen(function* () {
       const harness = yield* steerProviderSwitchHarness("after-stop");
       yield* Effect.gen(function* () {
@@ -3381,13 +3383,17 @@ describe("orchestration v2 provider switching", () => {
           threadId: harness.threadId,
           runId: claudeRun!.id,
         });
-        const error = yield* harness.steerToCodex.pipe(Effect.flip);
-        assert.instanceOf(error, Orchestrator.OrchestratorDispatchError);
+        yield* harness.steerToCodex;
         assert.deepEqual(
-          (yield* orchestrator.getThreadProjection(harness.threadId)).runs.map(
-            (run) => run.providerInstanceId,
-          ),
-          [CLAUDE_MODEL_SELECTION.instanceId],
+          (yield* orchestrator.getThreadProjection(harness.threadId)).runs.map((run) => [
+            run.providerInstanceId,
+            run.status,
+            run.sendAt,
+          ]),
+          [
+            [CLAUDE_MODEL_SELECTION.instanceId, "running", undefined],
+            [CODEX_MODEL_SELECTION.instanceId, "queued", "tool_boundary"],
+          ],
         );
         yield* Deferred.succeed(harness.release, undefined);
       }).pipe(Effect.provide(harness.layer));

@@ -1,9 +1,20 @@
 import type { InfinitusDesktopPrefs } from "@infinitus/contracts/infinitus";
-import { StrictMode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { act } from "../../../../test/reactTestRenderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
+// GT's real hooks need its browser runtime; English passes through as the app renders it.
+vi.mock("gt-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("gt-react")>()),
+  useGT:
+    () =>
+    (text: string, values: Record<string, unknown> = {}) =>
+      text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key])),
+  useMessages: () => (text: string) => text,
+  T: ({ children }: { children: ReactNode }) => children,
+  Var: ({ children }: { children: ReactNode }) => children,
+}));
 vi.mock("../../ui/switch", () => ({
   Switch: (props: Record<string, unknown>) => <input type="checkbox" {...props} />,
 }));

@@ -24,6 +24,7 @@ vi.mock("~/state/use-atom-command", () => ({
   useAtomCommand: () => (input: unknown) => fake.apply(input),
 }));
 vi.mock("~/hooks/useCopyToClipboard", () => ({
+  namedClipboardTarget: (name: string) => name,
   writeTextToClipboard: (...args: ReadonlyArray<unknown>) => fake.copy(...args),
 }));
 vi.mock("../ui/toast", () => ({
