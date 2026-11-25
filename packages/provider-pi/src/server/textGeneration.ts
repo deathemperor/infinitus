@@ -19,6 +19,7 @@ import { buildPiRpcLaunch, resolvePiLaunchArgs } from "./mcpInjection.ts";
 import * as TextGenerationOperations from "@infinitus/provider-core/server/textGenerationOperations";
 import { isPiThinkingLevel } from "./modelCapabilities.ts";
 import { runPiVersionCommand } from "./status.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const PI_TIMEOUT_MS = 180_000;
 
@@ -55,7 +56,7 @@ export const makePiTextGeneration = Effect.fn("makePiTextGeneration")(function* 
             : null;
         const broken =
           version === null
-            ? "T3 Code could not determine the Pi version. Update Pi and try again."
+            ? `${PRODUCT_NAME} could not determine the Pi version. Update Pi and try again.`
             : brokenVersionDetail({
                 name: "Pi",
                 version,

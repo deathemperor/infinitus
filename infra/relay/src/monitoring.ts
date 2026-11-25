@@ -183,7 +183,7 @@ const relayMonitors: ReadonlyArray<RelayMonitor> = [
     id: "RelayTunnelCleanupStoppedMonitor",
     // Pages because nothing else surfaces it: unnoticed, it ran 2026-11-15..18 while 27k+ idle tunnels piled up.
     severity: "page",
-    name: "T3 Connect relay: tunnel cleanup stopped",
+    name: `${CONNECT_NAME} relay: tunnel cleanup stopped`,
     description:
       "Tunnel cleanup sweeps that finished in 2 h. Healthy: 24. The cron is not running, or every sweep fails, as during the 2026-10-19 Cloudflare 429s and from 2026-11-15 when listing tunnels timed out. Idle tunnels pile up and are billed meanwhile.",
     query: (dataset) =>

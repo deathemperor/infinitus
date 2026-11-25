@@ -2,6 +2,7 @@ import type { AuthClientMetadata, AuthPairingLink } from "@infinitus/contracts";
 import { msg } from "gt-react-native";
 
 import { m } from "../../i18n/messages";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export interface ConnectDeviceApprovalPrompt {
   readonly pairingLinkId: string;
@@ -41,7 +42,7 @@ export function connectDeviceApprovalPrompts(input: {
           {
             device: describeConnectDevice(device),
             environment: input.environmentLabel,
-            product: "T3 Connect",
+            product: CONNECT_NAME,
             code: verificationCode,
           },
         ),

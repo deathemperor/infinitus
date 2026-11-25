@@ -177,7 +177,7 @@ function UpdateEverythingDialogContent({
               <span role="columnheader">
                 <T>Machine</T>
               </span>
-              <span role="columnheader">T3 Code</span>
+              <span role="columnheader">{PRODUCT_NAME}</span>
               <span role="columnheader">
                 <T>Providers</T>
               </span>

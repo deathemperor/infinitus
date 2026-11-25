@@ -64,7 +64,7 @@ img { width: 32px; height: 32px; pointer-events: none; }
 </style></head><body><main id="panel">
 <button id="close" aria-label="${escapeHtml(m(msg("Close permission helper")))}">×</button>
 <header>${escapeHtml(m(msg("↑ Drag Infinitus into the list above")))}</header>
-<button id="app" draggable="true" aria-label="${escapeHtml(m(msg("Drag Infinitus to System Settings, or click to reveal in Finder")))}"><img src="${escapeHtml(icon)}" alt="" draggable="false">T3 Code</button>
+<button id="app" draggable="true" aria-label="${escapeHtml(m(msg("Drag Infinitus to System Settings, or click to reveal in Finder")))}"><img src="${escapeHtml(icon)}" alt="" draggable="false">${PRODUCT_NAME}</button>
 </main></body></html>`;
 }
 

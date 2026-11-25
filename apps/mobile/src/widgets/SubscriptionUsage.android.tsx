@@ -20,6 +20,7 @@ import {
   width,
 } from "@expo/ui/jetpack-compose/modifiers";
 import { createWidget, type WidgetEnvironment } from "expo-widgets";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import type {
   SubscriptionUsageSnapshot as SubscriptionUsageProps,
@@ -56,17 +57,29 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
       };
   // English until the app publishes its first snapshot in the UI language.
   const text = props.text ?? {
-    refresh: "Open T3 to refresh",
+    refresh: `Open ${PRODUCT_NAME} to refresh`,
     left: "left",
     asOf: "As of {time}",
-    tapToConnect: "Tap to connect in T3",
+    tapToConnect: `Tap to connect in ${PRODUCT_NAME}`,
     moreInApp: {} as Record<string, string>,
   };
   const providers = props.providers ?? [
     // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
-    { name: "Codex", detail: "Open T3 to connect", windows: [], expiresAt: 0, totalWindows: 0 },
+    {
+      name: "Codex",
+      detail: `Open ${PRODUCT_NAME} to connect`,
+      windows: [],
+      expiresAt: 0,
+      totalWindows: 0,
+    },
     // oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text
-    { name: "Claude", detail: "Open T3 to connect", windows: [], expiresAt: 0, totalWindows: 0 },
+    {
+      name: "Claude",
+      detail: `Open ${PRODUCT_NAME} to connect`,
+      windows: [],
+      expiresAt: 0,
+      totalWindows: 0,
+    },
   ];
 
   const pad = 14;
@@ -338,7 +351,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
           {hidden > 0 ? (
             <Text color={colors.muted} maxLines={1} style={{ fontSize: 10 }}>
               {/* oxlint-disable-next-line t3code/no-untranslated-copy -- widget fallback until the app publishes translated text */}
-              {text.moreInApp[String(hidden)] ?? `${hidden} more in T3`}
+              {text.moreInApp[String(hidden)] ?? `${hidden} more in ${PRODUCT_NAME}`}
             </Text>
           ) : null}
         </Column>

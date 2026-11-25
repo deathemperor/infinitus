@@ -15,6 +15,7 @@ import {
 import { BearerConnectionTarget, type ConnectionTarget } from "./model.ts";
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export type ConnectionRouteKind =
   | "relay"
@@ -188,7 +189,7 @@ function routeAddressKey(route: ConnectionRoute): string | null {
   }
 }
 
-const T3_CONNECT_NAME = "T3 Connect";
+const T3_CONNECT_NAME = CONNECT_NAME;
 
 /** The route's label in English. Display sites use `connectionRouteLabelText`. */
 export function connectionRouteLabel(route: ConnectionRoute): string {

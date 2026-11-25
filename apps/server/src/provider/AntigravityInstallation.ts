@@ -50,6 +50,7 @@ import {
   type AntigravityCliReleaseAsset,
 } from "./antigravityCliRelease.ts";
 import { makeAntigravityAcpRuntime } from "./acp/AntigravityAcpSupport.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
   buildAntigravityAcpSpawnInput,
   prepareAntigravityProfile,
@@ -507,7 +508,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
         _tag: "repairable" as const,
         error: installationError(
           "resolve",
-          `Antigravity ${record.version} predates the Antigravity CLI and no longer works with this T3 Code release. Update it in Antigravity setup.`,
+          `Antigravity ${record.version} predates the Antigravity CLI and no longer works with this ${PRODUCT_NAME} release. Update it in Antigravity setup.`,
         ),
       };
     }
@@ -659,7 +660,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
       if (yield* isWithdrawn(installed.version))
         return yield* installationError(
           "resolve",
-          `Antigravity ${installed.version} no longer works with this T3 Code release. Update it in Antigravity setup.`,
+          `Antigravity ${installed.version} no longer works with this ${PRODUCT_NAME} release. Update it in Antigravity setup.`,
         );
       return installed;
     }

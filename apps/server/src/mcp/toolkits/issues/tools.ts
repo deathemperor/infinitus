@@ -22,6 +22,7 @@ import * as ThreadIssueService from "../../../orchestration-v2/ThreadIssueServic
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "../../../project/ProjectService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const dependencies = [
   McpInvocationContext.McpInvocationContext,
@@ -67,7 +68,7 @@ export class IssueTargetIncompleteError extends Schema.TaggedError<IssueTargetIn
   {},
 ) {
   override get message(): string {
-    return "Pass either url, or key (with projectId when not running inside a T3 thread).";
+    return `Pass either url, or key (with projectId when not running inside an ${PRODUCT_NAME} thread).`;
   }
 }
 
@@ -76,7 +77,7 @@ export class IssueProjectRequiredError extends Schema.TaggedError<IssueProjectRe
   {},
 ) {
   override get message(): string {
-    return "Pass projectId: this MCP client is not running inside a T3 thread.";
+    return `Pass projectId: this MCP client is not running inside an ${PRODUCT_NAME} thread.`;
   }
 }
 
@@ -85,7 +86,7 @@ export class IssueThreadRequiredError extends Schema.TaggedError<IssueThreadRequ
   {},
 ) {
   override get message(): string {
-    return "Pass threadId: this MCP client is not running inside a T3 thread.";
+    return `Pass threadId: this MCP client is not running inside an ${PRODUCT_NAME} thread.`;
   }
 }
 
@@ -334,8 +335,7 @@ const SetIssueStateTool = Tool.make("set_issue_state", {
   .annotate(Tool.OpenWorld, true);
 
 const LinkIssueTool = Tool.make("link_issue", {
-  description:
-    "Link an issue to a thread so T3 Code shows it beside the thread. Link every issue you work on or file.",
+  description: `Link an issue to a thread so ${PRODUCT_NAME} shows it beside the thread. Link every issue you work on or file.`,
   parameters: Schema.Struct({ ...IssueTargetInput.fields, ...ThreadTargetInput.fields }),
   success: LinkIssueResult,
   failure: IssueToolError,

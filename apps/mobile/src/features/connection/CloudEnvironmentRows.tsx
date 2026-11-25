@@ -159,7 +159,7 @@ function CloudEnvironmentRowsContent(
       !controller.relayDiscovery.isRefreshing ? (
         <View collapsable={false} className="gap-3 rounded-[24px] bg-grouped-card p-5">
           <Text className="text-base font-infinitus-bold text-foreground">
-            {gt("Could not load {product} environments", { product: "T3 Connect" })}
+            {gt("Could not load {product} environments", { product: CONNECT_NAME })}
           </Text>
           <Text className="text-sm text-foreground-muted">{controller.relayDiscovery.error}</Text>
           {controller.relayDiscovery.errorTraceId ? (

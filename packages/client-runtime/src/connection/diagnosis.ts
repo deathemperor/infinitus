@@ -371,7 +371,7 @@ function helpSection(
   }
 }
 
-const T3_CONNECT_NAME = "T3 Connect";
+const T3_CONNECT_NAME = CONNECT_NAME;
 
 const HOP_ORDER = {
   relay: ["device", "relay", "tunnel", "server"],
@@ -444,7 +444,7 @@ export function presentConnectionDiagnosis(
   );
   add(
     resolve(msg("Route", { $context: "diagnostics field label" })),
-    relayPath ? "T3 Connect" : resolve(msg("Direct", { $context: "connection route" })),
+    relayPath ? CONNECT_NAME : resolve(msg("Direct", { $context: "connection route" })),
   );
   add(resolve(msg("App version")), input.clientVersion);
   add(resolve(msg("Host version")), input.serverVersion);

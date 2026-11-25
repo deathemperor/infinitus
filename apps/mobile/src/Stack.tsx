@@ -213,7 +213,7 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   AddProject: msg("Add project"),
   ThreadFiles: msg("Files"),
   SettingsLegal: msg("Legal"),
-  ConnectOnboarding: msg("Set up {product}", { product: "T3 Connect" }),
+  ConnectOnboarding: msg("Set up {product}", { product: CONNECT_NAME }),
   Connections: msg("Environments"),
   ConnectionsNew: msg("Add Environment"),
 };

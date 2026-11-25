@@ -1,5 +1,6 @@
 import type { ProviderDriverKind, ServerProviderCompatibilityAdvisory } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /** Rates a detected provider version against the host's compatibility policy. */
 export type ProviderCompatibilityLookup = (
@@ -19,5 +20,5 @@ export function brokenVersionDetail(input: {
   if (input.advisory?.status !== "broken") return undefined;
   const target =
     input.advisory.recommendedVersion ?? input.advisory.recommendedRange ?? "a newer version";
-  return `${input.name} ${input.version} does not work with this T3 Code release. ${input.action ?? `Update ${input.name}`} to ${target}, then retry.`;
+  return `${input.name} ${input.version} does not work with this ${PRODUCT_NAME} release. ${input.action ?? `Update ${input.name}`} to ${target}, then retry.`;
 }

@@ -113,15 +113,15 @@ export type PromptLinkError =
 function englishPromptLinkError(error: PromptLinkError): string {
   switch (error) {
     case "prompt-too-long":
-      return `This prompt is longer than ${PROMPT_LINK_MAX_PROMPT_LENGTH.toLocaleString("en-US")} characters, so T3 Code did not open it.`;
+      return `This prompt is longer than ${PROMPT_LINK_MAX_PROMPT_LENGTH.toLocaleString("en-US")} characters, so ${PRODUCT_NAME} did not open it.`;
     case "prompt-only-hidden":
-      return "This prompt had only hidden characters, so it may be malicious. T3 Code did not open it.";
+      return `This prompt had only hidden characters, so it may be malicious. ${PRODUCT_NAME} did not open it.`;
     case "unreadable-pull-request":
-      return "This link names a pull request T3 Code cannot read.";
+      return `This link names a pull request ${PRODUCT_NAME} cannot read.`;
     case "missing-prompt":
       return "This link has no prompt.";
     case "unreadable-repository":
-      return "This link names a repository T3 Code cannot read.";
+      return `This link names a repository ${PRODUCT_NAME} cannot read.`;
   }
 }
 

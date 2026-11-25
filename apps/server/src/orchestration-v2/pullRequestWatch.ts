@@ -468,7 +468,7 @@ export function pullRequestWatchEndMessage(input: {
     : "was closed without merging";
   return {
     text: [
-      `Pull request #${input.number} (${input.url}) ${how}, so T3 Code stopped watching it.`,
+      `Pull request #${input.number} (${input.url}) ${how}, so ${PRODUCT_NAME} stopped watching it.`,
       ...(merged ? [] : ["If it is reopened, call watch_pull_request to watch it again."]),
     ].join(" "),
     notification: {

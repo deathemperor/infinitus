@@ -1,4 +1,5 @@
 import { msg } from "gt-i18n";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /**
  * Whole sentences for each T3 MCP tool row, keyed by the tool's labels from
@@ -250,7 +251,7 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Start\nStarting\nStarted\na T3 thread",
+    `Start\nStarting\nStarted\na ${PRODUCT_NAME} thread`,
     {
       detail: msg(
         "{status, select, inProgress {Starting an Infinitus thread} completed {Started an Infinitus thread} failed {Failed to start an Infinitus thread} declined {Declined to start an Infinitus thread} stopped {Stopped starting an Infinitus thread} other {Starting an Infinitus thread}}",
@@ -266,7 +267,7 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Read\nReading\nRead\na T3 thread",
+    `Read\nReading\nRead\na ${PRODUCT_NAME} thread`,
     {
       detail: msg(
         "{status, select, inProgress {Reading an Infinitus thread} completed {Read an Infinitus thread} failed {Failed to read an Infinitus thread} declined {Declined to read an Infinitus thread} stopped {Stopped reading an Infinitus thread} other {Reading an Infinitus thread}}",
@@ -274,7 +275,7 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Send\nSending\nSent\nto a T3 thread",
+    `Send\nSending\nSent\nto an ${PRODUCT_NAME} thread`,
     {
       detail: msg(
         "{status, select, inProgress {Sending to an Infinitus thread} completed {Sent to an Infinitus thread} failed {Failed to send to an Infinitus thread} declined {Declined to send to an Infinitus thread} stopped {Stopped sending to an Infinitus thread} other {Sending to an Infinitus thread}}",
@@ -282,7 +283,7 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Wait\nWaiting\nWaited\nfor a T3 thread",
+    `Wait\nWaiting\nWaited\nfor an ${PRODUCT_NAME} thread`,
     {
       detail: msg(
         "{status, select, inProgress {Waiting for an Infinitus thread} completed {Waited for an Infinitus thread} failed {Failed to wait for an Infinitus thread} declined {Declined to wait for an Infinitus thread} stopped {Stopped waiting for an Infinitus thread} other {Waiting for an Infinitus thread}}",
@@ -306,7 +307,7 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Interrupt\nInterrupting\nRequested an interrupt of\na T3 thread",
+    `Interrupt\nInterrupting\nRequested an interrupt of\na ${PRODUCT_NAME} thread`,
     {
       detail: msg(
         "{status, select, inProgress {Interrupting an Infinitus thread} completed {Requested an interrupt of an Infinitus thread} failed {Failed to interrupt an Infinitus thread} declined {Declined to interrupt an Infinitus thread} stopped {Stopped interrupting an Infinitus thread} other {Interrupting an Infinitus thread}}",

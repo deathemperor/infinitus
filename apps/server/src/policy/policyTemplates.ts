@@ -123,7 +123,7 @@ const policies = (): ReadonlyArray<Policy> => [
   {
     id: "PreviewTunnel",
     title: "Allow the preview tunnel",
-    help: "Disabled stops other devices from opening this machine's local servers through T3 Code: no in-app browser tabs loaded on the device, no Open on this device, no port forwarding. Browser tabs still stream from this machine.",
+    help: `Disabled stops other devices from opening this machine's local servers through ${PRODUCT_NAME}: no in-app browser tabs loaded on the device, no Open on this device, no port forwarding. Browser tabs still stream from this machine.`,
     toggle: "PreviewTunnel",
   },
   {

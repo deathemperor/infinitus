@@ -2,6 +2,7 @@ import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 
 import { resolveT3McpToolDefinition, type T3McpToolPresentation } from "./t3McpToolPresentation.ts";
+import { PRODUCT_NAME } from "./productName.ts";
 
 // Same English as each tool's displayName; a name missing here shows as authored.
 const DISPLAY_NAMES: ReadonlyMap<string, string> = new Map([
@@ -40,15 +41,15 @@ const DISPLAY_NAMES: ReadonlyMap<string, string> = new Map([
   ["Update a scheduled task", msg("Update a scheduled task")],
   ["Delete a scheduled task", msg("Delete a scheduled task")],
   ["Ask for a secret", msg("Ask for a secret")],
-  ["Create T3 threads", msg("Create Infinitus threads")],
-  ["Start a T3 thread", msg("Start an Infinitus thread")],
-  ["List T3 threads", msg("List Infinitus threads")],
-  ["Read a T3 thread", msg("Read an Infinitus thread")],
-  ["Send to a T3 thread", msg("Send to an Infinitus thread")],
-  ["Wait for a T3 thread", msg("Wait for an Infinitus thread")],
+  [`Create ${PRODUCT_NAME} threads`, msg("Create Infinitus threads")],
+  [`Start an ${PRODUCT_NAME} thread`, msg("Start an Infinitus thread")],
+  [`List ${PRODUCT_NAME} threads`, msg("List Infinitus threads")],
+  [`Read an ${PRODUCT_NAME} thread`, msg("Read an Infinitus thread")],
+  [`Send to an ${PRODUCT_NAME} thread`, msg("Send to an Infinitus thread")],
+  [`Wait for an ${PRODUCT_NAME} thread`, msg("Wait for an Infinitus thread")],
   ["Stop a workflow", msg("Stop a workflow")],
   ["Update background waits", msg("Update background waits")],
-  ["Interrupt a T3 thread", msg("Interrupt an Infinitus thread")],
+  [`Interrupt an ${PRODUCT_NAME} thread`, msg("Interrupt an Infinitus thread")],
   ["Hand off thread to a git worktree", msg("Hand off thread to a git worktree")],
   ["Get thread worktree status", msg("Get thread worktree status")],
   ["Get preview browser status", msg("Get preview browser status")],
@@ -95,7 +96,7 @@ const DISPLAY_NAMES: ReadonlyMap<string, string> = new Map([
   ["Search thread content", msg("Search thread content")],
   ["Read thread transfers", msg("Read thread transfers")],
   ["Organize a thread", msg("Organize a thread")],
-  ["Update T3 thread metadata", msg("Update Infinitus thread metadata")],
+  [`Update ${PRODUCT_NAME} thread metadata`, msg("Update Infinitus thread metadata")],
   ["List workspace branches", msg("List workspace branches")],
   ["List preview tabs", msg("List preview tabs")],
   ["Close a preview tab", msg("Close a preview tab")],

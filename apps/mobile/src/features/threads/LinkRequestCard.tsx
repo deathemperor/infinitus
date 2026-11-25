@@ -42,6 +42,7 @@ import { SettingsSection } from "../settings/components/SettingsSection";
 import { Button } from "../../components/ui/Button";
 import { Sheet } from "../../components/ui/Sheet";
 import { RUNTIME_MODE_CHOICES } from "./thread-settings-options";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 /** The same five levels as web's access picker: read-only, then the runtime modes. */
 export const LINK_ACCESS_CHOICES: ReadonlyArray<{
@@ -506,7 +507,7 @@ function MachineRow(props: {
     : machine.connected
       ? null
       : machine.connectOnly
-        ? "T3 Connect"
+        ? CONNECT_NAME
         : gt("Not connected");
   return (
     <Pressable

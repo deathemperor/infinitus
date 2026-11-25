@@ -381,19 +381,19 @@ export function CloudEnvironmentConnectRows({
       : gt("Not added");
     const statusText =
       unsupported && !savedEnvironment
-        ? `T3 Connect · ${notAdded} · ${gt("Client not supported")}`
+        ? `${CONNECT_NAME} · ${notAdded} · ${gt("Client not supported")}`
         : offlineReason !== null
           ? offlineReason
           : savedConnection
             ? savedConnection.statusText
             : availability === "online"
-              ? `T3 Connect · ${notAdded} · ${gt("Relay online")}`
+              ? `${CONNECT_NAME} · ${notAdded} · ${gt("Relay online")}`
               : availability === "offline"
-                ? `T3 Connect · ${notAdded} · ${gt("Relay offline")}`
+                ? `${CONNECT_NAME} · ${notAdded} · ${gt("Relay offline")}`
                 : availability === "checking"
-                  ? `T3 Connect · ${notAdded} · ${gt("Checking relay status…")}`
+                  ? `${CONNECT_NAME} · ${notAdded} · ${gt("Checking relay status…")}`
                   : (errorDisplayMessage(Option.getOrNull(error), m) ??
-                    `T3 Connect · ${notAdded} · ${gt("Relay status unavailable")}`);
+                    `${CONNECT_NAME} · ${notAdded} · ${gt("Relay status unavailable")}`);
     if (selection) {
       return (
         <label

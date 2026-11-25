@@ -33,6 +33,7 @@ import {
 import { readCachedCloudLinkState, useCloudLinkState } from "./cloudLinkState";
 import { resolveRelayClerkTokenOptions } from "./publicConfig";
 import { cloudChangeReplacesLink, isManagedTunnelActive } from "./t3ConnectState";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 export interface CloudLinkDesiredState {
   readonly managedTunnel: boolean;
@@ -79,7 +80,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
     const message =
       thrownErrorMessage(cause, m) ?? m(msg("Could not update Infinitus Connect access."));
     const traceId = findErrorTraceId(cause);
-    console.error("[t3-connect] Could not update T3 Connect", { message, traceId, cause });
+    console.error(`[t3-connect] Could not update ${CONNECT_NAME}`, { message, traceId, cause });
     setOperationError(
       traceId ? m(msg("{message} Trace ID: {traceId}", { message, traceId })) : message,
     );

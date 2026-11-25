@@ -30,6 +30,7 @@ import {
 } from "./ClerkUserProfilePage";
 import { m, type MessageResolver } from "../../i18n/messages";
 import { useT3ChatLink } from "./useT3ChatLink";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const linkedAtFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
@@ -275,7 +276,7 @@ export function InfinitusConnectUserProfilePage() {
 
   return (
     <ClerkUserProfilePage
-      title="T3 Connect"
+      title={CONNECT_NAME}
       description={gt(
         "Environments registered to your account. Connections on this device are managed in Settings.",
       )}

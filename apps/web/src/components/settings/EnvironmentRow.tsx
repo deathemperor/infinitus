@@ -15,8 +15,9 @@ import { usePreparedConnection } from "~/state/session";
 import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { m, type MessageResolver } from "../../i18n/messages";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
-const T3_CONNECT_NAME = "T3 Connect";
+const T3_CONNECT_NAME = CONNECT_NAME;
 
 export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): string {
   const authority = target.username ? `${target.username}@${target.hostname}` : target.hostname;
