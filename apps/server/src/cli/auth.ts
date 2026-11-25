@@ -30,6 +30,7 @@ import {
   resolveCliAuthConfig,
 } from "./config.ts";
 import * as RunningServer from "./runningServer.ts";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const runWithEnvironmentAuth = Effect.fn("auth.runWithEnvironmentAuth")(function* <A, E, R>(
   flags: CliAuthLocationFlags,

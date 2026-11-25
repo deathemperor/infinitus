@@ -3,7 +3,6 @@ import type { Icon } from "@tabler/icons-react-native/types";
 import IconAdjustmentsHorizontal from "@tabler/icons-react-native/IconAdjustmentsHorizontal";
 import IconAlarm from "@tabler/icons-react-native/IconAlarm";
 import IconAlignLeft from "@tabler/icons-react-native/IconAlignLeft";
-import IconAlarm from "@tabler/icons-react-native/IconAlarm";
 import IconShieldCheck from "@tabler/icons-react-native/IconShieldCheck";
 import IconUsersGroup from "@tabler/icons-react-native/IconUsersGroup";
 import IconAlertCircle from "@tabler/icons-react-native/IconAlertCircle";
@@ -199,7 +198,6 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "circle.inset.filled": IconCircleDot,
   "circle.dashed.inset.filled": IconCircleDot,
   "calendar.badge.clock": IconCalendarClock,
-  alarm: IconAlarm,
   clock: IconClock,
   timer: IconClock,
   "face.smiling": IconMoodPlus,

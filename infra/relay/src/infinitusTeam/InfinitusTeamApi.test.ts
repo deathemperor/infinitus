@@ -37,6 +37,7 @@ function harness() {
     listDeliveryUsersForEnvironment: () => Effect.die("unused"),
     findActiveManagedForEnvironment: () => Effect.succeed([]),
     setHoldWebhooksWhileOffline: () => Effect.void,
+    updateLiveActivityPreference: () => Effect.die("unused updateLiveActivityPreference"),
     listForUser: () => Effect.succeed([]),
     getForUser: (input) =>
       Effect.succeed(

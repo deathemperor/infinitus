@@ -145,7 +145,7 @@ describe("capture atoms", () => {
         } as unknown as WsRpcProtocolClient;
         const { atoms, registry } = yield* makeTestRuntime(client);
 
-        const result = yield* Effect.promise(() =>
+        const result = yield* Effect.exit(
           atoms.apply.run(registry, {
             environmentId: TARGET.environmentId,
             input: { projectId: PROJECT, command: { type: "add", text: "buy milk" } },

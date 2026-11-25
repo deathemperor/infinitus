@@ -12,6 +12,7 @@ import {
 } from "./MacSettingsWindow.ts";
 
 import { MAC_PERMISSION_SETUP_TITLES, type MacPermission } from "./MacPermission.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const permissionGranted = (permission: MacPermission) => {
   if (permission === "screen-recording")

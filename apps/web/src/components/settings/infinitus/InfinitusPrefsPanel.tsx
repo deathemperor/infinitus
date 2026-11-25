@@ -351,7 +351,7 @@ export function InfinitusPrefsPanel({
                 resetAction={
                   row.isDefault ? null : (
                     <SettingResetButton
-                      label={row.label}
+                      ariaLabel={`Reset ${row.label} to default`}
                       disabled={locked}
                       onClick={() => submit(pref, row, String(fallback))}
                     />

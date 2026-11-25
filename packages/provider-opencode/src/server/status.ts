@@ -33,6 +33,7 @@ import type { ProbedOpenCode } from "./versionProbe.ts";
 import type { Agent, ProviderListResponse } from "@opencode-ai/sdk/v2";
 import { ServiceUnavailableError } from "@opencode/protocol/errors";
 import * as OpenCodeServerOwner from "./OpenCodeServerOwner.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const OPENCODE_PRESENTATION = {
   displayName: "OpenCode",

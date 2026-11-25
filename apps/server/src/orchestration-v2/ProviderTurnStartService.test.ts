@@ -88,6 +88,7 @@ import * as ProviderUsageAnalytics from "../telemetry/ProviderUsageAnalytics.ts"
 import * as RuntimePolicy from "./RuntimePolicy.ts";
 import * as TurnStartGate from "./TurnStartGate.ts";
 import * as TurnItemPositionStore from "./TurnItemPositionStore.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const isDomainEvent = Schema.is(OrchestrationV2DomainEvent);
 

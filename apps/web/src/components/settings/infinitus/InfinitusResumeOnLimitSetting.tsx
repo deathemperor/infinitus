@@ -1,6 +1,6 @@
 import { ScopedSwitch } from "../ScopedSwitch";
 import { SettingsRow } from "../settingsLayout";
-import { searchableSetting } from "../settingsSearch";
+import { useSearchableSetting } from "../settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "../useScopedSettings";
 
 /**
@@ -11,6 +11,7 @@ import { useScopedSettings, useUpdateScopedSettings } from "../useScopedSettings
 export function InfinitusResumeOnLimitSetting() {
   const enabled = useScopedSettings((settings) => settings.infinitusResumeOnLimit);
   const updateSettings = useUpdateScopedSettings();
+  const searchableSetting = useSearchableSetting();
   return (
     <SettingsRow
       serverScoped

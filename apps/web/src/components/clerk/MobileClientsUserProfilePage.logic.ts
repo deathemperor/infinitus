@@ -1,4 +1,5 @@
 import type { RelayClientDeviceRecord } from "@infinitus/contracts/relay";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { msg } from "gt-react";
 
 import { m, type MessageResolver } from "~/i18n/messages";

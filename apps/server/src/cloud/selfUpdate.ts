@@ -48,6 +48,7 @@ import { bootServiceProgramOf, bootServiceUnitPath } from "./bootService.ts";
 import { runStagedServicePreflight } from "./servicePreflight.ts";
 import * as ServiceLauncherClient from "./serviceLauncherClient.ts";
 import { decodeServiceUnit, isExactServiceVersion } from "./serviceProtocol.ts";
+import * as Duration from "effect/Duration";
 
 export function resolveServerSelfUpdateCapability(input: {
   readonly desktopManaged: boolean;

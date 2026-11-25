@@ -28,6 +28,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { authLocationFlags, type CliAuthLocationFlags, resolveCliAuthConfig } from "./config.ts";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /**
  * Links live in this environment's database and secret store, so these
