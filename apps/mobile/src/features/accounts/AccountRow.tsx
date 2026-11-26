@@ -13,6 +13,7 @@ import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-nativ
 
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { AppText as Text } from "../../components/ui/AppText";
+import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
 import { Menu } from "../../components/ui/Menu";
 import { StatusPill } from "../../components/StatusPill";
@@ -62,6 +63,11 @@ export function AccountRow(props: {
   readonly fleetTitle: string;
   readonly row: AccountRowModel;
   readonly last: boolean;
+  /** Signs this account in again from the phone; set when its login expired and the fleet
+      takes a sign-in from here. */
+  readonly onRelogin?: (() => void) | undefined;
+  /** A sign-in runs on the Mac, so another cannot start. */
+  readonly reloginBusy?: boolean;
 }) {
   const { environmentId, fleetKey, fleetTitle } = props;
   const run = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
@@ -160,7 +166,7 @@ export function AccountRow(props: {
   const actions = rowMenuActions(row, { canPrompt: CAN_PROMPT });
   const badges = rowBadges(row);
   const content = (
-    <View className={cn("gap-2 px-4 py-3", props.last ? null : "border-b border-separator")}>
+    <View className="gap-2 px-4 py-3">
       <View className="flex-row items-center gap-2">
         <Text className="shrink text-base font-infinitus-medium text-foreground" numberOfLines={1}>
           {row.label}
@@ -199,20 +205,37 @@ export function AccountRow(props: {
     </View>
   );
 
-  if (actions.length === 0) return content;
   return (
-    <Menu
-      title={row.label}
-      actions={[...actions]}
-      onPressAction={({ nativeEvent }) => {
-        const choice = rowMenuChoice(nativeEvent.event);
-        onAction(choice.action, choice.kind);
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={`${row.label} actions`}
-    >
-      <Pressable className="active:opacity-70">{content}</Pressable>
-    </Menu>
+    <View className={props.last ? undefined : "border-b border-separator"}>
+      {actions.length === 0 ? (
+        content
+      ) : (
+        <Menu
+          title={row.label}
+          actions={[...actions]}
+          onPressAction={({ nativeEvent }) => {
+            const choice = rowMenuChoice(nativeEvent.event);
+            onAction(choice.action, choice.kind);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`${row.label} actions`}
+        >
+          <Pressable className="active:opacity-70">{content}</Pressable>
+        </Menu>
+      )}
+      {props.onRelogin ? (
+        <View className="px-4 pb-3">
+          <Button
+            size="compact"
+            tone="primary"
+            label="Sign in again"
+            accessibilityLabel={`Sign in again as ${row.label}`}
+            disabled={props.reloginBusy === true}
+            onPress={props.onRelogin}
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }
 

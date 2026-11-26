@@ -231,8 +231,9 @@ function freshnessLabel(account: InfinitusAccount): string | null {
 
 /**
  * What this row may ask for, read off the fleet's capabilities alone, never the
- * engine's identity. Switching to the account in use is not offered, and the
- * pick-first star is hidden where accounts carry no `preferred` knob.
+ * engine's identity. Switching to or removing the account in use is not
+ * offered (swapd refuses to remove the live login), and the pick-first star is
+ * hidden where accounts carry no `preferred` knob.
  */
 function rowActions(
   fleet: InfinitusFleet,
@@ -252,7 +253,7 @@ function rowActions(
     actions.push("reset");
   }
   if (capabilities.has("rename")) actions.push("rename");
-  if (capabilities.has("remove")) actions.push("remove");
+  if (capabilities.has("remove") && !active) actions.push("remove");
   return actions;
 }
 

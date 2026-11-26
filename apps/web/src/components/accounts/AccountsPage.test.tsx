@@ -143,7 +143,7 @@ vi.mock("../WorkspacePageContainer", () => ({ WorkspacePageContainer: "main" }))
 vi.mock("../WorkspacePageHeader", () => ({ WorkspacePageHeader: "header" }));
 
 import { AccountsPage } from "./AccountsPage";
-import { SIGN_IN_POLL_MS } from "./signIn.logic";
+import { SIGN_IN_POLL_MS } from "@infinitus/client-runtime/state/infinitusSignIn";
 
 const account = (overrides: Partial<InfinitusSnapshot["fleets"][number]["accounts"][number]>) => ({
   number: 1,

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   commandFailureMessage,
+  fleetSignsInFromPhone,
   infinitusMacs,
   exhaustedCopy,
   macAccountsModel,
@@ -18,6 +19,7 @@ import {
   rowMenuActions,
   rowMenuChoice,
   removeConfirmation,
+  signInPollFailureEnds,
   switchConfirmation,
   windowTone,
 } from "./accountsRoute.logic";
@@ -300,6 +302,36 @@ describe("commandFailureMessage", () => {
     expect(commandFailureMessage(Cause.fail(new Error("   ")))).toBe(
       "The command did not reach the Mac.",
     );
+  });
+});
+
+describe("sign-in from the phone", () => {
+  it("runs only the Mac's windowless sign-in, on a fleet that can add", () => {
+    const commands = (names: ReadonlyArray<string>): InfinitusSnapshot => ({
+      ...readySnapshot,
+      commands: names.map((name) => ({ name })) as never,
+    });
+    expect(fleetSignsInFromPhone(commands(["signin-begin"]), { canAdd: true })).toBe(true);
+    expect(fleetSignsInFromPhone(commands(["signin-begin"]), { canAdd: false })).toBe(false);
+    // An older build has only `add`, which puts the sign-in on the Mac's own screen.
+    expect(fleetSignsInFromPhone(commands(["add"]), { canAdd: true })).toBe(false);
+  });
+
+  it("gives up polling on the app's refusal, not on a dropped socket", () => {
+    expect(
+      signInPollFailureEnds(
+        Cause.fail({ _tag: "InfinitusCommandFailed", error: "no such flow", restarting: false }),
+      ),
+    ).toBe(true);
+    expect(
+      signInPollFailureEnds(
+        Cause.fail({ _tag: "InfinitusCommandFailed", error: "", restarting: true }),
+      ),
+    ).toBe(false);
+    expect(
+      signInPollFailureEnds(Cause.fail({ _tag: "InfinitusUnavailable", path: "/x", cause: "y" })),
+    ).toBe(false);
+    expect(signInPollFailureEnds(Cause.fail(new Error("socket hung up")))).toBe(false);
   });
 });
 
