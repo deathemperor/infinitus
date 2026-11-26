@@ -32,7 +32,7 @@ jobs:
 <<<<<<< HEAD
     runs-on: ubuntu-24.04
 =======
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write
@@ -126,7 +126,7 @@ jobs:
     name: EAS Preview
     needs: request
     if: needs.request.outputs.sha != ''
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     environment:
       name: mobile-preview-fork
 >>>>>>> upstream-sync-d878f7b192-upstream-renamed
