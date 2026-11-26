@@ -250,11 +250,14 @@ final class FleetState: ObservableObject, Identifiable {
         let engineID = engineID
         Task {
             var seeded: [String: [EngineFleet]] = [:]
+            var failure: String?
             do {
                 if let fleets = try await op() { seeded[engineID] = fleets }
                 host.lastError = nil
-            } catch { host.lastError = EngineFailure.sentence(error) }
+            } catch { failure = EngineFailure.sentence(error) }
             await host.refreshSnapshot(seeded: seeded)
+            // After the refresh: a pass the primary answers clears lastError.
+            if let failure { host.lastError = failure }
             settle()
         }
     }
@@ -324,6 +327,9 @@ final class FleetState: ObservableObject, Identifiable {
             return nil
         }
     }
+
+    /// Staged by a row's Remove…; the popup-level alert commits it.
+    @Published var pendingRemove: Int?
 
     func remove(_ number: Int) {
         let engine = engine, provider = provider

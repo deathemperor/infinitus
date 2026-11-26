@@ -44,6 +44,23 @@ final class FleetPanelTests: XCTestCase {
 
     /// The header line the Mac composes out of styled `Text`s and the
     /// Win32 panel draws as one string — same words, same order.
+    func testRemoveIsOfferedOnlyOffTheLiveLoginOfAnEngineThatCanRemove() {
+        let idle = account(2, "bravo@example.com")
+        XCTAssertTrue(AccountRemoval.offered(idle, capabilities: [.switch, .remove]))
+        XCTAssertFalse(AccountRemoval.offered(account(1, "alpha@example.com", active: true),
+                                              capabilities: [.switch, .remove]))
+        XCTAssertFalse(AccountRemoval.offered(idle, capabilities: [.switch, .hold]))
+    }
+
+    func testRemoveConfirmationNamesTheAccountAndItsMachine() {
+        let aliased = account(2, "bravo@example.com", alias: "Bloody")
+        XCTAssertEqual(AccountRemoval.confirmText(aliased, machine: "HyperNovae"),
+                       "This deletes Bloody's saved login (bravo@example.com) on HyperNovae "
+                       + "for good. Only signing in again brings it back.")
+        XCTAssertTrue(AccountRemoval.confirmText(account(3, "charlie@example.com", alias: ""), machine: nil)
+            .hasPrefix("This deletes charlie's saved login (charlie@example.com) on this Mac "))
+    }
+
     func testFleetLabelReadsProviderThenEngine() {
         XCTAssertEqual(FleetLabel(engineName: "9Router", provider: .claude).text,
                        "Claude \u{00B7} 9Router")

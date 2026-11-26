@@ -342,6 +342,23 @@ struct MenuContent: View {
         } message: {
             Text(resetConfirmText(model.pendingReset))
         }
+        // Removal deletes the login for good: the row's menu only STAGES it.
+        .alert(
+            "Remove account?",
+            isPresented: Binding(
+                get: { model.pendingRemove != nil },
+                set: { if !$0 { model.pendingRemove = nil } })
+        ) {
+            Button("Remove", role: .destructive) { model.commitPendingRemove() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            let fleet = model.pendingRemoveFleet
+            if let account = fleet?.accounts.first(where: { $0.number == fleet?.pendingRemove }) {
+                Text(AccountRemoval.confirmText(account, machine: (fleet?.engine as? PeerEngine)?.machineLabel))
+            } else {
+                Text("This deletes account \(model.pendingRemove.map(String.init) ?? "?")'s saved login for good.")
+            }
+        }
     }
 
     /// A Fable reset gives back what Fable used of the week rather than
