@@ -19,6 +19,7 @@
     "@infinitus/source-control-forgejo": "workspace:*",
     "@infinitus/source-control-gitcafe": "workspace:*",
     "@infinitus/source-control-github": "workspace:*",
-    "@infinitus/source-control-gitlab": "workspace:*"
+    "@infinitus/source-control-gitlab": "workspace:*",
+    "@infinitus/source-control-tanstack-source": "workspace:*"
   }
 }
