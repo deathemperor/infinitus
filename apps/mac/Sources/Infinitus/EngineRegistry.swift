@@ -4,7 +4,8 @@ import InfinitusCore
 
 /// The enabled engines and the fleets they last reported (#8). One
 /// FleetState per (engine, provider), created on first sight and kept
-/// for the app's life so its animation ticks survive across snapshots.
+/// while its engine reports it, so its animation ticks survive across
+/// snapshots.
 /// Order: Claude fleets first (swapd before anything else), then the
 /// rest in registration order.
 @MainActor
@@ -34,6 +35,18 @@ final class EngineRegistry: ObservableObject {
         guard !gone.isEmpty else { return }
         for state in gone { sinks[state.id] = nil }
         fleets.removeAll { $0.engineID == engineID }
+        host.forwardFleetChange()
+    }
+
+    /// Drop the fleet states an engine's successful snapshot stopped
+    /// reporting, so a deleted provider leaves the popup and the launch
+    /// cache instead of lingering stale forever.
+    func removeFleets(engineID: String, keeping snapshot: [EngineFleet]) {
+        let held = fleets.filter { $0.engineID == engineID }.map(\.id)
+        let gone = EngineFleet.dropped(held: held, engineID: engineID, snapshot: snapshot)
+        guard !gone.isEmpty else { return }
+        for id in gone { sinks[id] = nil }
+        fleets.removeAll { gone.contains($0.id) }
         host.forwardFleetChange()
     }
 
