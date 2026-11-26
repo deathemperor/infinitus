@@ -4,7 +4,7 @@ import { redirectedInfinitusSettingsPath } from "../components/settings/infinitu
 
 /** The old `/settings/infinitus[/…]` group: every path redirects to the page's
     top-level route, search (Engines' `environmentId`) kept. */
-export const Route = createFileRoute("/settings/infinitus/$")({
+export const Route = createFileRoute("/_chat/settings/infinitus/$")({
   beforeLoad: ({ params }) => {
     throw redirect({
       to: redirectedInfinitusSettingsPath(params._splat),

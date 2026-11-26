@@ -13,6 +13,6 @@ function SettingsNotificationsRoute() {
   );
 }
 
-export const Route = createFileRoute("/settings/notifications")({
+export const Route = createFileRoute("/_chat/settings/notifications")({
   component: SettingsNotificationsRoute,
 });

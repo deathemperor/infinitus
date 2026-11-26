@@ -9,6 +9,6 @@ function SettingsAnimationsRoute() {
   return <InfinitusPrefsPanel sectionSlugs={["animations"]} title="Animations" />;
 }
 
-export const Route = createFileRoute("/settings/animations")({
+export const Route = createFileRoute("/_chat/settings/animations")({
   component: SettingsAnimationsRoute,
 });

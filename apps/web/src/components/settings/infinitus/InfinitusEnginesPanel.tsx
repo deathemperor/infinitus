@@ -9,7 +9,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { useStableCallback } from "~/hooks/useStableCallback";
-import type { EnvironmentPresentation } from "~/state/environments";
+import { usePrimaryEnvironment, type EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Badge } from "../../ui/badge";
@@ -74,17 +74,13 @@ function InfinitusEngineStatusList({
               {row.keyState === "none" ? null : (
                 <Badge variant="outline">{KEY_STATUS[row.keyState]}</Badge>
               )}
+              {row.error === null ? null : (
+                <span className="basis-full text-destructive">{row.error}</span>
+              )}
             </span>
           }
         />
       ))}
-      {rows
-        .filter((row) => row.error !== null)
-        .map((row) => (
-          <p key={row.key} className="px-3 py-2 text-sm text-destructive sm:px-4">
-            {row.label}: {row.error}
-          </p>
-        ))}
       {updateOn && swapdRegistered ? (
         <InfinitusEngineUpdateRow {...(environment === undefined ? {} : { environment })} />
       ) : null}
@@ -218,22 +214,26 @@ export function InfinitusEnginesPanel({
   // environment: the shell can only start one on the machine it runs on.
   const localProcesses = useInfinitusEngineProcesses();
   const processes = environment ? null : localProcesses;
+  const primary = usePrimaryEnvironment();
+  const managedLabel = (environment === undefined ? primary : environment)?.label;
   return (
     <InfinitusPrefsPanel {...target} sectionSlugs={["engines"]} title="Engines">
-      {environment ? (
-        <p className="px-3 text-sm sm:px-4">Managing engines on {environment.label}.</p>
-      ) : null}
-      <p className="px-3 text-sm text-muted-foreground sm:px-4">
-        Engines manage your provider accounts and switching.{" "}
-        <a
-          href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
-          target="_blank"
-          rel="noreferrer"
-          className="underline underline-offset-4"
-        >
-          Read the accounts setup guide
-        </a>
-      </p>
+      <SettingsSection id="infinitus-engines-overview" title="Overview">
+        <SettingsRow
+          title={managedLabel ? `Managing engines on ${managedLabel}` : "Managing engines"}
+          description="Engines manage your provider accounts and switching."
+          control={
+            <a
+              href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm underline underline-offset-4"
+            >
+              Read the accounts setup guide
+            </a>
+          }
+        />
+      </SettingsSection>
       <InfinitusEngineStatusList {...target} />
       <InfinitusEnginePolicy {...target} />
       <InfinitusEngineSecrets {...target} processes={processes} />

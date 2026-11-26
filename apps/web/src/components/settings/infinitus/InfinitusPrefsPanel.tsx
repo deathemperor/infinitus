@@ -7,7 +7,7 @@
  */
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { InfinitusPref, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
-import { useEffect, useReducer, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useReducer, useState, type ReactNode } from "react";
 
 import { usePrimaryEnvironment, type EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
@@ -213,6 +213,7 @@ export function InfinitusPrefsPanel({
   children,
   lead,
   footer,
+  contained = true,
 }: {
   readonly environment?: EnvironmentPresentation | null;
   readonly sectionSlugs: ReadonlyArray<string>;
@@ -225,7 +226,10 @@ export function InfinitusPrefsPanel({
   readonly lead?: ReactNode;
   /** The Devices pane's pairing card, drawn under the prefs once they answer. */
   readonly footer?: ReactNode;
+  /** False when the page already scrolls in a container of its own (Devices). */
+  readonly contained?: boolean;
 }) {
+  const Container = contained ? SettingsPageContainer : Fragment;
   const { environmentId, capability, snapshot } = useInfinitusEnvironment(environment);
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const [writeState, dispatch] = useReducer(reducePrefWrite, initialPrefWriteState);
@@ -290,7 +294,7 @@ export function InfinitusPrefsPanel({
 
   if (state !== "ready") {
     return (
-      <SettingsPageContainer>
+      <Container>
         {lead}
         <SettingsSection id={`infinitus-${sectionSlugs[0] ?? "prefs"}`} title={title}>
           {snapshot?.available === true ? children : null}
@@ -304,20 +308,20 @@ export function InfinitusPrefsPanel({
             />
           ) : null}
         </SettingsSection>
-      </SettingsPageContainer>
+      </Container>
     );
   }
 
   const locked = writeState.relaunching || environmentId === null;
 
   return (
-    <SettingsPageContainer>
+    <Container>
       {lead}
       {children}
       {writeState.relaunching ? (
-        <p role="status" className="px-3 text-sm text-muted-foreground sm:px-4">
-          Infinitus is relaunching. This page picks up again when it answers.
-        </p>
+        <SettingsSection id="infinitus-relaunching" title="Relaunching" hideTitle>
+          <InfinitusPanelNotice message="Infinitus is relaunching. This page picks up again when it answers." />
+        </SettingsSection>
       ) : null}
       {sections.length === 0 && children === undefined && footer === undefined ? (
         <SettingsSection id={`infinitus-${sectionSlugs[0] ?? "prefs"}`} title={title}>
@@ -378,6 +382,6 @@ export function InfinitusPrefsPanel({
           setPendingRestart(null);
         }}
       />
-    </SettingsPageContainer>
+    </Container>
   );
 }

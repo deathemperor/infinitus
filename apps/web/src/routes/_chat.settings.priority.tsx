@@ -10,6 +10,6 @@ function SettingsPriorityRoute() {
   return <InfinitusPrefsPanel sectionSlugs={["priority", "sessions"]} title="Priority" />;
 }
 
-export const Route = createFileRoute("/settings/priority")({
+export const Route = createFileRoute("/_chat/settings/priority")({
   component: SettingsPriorityRoute,
 });

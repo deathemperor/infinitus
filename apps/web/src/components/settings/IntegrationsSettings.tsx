@@ -41,7 +41,7 @@ import { isValidSearchUrlTemplate } from "@infinitus/shared/preview";
 import { PREVIEW_VIEWPORT_PRESETS } from "@infinitus/shared/previewViewport";
 import { MoreVertical, Plus as PlusIcon } from "lucide-react";
 import * as Schema from "effect/Schema";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { m as resolveNow, type MessageResolver } from "../../i18n/messages";
 
@@ -1729,10 +1729,11 @@ export function BrowserSettingsPanel() {
   );
 }
 
-export function DevicesSettingsPanel() {
+export function DevicesSettingsPanel({ children }: { children?: ReactNode }) {
   return (
     <SettingsPageContainer>
       <DeviceIntegrationSettings />
+      {children}
     </SettingsPageContainer>
   );
 }

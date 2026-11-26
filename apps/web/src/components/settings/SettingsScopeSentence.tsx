@@ -47,6 +47,7 @@ import {
   settingsScopeEnvironmentLabels,
   settingsScopeProjectMachines,
 } from "./settingsScopeAxis";
+import { INFINITUS_DEVICE_ONLY_PATHS } from "./infinitus/settingsNav";
 
 export const SETTINGS_DEVICE_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/settings/general",
@@ -58,6 +59,7 @@ export const SETTINGS_DEVICE_ONLY_PATHS: ReadonlySet<string> = new Set([
   // Access picks its environment on the page itself.
   "/settings/access",
   "/settings/about",
+  ...INFINITUS_DEVICE_ONLY_PATHS,
 ]);
 
 interface SettingsScopeMenuProps {

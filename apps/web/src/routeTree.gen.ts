@@ -20,12 +20,6 @@ import { Route as ApproveAgentRouteImport } from './routes/approve-agent'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
-import { Route as SettingsTeamRouteImport } from './routes/settings.team'
-import { Route as SettingsPriorityRouteImport } from './routes/settings.priority'
-import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
-import { Route as SettingsMenuBarRouteImport } from './routes/settings.menu-bar'
-import { Route as SettingsEnginesRouteImport } from './routes/settings.engines'
-import { Route as SettingsAnimationsRouteImport } from './routes/settings.animations'
 import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
 import { Route as ChatUsageRouteImport } from './routes/_chat.usage'
 import { Route as ChatSettingsRouteImport } from './routes/_chat.settings'
@@ -33,11 +27,10 @@ import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-reques
 import { Route as ChatNewRouteImport } from './routes/_chat.new'
 import { Route as ChatIssuesRouteImport } from './routes/_chat.issues'
 import { Route as ThreadsEnvironmentIdThreadIdRouteImport } from './routes/threads.$environmentId.$threadId'
-import { Route as SettingsInfinitusSplatRouteImport } from './routes/settings.infinitus.$'
-import { Route as SettingsEnginesActivityRouteImport } from './routes/settings.engines_.activity'
 import { Route as ChatSettingsWorktreesRouteImport } from './routes/_chat.settings.worktrees'
 import { Route as ChatSettingsVoiceRouteImport } from './routes/_chat.settings.voice'
 import { Route as ChatSettingsThreadsRouteImport } from './routes/_chat.settings.threads'
+import { Route as ChatSettingsTeamRouteImport } from './routes/_chat.settings.team'
 import { Route as ChatSettingsStorageRouteImport } from './routes/_chat.settings.storage'
 import { Route as ChatSettingsSourceControlRouteImport } from './routes/_chat.settings.source-control'
 import { Route as ChatSettingsSnapShotRouteImport } from './routes/_chat.settings.snap-shot'
@@ -45,12 +38,16 @@ import { Route as ChatSettingsSecretsRouteImport } from './routes/_chat.settings
 import { Route as ChatSettingsScheduledTasksRouteImport } from './routes/_chat.settings.scheduled-tasks'
 import { Route as ChatSettingsProvidersRouteImport } from './routes/_chat.settings.providers'
 import { Route as ChatSettingsProjectsRouteImport } from './routes/_chat.settings.projects'
+import { Route as ChatSettingsPriorityRouteImport } from './routes/_chat.settings.priority'
 import { Route as ChatSettingsOpenSourceLicensesRouteImport } from './routes/_chat.settings.open-source-licenses'
+import { Route as ChatSettingsNotificationsRouteImport } from './routes/_chat.settings.notifications'
+import { Route as ChatSettingsMenuBarRouteImport } from './routes/_chat.settings.menu-bar'
 import { Route as ChatSettingsMaintenanceRouteImport } from './routes/_chat.settings.maintenance'
 import { Route as ChatSettingsLabsRouteImport } from './routes/_chat.settings.labs'
 import { Route as ChatSettingsKeybindingsRouteImport } from './routes/_chat.settings.keybindings'
 import { Route as ChatSettingsIntegrationsRouteImport } from './routes/_chat.settings.integrations'
 import { Route as ChatSettingsGeneralRouteImport } from './routes/_chat.settings.general'
+import { Route as ChatSettingsEnginesRouteImport } from './routes/_chat.settings.engines'
 import { Route as ChatSettingsDiffsRouteImport } from './routes/_chat.settings.diffs'
 import { Route as ChatSettingsDiagnosticsRouteImport } from './routes/_chat.settings.diagnostics'
 import { Route as ChatSettingsDevicesRouteImport } from './routes/_chat.settings.devices'
@@ -60,10 +57,13 @@ import { Route as ChatSettingsBrowserRouteImport } from './routes/_chat.settings
 import { Route as ChatSettingsBetaRouteImport } from './routes/_chat.settings.beta'
 import { Route as ChatSettingsArchivedRouteImport } from './routes/_chat.settings.archived'
 import { Route as ChatSettingsAppearanceRouteImport } from './routes/_chat.settings.appearance'
+import { Route as ChatSettingsAnimationsRouteImport } from './routes/_chat.settings.animations'
 import { Route as ChatSettingsAccessRouteImport } from './routes/_chat.settings.access'
 import { Route as ChatSettingsAboutRouteImport } from './routes/_chat.settings.about'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
+import { Route as ChatSettingsInfinitusSplatRouteImport } from './routes/_chat.settings.infinitus.$'
+import { Route as ChatSettingsEnginesActivityRouteImport } from './routes/_chat.settings.engines_.activity'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -119,36 +119,6 @@ const ChatIndexRoute = ChatIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ChatRoute,
 } as any)
-const SettingsTeamRoute = SettingsTeamRouteImport.update({
-  id: '/settings/team',
-  path: '/settings/team',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsPriorityRoute = SettingsPriorityRouteImport.update({
-  id: '/settings/priority',
-  path: '/settings/priority',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsNotificationsRoute = SettingsNotificationsRouteImport.update({
-  id: '/settings/notifications',
-  path: '/settings/notifications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsMenuBarRoute = SettingsMenuBarRouteImport.update({
-  id: '/settings/menu-bar',
-  path: '/settings/menu-bar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsEnginesRoute = SettingsEnginesRouteImport.update({
-  id: '/settings/engines',
-  path: '/settings/engines',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsAnimationsRoute = SettingsAnimationsRouteImport.update({
-  id: '/settings/animations',
-  path: '/settings/animations',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProjectsProjectKeyRoute = ProjectsProjectKeyRouteImport.update({
   id: '/projects/$projectKey',
   path: '/projects/$projectKey',
@@ -185,16 +155,6 @@ const ThreadsEnvironmentIdThreadIdRoute =
     path: '/threads/$environmentId/$threadId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const SettingsInfinitusSplatRoute = SettingsInfinitusSplatRouteImport.update({
-  id: '/settings/infinitus/$',
-  path: '/settings/infinitus/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsEnginesActivityRoute = SettingsEnginesActivityRouteImport.update({
-  id: '/settings/engines_/activity',
-  path: '/settings/engines/activity',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ChatSettingsWorktreesRoute = ChatSettingsWorktreesRouteImport.update({
   id: '/worktrees',
   path: '/worktrees',
@@ -208,6 +168,11 @@ const ChatSettingsVoiceRoute = ChatSettingsVoiceRouteImport.update({
 const ChatSettingsThreadsRoute = ChatSettingsThreadsRouteImport.update({
   id: '/threads',
   path: '/threads',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ChatSettingsTeamRoute = ChatSettingsTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
   getParentRoute: () => ChatSettingsRoute,
 } as any)
 const ChatSettingsStorageRoute = ChatSettingsStorageRouteImport.update({
@@ -247,12 +212,28 @@ const ChatSettingsProjectsRoute = ChatSettingsProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => ChatSettingsRoute,
 } as any)
+const ChatSettingsPriorityRoute = ChatSettingsPriorityRouteImport.update({
+  id: '/priority',
+  path: '/priority',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
 const ChatSettingsOpenSourceLicensesRoute =
   ChatSettingsOpenSourceLicensesRouteImport.update({
     id: '/open-source-licenses',
     path: '/open-source-licenses',
     getParentRoute: () => ChatSettingsRoute,
   } as any)
+const ChatSettingsNotificationsRoute =
+  ChatSettingsNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => ChatSettingsRoute,
+  } as any)
+const ChatSettingsMenuBarRoute = ChatSettingsMenuBarRouteImport.update({
+  id: '/menu-bar',
+  path: '/menu-bar',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
 const ChatSettingsMaintenanceRoute = ChatSettingsMaintenanceRouteImport.update({
   id: '/maintenance',
   path: '/maintenance',
@@ -277,6 +258,11 @@ const ChatSettingsIntegrationsRoute =
 const ChatSettingsGeneralRoute = ChatSettingsGeneralRouteImport.update({
   id: '/general',
   path: '/general',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
+const ChatSettingsEnginesRoute = ChatSettingsEnginesRouteImport.update({
+  id: '/engines',
+  path: '/engines',
   getParentRoute: () => ChatSettingsRoute,
 } as any)
 const ChatSettingsDiffsRoute = ChatSettingsDiffsRouteImport.update({
@@ -324,6 +310,11 @@ const ChatSettingsAppearanceRoute = ChatSettingsAppearanceRouteImport.update({
   path: '/appearance',
   getParentRoute: () => ChatSettingsRoute,
 } as any)
+const ChatSettingsAnimationsRoute = ChatSettingsAnimationsRouteImport.update({
+  id: '/animations',
+  path: '/animations',
+  getParentRoute: () => ChatSettingsRoute,
+} as any)
 const ChatSettingsAccessRoute = ChatSettingsAccessRouteImport.update({
   id: '/access',
   path: '/access',
@@ -345,6 +336,18 @@ const ChatEnvironmentIdThreadIdRoute =
     path: '/$environmentId/$threadId',
     getParentRoute: () => ChatRoute,
   } as any)
+const ChatSettingsInfinitusSplatRoute =
+  ChatSettingsInfinitusSplatRouteImport.update({
+    id: '/infinitus/$',
+    path: '/infinitus/$',
+    getParentRoute: () => ChatSettingsRoute,
+  } as any)
+const ChatSettingsEnginesActivityRoute =
+  ChatSettingsEnginesActivityRouteImport.update({
+    id: '/engines_/activity',
+    path: '/engines/activity',
+    getParentRoute: () => ChatSettingsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
@@ -363,16 +366,11 @@ export interface FileRoutesByFullPath {
   '/settings': typeof ChatSettingsRouteWithChildren
   '/usage': typeof ChatUsageRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
-  '/settings/animations': typeof SettingsAnimationsRoute
-  '/settings/engines': typeof SettingsEnginesRoute
-  '/settings/menu-bar': typeof SettingsMenuBarRoute
-  '/settings/notifications': typeof SettingsNotificationsRoute
-  '/settings/priority': typeof SettingsPriorityRoute
-  '/settings/team': typeof SettingsTeamRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/settings/about': typeof ChatSettingsAboutRoute
   '/settings/access': typeof ChatSettingsAccessRoute
+  '/settings/animations': typeof ChatSettingsAnimationsRoute
   '/settings/appearance': typeof ChatSettingsAppearanceRoute
   '/settings/archived': typeof ChatSettingsArchivedRoute
   '/settings/beta': typeof ChatSettingsBetaRoute
@@ -382,12 +380,16 @@ export interface FileRoutesByFullPath {
   '/settings/devices': typeof ChatSettingsDevicesRoute
   '/settings/diagnostics': typeof ChatSettingsDiagnosticsRoute
   '/settings/diffs': typeof ChatSettingsDiffsRoute
+  '/settings/engines': typeof ChatSettingsEnginesRoute
   '/settings/general': typeof ChatSettingsGeneralRoute
   '/settings/integrations': typeof ChatSettingsIntegrationsRoute
   '/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/settings/labs': typeof ChatSettingsLabsRoute
   '/settings/maintenance': typeof ChatSettingsMaintenanceRoute
+  '/settings/menu-bar': typeof ChatSettingsMenuBarRoute
+  '/settings/notifications': typeof ChatSettingsNotificationsRoute
   '/settings/open-source-licenses': typeof ChatSettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof ChatSettingsPriorityRoute
   '/settings/projects': typeof ChatSettingsProjectsRoute
   '/settings/providers': typeof ChatSettingsProvidersRoute
   '/settings/scheduled-tasks': typeof ChatSettingsScheduledTasksRoute
@@ -395,12 +397,13 @@ export interface FileRoutesByFullPath {
   '/settings/snap-shot': typeof ChatSettingsSnapShotRoute
   '/settings/source-control': typeof ChatSettingsSourceControlRoute
   '/settings/storage': typeof ChatSettingsStorageRoute
+  '/settings/team': typeof ChatSettingsTeamRoute
   '/settings/threads': typeof ChatSettingsThreadsRoute
   '/settings/voice': typeof ChatSettingsVoiceRoute
   '/settings/worktrees': typeof ChatSettingsWorktreesRoute
-  '/settings/engines/activity': typeof SettingsEnginesActivityRoute
-  '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
   '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
+  '/settings/engines/activity': typeof ChatSettingsEnginesActivityRoute
+  '/settings/infinitus/$': typeof ChatSettingsInfinitusSplatRoute
 }
 export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
@@ -418,17 +421,12 @@ export interface FileRoutesByTo {
   '/settings': typeof ChatSettingsRouteWithChildren
   '/usage': typeof ChatUsageRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
-  '/settings/animations': typeof SettingsAnimationsRoute
-  '/settings/engines': typeof SettingsEnginesRoute
-  '/settings/menu-bar': typeof SettingsMenuBarRoute
-  '/settings/notifications': typeof SettingsNotificationsRoute
-  '/settings/priority': typeof SettingsPriorityRoute
-  '/settings/team': typeof SettingsTeamRoute
   '/': typeof ChatIndexRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/settings/about': typeof ChatSettingsAboutRoute
   '/settings/access': typeof ChatSettingsAccessRoute
+  '/settings/animations': typeof ChatSettingsAnimationsRoute
   '/settings/appearance': typeof ChatSettingsAppearanceRoute
   '/settings/archived': typeof ChatSettingsArchivedRoute
   '/settings/beta': typeof ChatSettingsBetaRoute
@@ -438,12 +436,16 @@ export interface FileRoutesByTo {
   '/settings/devices': typeof ChatSettingsDevicesRoute
   '/settings/diagnostics': typeof ChatSettingsDiagnosticsRoute
   '/settings/diffs': typeof ChatSettingsDiffsRoute
+  '/settings/engines': typeof ChatSettingsEnginesRoute
   '/settings/general': typeof ChatSettingsGeneralRoute
   '/settings/integrations': typeof ChatSettingsIntegrationsRoute
   '/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/settings/labs': typeof ChatSettingsLabsRoute
   '/settings/maintenance': typeof ChatSettingsMaintenanceRoute
+  '/settings/menu-bar': typeof ChatSettingsMenuBarRoute
+  '/settings/notifications': typeof ChatSettingsNotificationsRoute
   '/settings/open-source-licenses': typeof ChatSettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof ChatSettingsPriorityRoute
   '/settings/projects': typeof ChatSettingsProjectsRoute
   '/settings/providers': typeof ChatSettingsProvidersRoute
   '/settings/scheduled-tasks': typeof ChatSettingsScheduledTasksRoute
@@ -451,12 +453,13 @@ export interface FileRoutesByTo {
   '/settings/snap-shot': typeof ChatSettingsSnapShotRoute
   '/settings/source-control': typeof ChatSettingsSourceControlRoute
   '/settings/storage': typeof ChatSettingsStorageRoute
+  '/settings/team': typeof ChatSettingsTeamRoute
   '/settings/threads': typeof ChatSettingsThreadsRoute
   '/settings/voice': typeof ChatSettingsVoiceRoute
   '/settings/worktrees': typeof ChatSettingsWorktreesRoute
-  '/settings/engines/activity': typeof SettingsEnginesActivityRoute
-  '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
   '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
+  '/settings/engines/activity': typeof ChatSettingsEnginesActivityRoute
+  '/settings/infinitus/$': typeof ChatSettingsInfinitusSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -476,17 +479,12 @@ export interface FileRoutesById {
   '/_chat/settings': typeof ChatSettingsRouteWithChildren
   '/_chat/usage': typeof ChatUsageRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
-  '/settings/animations': typeof SettingsAnimationsRoute
-  '/settings/engines': typeof SettingsEnginesRoute
-  '/settings/menu-bar': typeof SettingsMenuBarRoute
-  '/settings/notifications': typeof SettingsNotificationsRoute
-  '/settings/priority': typeof SettingsPriorityRoute
-  '/settings/team': typeof SettingsTeamRoute
   '/_chat/': typeof ChatIndexRoute
   '/_chat/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/_chat/settings/about': typeof ChatSettingsAboutRoute
   '/_chat/settings/access': typeof ChatSettingsAccessRoute
+  '/_chat/settings/animations': typeof ChatSettingsAnimationsRoute
   '/_chat/settings/appearance': typeof ChatSettingsAppearanceRoute
   '/_chat/settings/archived': typeof ChatSettingsArchivedRoute
   '/_chat/settings/beta': typeof ChatSettingsBetaRoute
@@ -496,12 +494,16 @@ export interface FileRoutesById {
   '/_chat/settings/devices': typeof ChatSettingsDevicesRoute
   '/_chat/settings/diagnostics': typeof ChatSettingsDiagnosticsRoute
   '/_chat/settings/diffs': typeof ChatSettingsDiffsRoute
+  '/_chat/settings/engines': typeof ChatSettingsEnginesRoute
   '/_chat/settings/general': typeof ChatSettingsGeneralRoute
   '/_chat/settings/integrations': typeof ChatSettingsIntegrationsRoute
   '/_chat/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/_chat/settings/labs': typeof ChatSettingsLabsRoute
   '/_chat/settings/maintenance': typeof ChatSettingsMaintenanceRoute
+  '/_chat/settings/menu-bar': typeof ChatSettingsMenuBarRoute
+  '/_chat/settings/notifications': typeof ChatSettingsNotificationsRoute
   '/_chat/settings/open-source-licenses': typeof ChatSettingsOpenSourceLicensesRoute
+  '/_chat/settings/priority': typeof ChatSettingsPriorityRoute
   '/_chat/settings/projects': typeof ChatSettingsProjectsRoute
   '/_chat/settings/providers': typeof ChatSettingsProvidersRoute
   '/_chat/settings/scheduled-tasks': typeof ChatSettingsScheduledTasksRoute
@@ -509,12 +511,13 @@ export interface FileRoutesById {
   '/_chat/settings/snap-shot': typeof ChatSettingsSnapShotRoute
   '/_chat/settings/source-control': typeof ChatSettingsSourceControlRoute
   '/_chat/settings/storage': typeof ChatSettingsStorageRoute
+  '/_chat/settings/team': typeof ChatSettingsTeamRoute
   '/_chat/settings/threads': typeof ChatSettingsThreadsRoute
   '/_chat/settings/voice': typeof ChatSettingsVoiceRoute
   '/_chat/settings/worktrees': typeof ChatSettingsWorktreesRoute
-  '/settings/engines_/activity': typeof SettingsEnginesActivityRoute
-  '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
   '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
+  '/_chat/settings/engines_/activity': typeof ChatSettingsEnginesActivityRoute
+  '/_chat/settings/infinitus/$': typeof ChatSettingsInfinitusSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -535,16 +538,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/usage'
     | '/projects/$projectKey'
-    | '/settings/animations'
-    | '/settings/engines'
-    | '/settings/menu-bar'
-    | '/settings/notifications'
-    | '/settings/priority'
-    | '/settings/team'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
     | '/settings/about'
     | '/settings/access'
+    | '/settings/animations'
     | '/settings/appearance'
     | '/settings/archived'
     | '/settings/beta'
@@ -554,12 +552,16 @@ export interface FileRouteTypes {
     | '/settings/devices'
     | '/settings/diagnostics'
     | '/settings/diffs'
+    | '/settings/engines'
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
     | '/settings/labs'
     | '/settings/maintenance'
+    | '/settings/menu-bar'
+    | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/scheduled-tasks'
@@ -567,12 +569,13 @@ export interface FileRouteTypes {
     | '/settings/snap-shot'
     | '/settings/source-control'
     | '/settings/storage'
+    | '/settings/team'
     | '/settings/threads'
     | '/settings/voice'
     | '/settings/worktrees'
+    | '/threads/$environmentId/$threadId'
     | '/settings/engines/activity'
     | '/settings/infinitus/$'
-    | '/threads/$environmentId/$threadId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/accounts'
@@ -590,17 +593,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/usage'
     | '/projects/$projectKey'
-    | '/settings/animations'
-    | '/settings/engines'
-    | '/settings/menu-bar'
-    | '/settings/notifications'
-    | '/settings/priority'
-    | '/settings/team'
     | '/'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
     | '/settings/about'
     | '/settings/access'
+    | '/settings/animations'
     | '/settings/appearance'
     | '/settings/archived'
     | '/settings/beta'
@@ -610,12 +608,16 @@ export interface FileRouteTypes {
     | '/settings/devices'
     | '/settings/diagnostics'
     | '/settings/diffs'
+    | '/settings/engines'
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
     | '/settings/labs'
     | '/settings/maintenance'
+    | '/settings/menu-bar'
+    | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/scheduled-tasks'
@@ -623,12 +625,13 @@ export interface FileRouteTypes {
     | '/settings/snap-shot'
     | '/settings/source-control'
     | '/settings/storage'
+    | '/settings/team'
     | '/settings/threads'
     | '/settings/voice'
     | '/settings/worktrees'
+    | '/threads/$environmentId/$threadId'
     | '/settings/engines/activity'
     | '/settings/infinitus/$'
-    | '/threads/$environmentId/$threadId'
   id:
     | '__root__'
     | '/_chat'
@@ -647,17 +650,12 @@ export interface FileRouteTypes {
     | '/_chat/settings'
     | '/_chat/usage'
     | '/projects/$projectKey'
-    | '/settings/animations'
-    | '/settings/engines'
-    | '/settings/menu-bar'
-    | '/settings/notifications'
-    | '/settings/priority'
-    | '/settings/team'
     | '/_chat/'
     | '/_chat/$environmentId/$threadId'
     | '/_chat/draft/$draftId'
     | '/_chat/settings/about'
     | '/_chat/settings/access'
+    | '/_chat/settings/animations'
     | '/_chat/settings/appearance'
     | '/_chat/settings/archived'
     | '/_chat/settings/beta'
@@ -667,12 +665,16 @@ export interface FileRouteTypes {
     | '/_chat/settings/devices'
     | '/_chat/settings/diagnostics'
     | '/_chat/settings/diffs'
+    | '/_chat/settings/engines'
     | '/_chat/settings/general'
     | '/_chat/settings/integrations'
     | '/_chat/settings/keybindings'
     | '/_chat/settings/labs'
     | '/_chat/settings/maintenance'
+    | '/_chat/settings/menu-bar'
+    | '/_chat/settings/notifications'
     | '/_chat/settings/open-source-licenses'
+    | '/_chat/settings/priority'
     | '/_chat/settings/projects'
     | '/_chat/settings/providers'
     | '/_chat/settings/scheduled-tasks'
@@ -680,12 +682,13 @@ export interface FileRouteTypes {
     | '/_chat/settings/snap-shot'
     | '/_chat/settings/source-control'
     | '/_chat/settings/storage'
+    | '/_chat/settings/team'
     | '/_chat/settings/threads'
     | '/_chat/settings/voice'
     | '/_chat/settings/worktrees'
-    | '/settings/engines_/activity'
-    | '/settings/infinitus/$'
     | '/threads/$environmentId/$threadId'
+    | '/_chat/settings/engines_/activity'
+    | '/_chat/settings/infinitus/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -700,14 +703,6 @@ export interface RootRouteChildren {
   UtilizationRoute: typeof UtilizationRoute
   WelcomeRoute: typeof WelcomeRoute
   ProjectsProjectKeyRoute: typeof ProjectsProjectKeyRoute
-  SettingsAnimationsRoute: typeof SettingsAnimationsRoute
-  SettingsEnginesRoute: typeof SettingsEnginesRoute
-  SettingsMenuBarRoute: typeof SettingsMenuBarRoute
-  SettingsNotificationsRoute: typeof SettingsNotificationsRoute
-  SettingsPriorityRoute: typeof SettingsPriorityRoute
-  SettingsTeamRoute: typeof SettingsTeamRoute
-  SettingsEnginesActivityRoute: typeof SettingsEnginesActivityRoute
-  SettingsInfinitusSplatRoute: typeof SettingsInfinitusSplatRoute
   ThreadsEnvironmentIdThreadIdRoute: typeof ThreadsEnvironmentIdThreadIdRoute
 }
 
@@ -790,48 +785,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatIndexRouteImport
       parentRoute: typeof ChatRoute
     }
-    '/settings/team': {
-      id: '/settings/team'
-      path: '/settings/team'
-      fullPath: '/settings/team'
-      preLoaderRoute: typeof SettingsTeamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/priority': {
-      id: '/settings/priority'
-      path: '/settings/priority'
-      fullPath: '/settings/priority'
-      preLoaderRoute: typeof SettingsPriorityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/notifications': {
-      id: '/settings/notifications'
-      path: '/settings/notifications'
-      fullPath: '/settings/notifications'
-      preLoaderRoute: typeof SettingsNotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/menu-bar': {
-      id: '/settings/menu-bar'
-      path: '/settings/menu-bar'
-      fullPath: '/settings/menu-bar'
-      preLoaderRoute: typeof SettingsMenuBarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/engines': {
-      id: '/settings/engines'
-      path: '/settings/engines'
-      fullPath: '/settings/engines'
-      preLoaderRoute: typeof SettingsEnginesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/animations': {
-      id: '/settings/animations'
-      path: '/settings/animations'
-      fullPath: '/settings/animations'
-      preLoaderRoute: typeof SettingsAnimationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/projects/$projectKey': {
       id: '/projects/$projectKey'
       path: '/projects/$projectKey'
@@ -881,20 +834,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ThreadsEnvironmentIdThreadIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/infinitus/$': {
-      id: '/settings/infinitus/$'
-      path: '/settings/infinitus/$'
-      fullPath: '/settings/infinitus/$'
-      preLoaderRoute: typeof SettingsInfinitusSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/engines_/activity': {
-      id: '/settings/engines_/activity'
-      path: '/settings/engines/activity'
-      fullPath: '/settings/engines/activity'
-      preLoaderRoute: typeof SettingsEnginesActivityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_chat/settings/worktrees': {
       id: '/_chat/settings/worktrees'
       path: '/worktrees'
@@ -914,6 +853,13 @@ declare module '@tanstack/react-router' {
       path: '/threads'
       fullPath: '/settings/threads'
       preLoaderRoute: typeof ChatSettingsThreadsRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/team': {
+      id: '/_chat/settings/team'
+      path: '/team'
+      fullPath: '/settings/team'
+      preLoaderRoute: typeof ChatSettingsTeamRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
     '/_chat/settings/storage': {
@@ -965,11 +911,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSettingsProjectsRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
+    '/_chat/settings/priority': {
+      id: '/_chat/settings/priority'
+      path: '/priority'
+      fullPath: '/settings/priority'
+      preLoaderRoute: typeof ChatSettingsPriorityRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
     '/_chat/settings/open-source-licenses': {
       id: '/_chat/settings/open-source-licenses'
       path: '/open-source-licenses'
       fullPath: '/settings/open-source-licenses'
       preLoaderRoute: typeof ChatSettingsOpenSourceLicensesRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/notifications': {
+      id: '/_chat/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof ChatSettingsNotificationsRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/menu-bar': {
+      id: '/_chat/settings/menu-bar'
+      path: '/menu-bar'
+      fullPath: '/settings/menu-bar'
+      preLoaderRoute: typeof ChatSettingsMenuBarRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
     '/_chat/settings/maintenance': {
@@ -1005,6 +972,13 @@ declare module '@tanstack/react-router' {
       path: '/general'
       fullPath: '/settings/general'
       preLoaderRoute: typeof ChatSettingsGeneralRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/engines': {
+      id: '/_chat/settings/engines'
+      path: '/engines'
+      fullPath: '/settings/engines'
+      preLoaderRoute: typeof ChatSettingsEnginesRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
     '/_chat/settings/diffs': {
@@ -1070,6 +1044,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSettingsAppearanceRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
+    '/_chat/settings/animations': {
+      id: '/_chat/settings/animations'
+      path: '/animations'
+      fullPath: '/settings/animations'
+      preLoaderRoute: typeof ChatSettingsAnimationsRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
     '/_chat/settings/access': {
       id: '/_chat/settings/access'
       path: '/access'
@@ -1098,12 +1079,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatEnvironmentIdThreadIdRouteImport
       parentRoute: typeof ChatRoute
     }
+    '/_chat/settings/infinitus/$': {
+      id: '/_chat/settings/infinitus/$'
+      path: '/infinitus/$'
+      fullPath: '/settings/infinitus/$'
+      preLoaderRoute: typeof ChatSettingsInfinitusSplatRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
+    '/_chat/settings/engines_/activity': {
+      id: '/_chat/settings/engines_/activity'
+      path: '/engines/activity'
+      fullPath: '/settings/engines/activity'
+      preLoaderRoute: typeof ChatSettingsEnginesActivityRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
   }
 }
 
 interface ChatSettingsRouteChildren {
   ChatSettingsAboutRoute: typeof ChatSettingsAboutRoute
   ChatSettingsAccessRoute: typeof ChatSettingsAccessRoute
+  ChatSettingsAnimationsRoute: typeof ChatSettingsAnimationsRoute
   ChatSettingsAppearanceRoute: typeof ChatSettingsAppearanceRoute
   ChatSettingsArchivedRoute: typeof ChatSettingsArchivedRoute
   ChatSettingsBetaRoute: typeof ChatSettingsBetaRoute
@@ -1113,12 +1109,16 @@ interface ChatSettingsRouteChildren {
   ChatSettingsDevicesRoute: typeof ChatSettingsDevicesRoute
   ChatSettingsDiagnosticsRoute: typeof ChatSettingsDiagnosticsRoute
   ChatSettingsDiffsRoute: typeof ChatSettingsDiffsRoute
+  ChatSettingsEnginesRoute: typeof ChatSettingsEnginesRoute
   ChatSettingsGeneralRoute: typeof ChatSettingsGeneralRoute
   ChatSettingsIntegrationsRoute: typeof ChatSettingsIntegrationsRoute
   ChatSettingsKeybindingsRoute: typeof ChatSettingsKeybindingsRoute
   ChatSettingsLabsRoute: typeof ChatSettingsLabsRoute
   ChatSettingsMaintenanceRoute: typeof ChatSettingsMaintenanceRoute
+  ChatSettingsMenuBarRoute: typeof ChatSettingsMenuBarRoute
+  ChatSettingsNotificationsRoute: typeof ChatSettingsNotificationsRoute
   ChatSettingsOpenSourceLicensesRoute: typeof ChatSettingsOpenSourceLicensesRoute
+  ChatSettingsPriorityRoute: typeof ChatSettingsPriorityRoute
   ChatSettingsProjectsRoute: typeof ChatSettingsProjectsRoute
   ChatSettingsProvidersRoute: typeof ChatSettingsProvidersRoute
   ChatSettingsScheduledTasksRoute: typeof ChatSettingsScheduledTasksRoute
@@ -1126,14 +1126,18 @@ interface ChatSettingsRouteChildren {
   ChatSettingsSnapShotRoute: typeof ChatSettingsSnapShotRoute
   ChatSettingsSourceControlRoute: typeof ChatSettingsSourceControlRoute
   ChatSettingsStorageRoute: typeof ChatSettingsStorageRoute
+  ChatSettingsTeamRoute: typeof ChatSettingsTeamRoute
   ChatSettingsThreadsRoute: typeof ChatSettingsThreadsRoute
   ChatSettingsVoiceRoute: typeof ChatSettingsVoiceRoute
   ChatSettingsWorktreesRoute: typeof ChatSettingsWorktreesRoute
+  ChatSettingsEnginesActivityRoute: typeof ChatSettingsEnginesActivityRoute
+  ChatSettingsInfinitusSplatRoute: typeof ChatSettingsInfinitusSplatRoute
 }
 
 const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
   ChatSettingsAboutRoute: ChatSettingsAboutRoute,
   ChatSettingsAccessRoute: ChatSettingsAccessRoute,
+  ChatSettingsAnimationsRoute: ChatSettingsAnimationsRoute,
   ChatSettingsAppearanceRoute: ChatSettingsAppearanceRoute,
   ChatSettingsArchivedRoute: ChatSettingsArchivedRoute,
   ChatSettingsBetaRoute: ChatSettingsBetaRoute,
@@ -1143,12 +1147,16 @@ const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
   ChatSettingsDevicesRoute: ChatSettingsDevicesRoute,
   ChatSettingsDiagnosticsRoute: ChatSettingsDiagnosticsRoute,
   ChatSettingsDiffsRoute: ChatSettingsDiffsRoute,
+  ChatSettingsEnginesRoute: ChatSettingsEnginesRoute,
   ChatSettingsGeneralRoute: ChatSettingsGeneralRoute,
   ChatSettingsIntegrationsRoute: ChatSettingsIntegrationsRoute,
   ChatSettingsKeybindingsRoute: ChatSettingsKeybindingsRoute,
   ChatSettingsLabsRoute: ChatSettingsLabsRoute,
   ChatSettingsMaintenanceRoute: ChatSettingsMaintenanceRoute,
+  ChatSettingsMenuBarRoute: ChatSettingsMenuBarRoute,
+  ChatSettingsNotificationsRoute: ChatSettingsNotificationsRoute,
   ChatSettingsOpenSourceLicensesRoute: ChatSettingsOpenSourceLicensesRoute,
+  ChatSettingsPriorityRoute: ChatSettingsPriorityRoute,
   ChatSettingsProjectsRoute: ChatSettingsProjectsRoute,
   ChatSettingsProvidersRoute: ChatSettingsProvidersRoute,
   ChatSettingsScheduledTasksRoute: ChatSettingsScheduledTasksRoute,
@@ -1156,9 +1164,12 @@ const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
   ChatSettingsSnapShotRoute: ChatSettingsSnapShotRoute,
   ChatSettingsSourceControlRoute: ChatSettingsSourceControlRoute,
   ChatSettingsStorageRoute: ChatSettingsStorageRoute,
+  ChatSettingsTeamRoute: ChatSettingsTeamRoute,
   ChatSettingsThreadsRoute: ChatSettingsThreadsRoute,
   ChatSettingsVoiceRoute: ChatSettingsVoiceRoute,
   ChatSettingsWorktreesRoute: ChatSettingsWorktreesRoute,
+  ChatSettingsEnginesActivityRoute: ChatSettingsEnginesActivityRoute,
+  ChatSettingsInfinitusSplatRoute: ChatSettingsInfinitusSplatRoute,
 }
 
 const ChatSettingsRouteWithChildren = ChatSettingsRoute._addFileChildren(
@@ -1201,14 +1212,6 @@ const rootRouteChildren: RootRouteChildren = {
   UtilizationRoute: UtilizationRoute,
   WelcomeRoute: WelcomeRoute,
   ProjectsProjectKeyRoute: ProjectsProjectKeyRoute,
-  SettingsAnimationsRoute: SettingsAnimationsRoute,
-  SettingsEnginesRoute: SettingsEnginesRoute,
-  SettingsMenuBarRoute: SettingsMenuBarRoute,
-  SettingsNotificationsRoute: SettingsNotificationsRoute,
-  SettingsPriorityRoute: SettingsPriorityRoute,
-  SettingsTeamRoute: SettingsTeamRoute,
-  SettingsEnginesActivityRoute: SettingsEnginesActivityRoute,
-  SettingsInfinitusSplatRoute: SettingsInfinitusSplatRoute,
   ThreadsEnvironmentIdThreadIdRoute: ThreadsEnvironmentIdThreadIdRoute,
 }
 export const routeTree = rootRouteImport

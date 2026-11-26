@@ -266,7 +266,7 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
             onError={fail}
           />
           {!isLeader ? null : (
-            <SettingsSection title="Requests">
+            <SettingsSection id="infinitus-team-requests" title="Requests">
               {team.requests.length === 0 ? (
                 <InfinitusPanelNotice message="No one is asking to join." />
               ) : (
@@ -500,7 +500,7 @@ function MembersSection({
   };
 
   return (
-    <SettingsSection title="Members">
+    <SettingsSection id="infinitus-team-members" title="Members">
       {team.members.map((member) => {
         const isMe = member.userId === team.me.userId;
         const machineLabel = (environmentId: string) =>

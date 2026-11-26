@@ -16,6 +16,12 @@ export const INFINITUS_SECTION_ICONS = {
 
 const INFINITUS_SETTINGS_PATHS: ReadonlySet<string> = new Set(Object.keys(INFINITUS_SECTION_ICONS));
 
+/** Every page here drives one Infinitus app, never a settings scope, so none shows the scope picker. */
+export const INFINITUS_DEVICE_ONLY_PATHS: ReadonlyArray<string> = [
+  ...INFINITUS_SETTINGS_PATHS,
+  "/settings/engines/activity",
+];
+
 /**
  * The nav groups minus the menu bar app's pages, and any group they leave empty, when no
  * connected environment runs it. One connected Infinitus is enough: the pages read the

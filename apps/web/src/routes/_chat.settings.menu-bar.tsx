@@ -13,6 +13,6 @@ function SettingsMenuBarRoute() {
   );
 }
 
-export const Route = createFileRoute("/settings/menu-bar")({
+export const Route = createFileRoute("/_chat/settings/menu-bar")({
   component: SettingsMenuBarRoute,
 });
