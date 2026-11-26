@@ -69,10 +69,14 @@ import {
 import type { ModelOption } from "../../lib/modelOptions";
 import { m, type MessageResolver } from "../../i18n/messages";
 import type { ComposerCommandItem } from "./ComposerCommandPopover";
+<<<<<<< HEAD
 import { matchesSlashSkillQuery } from "./composerSlashSkillSearch";
 import { promptSnippetCommandItems } from "./promptSnippetItems";
 
 const NO_PROMPT_SNIPPETS: readonly PromptSnippet[] = [];
+=======
+import { scoreSlashSkillQuery } from "./composerSlashSkillSearch";
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 
 const idleWorkspaceSnapshotRefreshAtom: Atom.Atom<unknown> = Atom.make<void>(undefined).pipe(
   Atom.withLabel("mobile:provider-workspace-snapshot-refresh:idle"),
@@ -432,8 +436,12 @@ export function useComposerCommandMenu({
       );
 
       const skillItems = visibleSkills
-        .filter((skill) => matchesSlashSkillQuery(skill, q))
-        .map((skill) => ({
+        .flatMap((skill) => {
+          const score = scoreSlashSkillQuery(skill, q);
+          return score === null ? [] : [{ skill, score }];
+        })
+        .sort((left, right) => left.score - right.score)
+        .map(({ skill }) => ({
           id: `skill:${skill.name}`,
           type: "skill" as const,
           skill,
@@ -544,7 +552,7 @@ export function useComposerCommandMenu({
         : [];
       const environmentItems = environmentId
         ? matchComposerEnvironmentItems(
-            { environments, environmentId, query: trigger.query },
+            { environments, linkedEnvironments, environmentId, query: trigger.query },
             messages,
           )
         : [];
@@ -557,7 +565,7 @@ export function useComposerCommandMenu({
         ...environmentItems,
         ...modelItems,
         ...pathSearch.entries.map((entry) => {
-          const parts = entry.path.split("/");
+          const parts = entry.path.normalize("NFC").split("/");
           return {
             id: `path:${entry.path}`,
             type: "path" as const,

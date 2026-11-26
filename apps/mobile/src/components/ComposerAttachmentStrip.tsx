@@ -10,6 +10,7 @@ import { Paths } from "expo-file-system";
 import { Image, Pressable, ScrollView, View } from "react-native";
 
 import { AppText as Text } from "./ui/AppText";
+import { AppActivityIndicator } from "./ui/AppActivityIndicator";
 import { MaterializedPreviewKey, materializedPreviewAtom } from "../lib/composerImagePreview";
 import { PierreEntryIcon } from "./PierreEntryIcon";
 import {
@@ -44,8 +45,13 @@ export interface ComposerAttachmentStripProps {
   readonly imageSize?: number;
   readonly imageBorderRadius?: number;
   readonly removeButtonPlacement?: "overlay" | "gutter";
+<<<<<<< HEAD
   /** Infinitus (#269 I): a pencil on each image tile opens it for markup. */
   readonly onMarkUp?: (attachment: DraftComposerImageAttachment) => void;
+=======
+  /** Pasted images still being prepared, shown as placeholders after the attachments. */
+  readonly pendingImageCount?: number;
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 }
 
 type ComposerAttachmentThumbnailProps = {
@@ -303,7 +309,8 @@ export function ComposerAttachmentStrip(props: ComposerAttachmentStripProps) {
   const removeButtonPlacement = props.removeButtonPlacement ?? "overlay";
   const removeButtonGutter = removeButtonPlacement === "gutter" ? 10 : 0;
 
-  if (props.attachments.length === 0) {
+  const pendingImageCount = props.pendingImageCount ?? 0;
+  if (props.attachments.length === 0 && pendingImageCount === 0) {
     return null;
   }
 
@@ -370,6 +377,21 @@ export function ComposerAttachmentStrip(props: ComposerAttachmentStripProps) {
                   weight="bold"
                 />
               </Pressable>
+            </View>
+          ))}
+          {Array.from({ length: pendingImageCount }, (_, index) => (
+            <View
+              key={`pending-${index}`}
+              accessibilityLabel={gt("Preparing pasted image")}
+              className="items-center justify-center bg-subtle"
+              style={{
+                width: size,
+                height: size,
+                borderRadius: radius,
+                marginTop: removeButtonGutter,
+              }}
+            >
+              <AppActivityIndicator />
             </View>
           ))}
         </View>

@@ -1,14 +1,12 @@
 # Remote access
 
-Connect a phone, browser, or another desktop app to Infinitus running on a different
-machine. That machine must stay running and reachable while you work.
+Drive Infinitus from your phone, browser (`app.t3.codes`), or another desktop app while your agents run on a host computer or server. The host must stay awake and running while you work.
 
-## Infinitus Connect
+## Infinitus Connect (recommended)
 
-Infinitus Connect makes an environment available to your other devices without setting
-up router forwarding. In the desktop app on the host, open **Settings →
-Sharing & access**, sign in, and enable **Infinitus Connect** for that environment.
+Infinitus Connect links your host to your other devices without router port-forwarding.
 
+<<<<<<< HEAD
 For a Linux host without the desktop app, run the unpacked server archive's
 `infinitus` (see [Install](./install.md#headless-server-linux)):
 
@@ -73,21 +71,23 @@ the defaults. Without a terminal:
 
 `./infinitus status --json` prints the settings. `./infinitus up --help` lists every flag with
 examples.
+=======
+- **Desktop host**: Open **Settings → Sharing & access**, sign in, and turn on **Infinitus Connect** (note: closing the desktop app's last window stops its local server—use the [background service](./background-service.md) for unattended access).
+- **CLI / headless host**: Run `t3 up` (or `t3 connect` / `t3 up --connect --lan --yes` for non-interactive scripts) and complete the printed sign-in link on any device. Check status with `t3 status [--json]`.
+- **Other devices**: Sign in to the same Infinitus Connect account and pick the environment.
+
+### Approve new devices
+
+By default, any device signed into your Infinitus Connect account can connect. Turn on **Require approval for new devices** in **Settings → Sharing & access** on the host so new devices must present a short code (valid 10 minutes) that you approve from an existing device or via `t3 auth connect-device approve <code>`. Revoke devices anytime in **Settings → Sharing & access** or `t3 auth connect-device revoke <code>`.
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 
 ### More machines with T3 Chat
 
-Each Infinitus Connect account can link up to 3 machines. Phones and browsers do not
-count. A paid T3 Chat plan raises the limit to 10 machines with Pro, or 100 with
-Premier.
-
-To link T3 Chat, open your account menu on the web or desktop app, go to
-**T3 Chat**, and select **Link T3 Chat**. Sign in to T3 Chat in the window that
-opens and approve. The new limit applies the next time you add a machine. If you
-cancel or downgrade T3 Chat, machines you already linked stay linked, but you
-cannot add more until you are under the limit again.
+Free Infinitus Connect accounts can link up to **3 host machines** (phones and browsers don't count). Link a paid T3 Chat account from your account menu → **T3 Chat → Link T3 Chat** to raise the limit to **10** (Pro) or **100** (Premier).
 
 ## Pair over a LAN or private network
 
+<<<<<<< HEAD
 Use direct pairing when the other device can reach the host's network address.
 
 On a desktop host, open **Settings → Sharing & access**, enable **Network access**,
@@ -193,21 +193,27 @@ a specific machine to override it. Choosing a branch or worktree also keeps the 
 on that machine. Existing threads stay where they started. If resource checks are
 unavailable or all eligible machines are full, choose a machine manually to continue.
 Mobile keeps its manual environment selection.
+=======
+- **Desktop host**: Enable **Settings → Sharing & access → Network access** (restarts desktop) and create a one-time pairing link.
+- **CLI host**: Run `t3 up --lan` (background service) or `t3 serve --lan` (foreground), then run `t3 pair` to generate a QR code / pairing URL (`t3code://pair` opens directly in the desktop app).
+- **Hosted web app (`app.t3.codes`)**: Requires an HTTPS endpoint (Infinitus Connect or Tailscale HTTPS). For plain HTTP on a LAN, open the direct pairing URL in a local browser or pair from the desktop/mobile app. For custom CAs on Android, install the CA certificate in Android security settings.
+- **Session lifetime**: Paired devices stay signed in while active; sessions unused for 30 days must re-pair.
+
+### Reach one machine several ways
+
+A host can have multiple routes (LAN, Tailscale, VPN, public URL, SSH, Infinitus Connect). Infinitus automatically learns LAN and Tailscale routes when network access is enabled, connects over the fastest working route, and switches back to higher-priority routes when you return home. Reorder or add routes in **Settings → Environments** (**Add route**).
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 
 ### Tailscale HTTPS
 
-Join both devices to the same tailnet. In the desktop app, enable **Tailscale
-HTTPS** in **Settings → Sharing & access**. Turn it off there to remove that route.
+Join both devices to a tailnet with [MagicDNS and HTTPS certificates](https://tailscale.com/docs/how-to/set-up-https-certificates) enabled (on Linux, grant [operator permission](https://tailscale.com/docs/reference/troubleshooting/linux/linux-operator-permission)).
 
-Your tailnet needs MagicDNS and HTTPS certificates enabled; see
-[Tailscale's HTTPS setup](https://tailscale.com/docs/how-to/set-up-https-certificates).
-On Linux, Infinitus also needs permission to manage Tailscale; see
-[operator permission](https://tailscale.com/docs/reference/troubleshooting/linux/linux-operator-permission)
-for non-root users. If any of these is missing, Infinitus still starts but can't
-add the HTTPS route.
+- **Desktop**: Enable **Settings → Sharing & access → Tailscale HTTPS**.
+- **CLI**: Run `t3 serve --tailscale-serve` or `t3 pair --tailscale` (use `--tailscale-serve-port` if 443 is taken; remove with `tailscale serve --https=443 --set-path=/ off`).
 
-To start a command-line server with Tailscale HTTPS:
+### Balance new threads across machines
 
+<<<<<<< HEAD
 ```bash
 ./infinitus serve --tailscale-serve
 ```
@@ -274,220 +280,76 @@ again on its next connect.
 
 For Antigravity's Google callback on a remote host, see
 [remote sign-in](./providers-antigravity.md#sign-in-from-a-remote-device).
+=======
+On web and desktop with 2+ connected machines, enable **Settings → Environments → Load balancing** (per client) to auto-select a host for new threads in shared projects. Set each machine to **Prefer**, **Normal**, **Less often**, or **Manual only**.
+
+## Desktop-managed SSH
+
+In the desktop app, open **Settings → Environments → Add environment → SSH** and enter a host or SSH alias (e.g. `user@example.com`). Infinitus downloads its runtime to `~/.t3/runtime` on the Linux or Apple Silicon macOS host, starts or reuses a server, and manages port forwarding automatically.
+
+- Provider CLIs must be on a non-interactive login shell's `PATH` (check with `ssh user@example.com 'sh -lc "command -v claude codex"'`).
+- For 2FA/Duo hosts on macOS/Linux, enable SSH `ControlMaster` in `~/.ssh/config` and open a terminal SSH session first.
+- Revoke unused SSH sessions in **Settings → Sharing & access** or `t3 auth session revoke <id>`.
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 
 ## Browser on a remote environment
 
-Browser tabs belong to the environment, so you and your agents see the same
-tabs from any device. The desktop app shows its own environment's tabs
-directly. Every other device, and the desktop app for other environments,
-streams them from the host. Agents keep using them while no device is
-connected, and `localhost` addresses reach servers on the host.
+Browser tabs belong to the host environment so you and your agents share them from any device.
 
-A tab you open yourself in the desktop app for another environment loads on
-your computer instead, so the element picker, screenshots, and annotations work
-as they do locally. Its `localhost` addresses still reach servers on the host,
-over the connection the app already has, whichever way you connected. If the
-host cannot be reached, the tab shows a connection error; a `localhost`,
-`127.0.0.1`, or `[::1]` address never opens a server on your own computer.
-Other names that point at your computer, such as `/etc/hosts` entries, still
-do. These tabs ignore your system proxy settings, so they can't reach a host
-you connect to only through a proxy or over HTTPS with a privately issued
-certificate. The web app keeps streaming.
-
-The desktop app can also forward a port on the host to your computer, so any
-app there, such as your own browser, `curl`, or a database client, reaches it
-at `localhost`. Use the forward button on a server in the thread's **Servers**
-list, or **Forwarded ports** in the command palette, where you can also type
-any port number and stop forwards. A forward keeps the host's port number
-unless that port is taken on your computer, in which case it uses a free one
-and shows it. Forwards end when you stop them or quit the app. ⌘-click
-(Ctrl-click on Windows and Linux) on a remote server forwards it and opens it
-in your browser.
-
-A forwarded port behaves like a server running on your computer: anything on
-your computer can reach it, including web pages open in your browser, so a
-forwarded service is exposed the same way a local dev server is. Forwards
-listen only on your computer's loopback, never on your network. On Linux they
-accept only apps running as your user; on macOS and Windows, other users signed
-in to the same computer can reach them too.
-
-On iPhone, iPad, and Android, a tab showing one of the host's `localhost` pages
-has **Open on this device** in its menu. So does a long press on a `localhost`
-link in a chat. It opens the page in the phone's own browser view, at the same
-`localhost` address, so it scrolls and responds to touch natively. Like the
-desktop app, it never opens a server on the phone itself. The streamed tab
-stays where it was, and agents keep using it. Each host keeps its own cookies
-and site data on the phone. On iPhone and iPad the page runs under a stand-in
-address while the address bar shows `localhost`, so browser features that need
-a secure page, such as the clipboard or service workers, aren't available there.
-
-All of this rides the host's preview tunnel. Turn off **Settings → Sharing &
-access → Preview tunnel** on the host to stop other devices from loading its
-`localhost` pages themselves: port forwarding and **Open on this device** go
-away, and open tunnels close. Tabs keep working by streaming from the host, so
-anyone who can use the host's browser tabs can still view its `localhost` pages
-there. An administrator can also turn it off with a
-[managed policy](./managed-policy.md#other-capabilities).
-
-The first tab downloads a headless Chrome, about 120 MB, into the Infinitus home. It
-is the same browser [HTML renders](html-renders.md) use, so a host downloads it
-only once. Some Linux hosts need [setup](#browser-host-setup) before it can
-start.
-
-Agent tabs have separate storage and share a Chromium process. Take control before
-typing into an agent's tab, then release control when you want the agent to
-continue. Read-only connections can watch without changing the page.
-
-While you have control, the tab works with your device: text the page copies or
-cuts goes to your clipboard, a file picker on the page opens your device's
-picker, and a finished download is offered for you to save. Popups such as
-sign-in windows open as their own tabs. Downloads stay on the host until the
-tab closes. Audio does not play on your device.
-
-On a phone, tap the floating preview's corner dot to show its controls, then
-**Pop into separate window** to keep watching in picture-in-picture over other
-apps.
-
-### Local servers
-
-The browser lists ports held by processes your terminals and agents started.
-Infinitus reads which process holds each port and never connects to it, so a
-listed port opens as `http://localhost:<port>` and might not be a web page. For
-an HTTPS server or a specific path, set the **Preview URL** on the project
-script that starts it; Infinitus checks that address and opens it as written.
-
-To stop listing ports, set `T3CODE_PORT_DISCOVERY=0` in the environment that
-starts the Infinitus server, such as
-[`service.env`](./background-service.md#configure-the-service-environment) for
-the background service, and restart it. Script preview URLs still appear.
+- **Streaming & local loading**: Web and mobile stream tabs from the host. In the desktop app, tabs you open for a remote environment load locally while routing `localhost` requests to the host over the **preview tunnel** (so element picker and annotations work locally).
+- **Port forwarding (desktop)**: Forward any remote host port to your local `localhost` via the thread's **Servers** list or **Forwarded ports** in the command palette (`Cmd/Ctrl-click` forwards and opens in your browser).
+- **Open on this device (mobile)**: Tap **Open on this device** on a streamed `localhost` tab or long-press a `localhost` link in chat for native touch scrolling.
+- **Disable preview tunnel**: Turn off **Settings → Sharing & access → Preview tunnel** on the host (or via [managed policy](./managed-policy.md#other-capabilities)) to disable port forwarding and **Open on this device** (streamed tabs continue working).
+- **Take control**: Click **Take control** before typing into an agent's tab, and release control when done.
+- **Local servers**: Infinitus lists listening ports from your terminals and agents as `http://localhost:<port>` (set a script's **Preview URL** for HTTPS or subpaths). Disable discovery with `T3CODE_PORT_DISCOVERY=0`.
 
 ### Browser host setup
 
-macOS, Windows, and Linux desktops run the browser as is. Some Linux hosts need
-one-time setup: Ubuntu 23.10 and later block the sandbox the browser runs in,
-and minimal images and containers lack libraries it loads. When that happens,
-the server says so at startup, and browser tabs and HTML previews show the
-command to run on the host:
+The first server browser tab downloads ~120 MB headless Chromium (shared with [HTML renders](./html-renders.md)). On Ubuntu 23.10+ or minimal Linux containers, run the one-time setup command on the host:
 
 ```sh
 sudo t3 browser setup
 ```
 
-The server shows the exact line for how you started it, and keeps your `PATH`
-when you started it with `npx` and Node is installed only for your user. Where `t3` is not on your `PATH`, such as with only the
-desktop app installed, it names the full path of the app's own `t3` instead. It allows Chrome's sandbox with an AppArmor profile and installs
-any missing libraries and system fonts with apt; pages that load without text
-can mean the host has no fonts. It is safe to run again, and each run reloads
-the AppArmor profile: run it again if the browser reports a blocked sandbox on a
-host restored from an image or snapshot, where the profile can be on disk
-without being loaded. Without `sudo`, it only reports what it would change.
-
-The browser runs in Chrome's sandbox by default. Chrome cannot start that sandbox
-as root. If your Infinitus server runs as root, run it as a nonroot user to keep
-sandboxing enabled. `t3 browser setup` does not fix this root restriction.
-
-If you need to run as root, or cannot enable the sandbox on your host, set
-`T3CODE_SERVER_BROWSER_SANDBOX=0` in the **Infinitus server's environment** and restart
-the server. This disables Chrome's sandbox. For a manual launch:
-
-```sh
-T3CODE_SERVER_BROWSER_SANDBOX=0 t3 serve
-```
-
-For a systemd service, add `Environment=T3CODE_SERVER_BROWSER_SANDBOX=0` under
-`[Service]` in its configuration, run `sudo systemctl daemon-reload`, then restart
-your Infinitus service. Setting the variable in an agent's terminal does not change the
-environment of an already running Infinitus server.
-
-## Connect an outside agent
-
-Claude Code, Codex, ChatGPT and other agents Infinitus did not start can drive
-threads on an environment through its MCP server. See
-[outside agents](./outside-agents.md) for setup.
+This installs an AppArmor profile for Chrome's sandbox plus missing libraries and fonts. Never run the Infinitus server as root (Chrome's sandbox rejects root); if sandboxing is impossible on your host, set `T3CODE_SERVER_BROWSER_SANDBOX=0` in the server environment and restart.
 
 ## Link another environment
 
-Link two machines, such as your laptop and a VPS, and agents on one can work on
-the other: launch, message, wait on and stop its threads, answer their
-questions, and manage its queues, projects and scheduled tasks.
+Link two Infinitus machines (beta) so agents on one can launch, message, delegate to, and manage threads on the other.
 
-Linked environments is a beta. Turn it on for both machines in **Settings →
-Labs**; on mobile, **Settings → Labs** lists each connected machine. While it is
-off on either machine, agents start nothing over a link between them. A task
-already running on the other machine still finishes, and if that machine has it
-off, its result arrives once it is back on.
+1. Enable **Settings → Labs → Linked environments** on **both** machines (or `"linkedEnvironmentsEnabled": true` in `userdata/settings.json`).
+2. On the source machine, open **Settings → Environments → Linked environments → Link** (or drag from one machine's `+` to another on the Environments map, or run `t3 environment link <address> --pairing-code <code> --access <mode>`). Use **Link several…** or `--from <file>` for batch linking.
+3. Links are one-way (tick **Also link … back** for two-way) and do not chain. Links expire after 30 days of inactivity and can be revoked in **Settings → Sharing & access** or **Forget**.
 
-On the machine you will work from, open **Settings → Environments → Linked environments**,
-choose **Link**, and pick the other machine or enter its address. The list
-holds the machines this app knows and those on your Infinitus Connect account. If this
-app has an address for that machine and is connected to it with a session that
-manages access there, it makes the pairing code itself; otherwise paste one
-from that machine's **Settings → Sharing & access**. An address you type always
-needs a pasted code. From a terminal, use
-`t3 environment link <address> --pairing-code <code> --access <mode>`.
+- **Access boundary**: Agents never get more permissions on the target than the link's access level or their own thread mode. Below Full access, linked agents can only modify threads they started and skip project setup scripts.
+- **Delegation**: Agents can target a linked machine with `delegate_task`, or ask you to link an unlinked machine via an in-thread approval card.
 
-To link many machines at once, choose **Link several…** (it appears once this
-app has two other machines saved). Tick the machines, pick one access level for
-all of them, and confirm once. A machine can be ticked when this app is
-connected to it with a session that manages access there and has an address
-another machine can reach; the list says why when it cannot. Each machine
-reports its own result, and the ones that failed stay ticked so you can try
-only those again. Machines already linked are left as they are.
+### Read a linked machine's threads
 
-For machines no app is connected to, put one `<address> <pairing-code>` per
-line in a file (make each code with `t3 pair` on that machine) and run
-`t3 environment link --from <file> --access <mode>`, or `--from -` to read
-standard input. It prints a result per line, leaves machines already linked as
-they are, and exits non-zero if any line failed, so the same file can be run
-again with fresh codes for the failures.
-
-You can also ask an agent to link a machine by name, such as "delegate this to
-my vps". It shows a card in the thread where you pick the machine the same way
-and the access, then approve. An address the agent gives that this app does
-not know for one of your machines also needs a pasted code. Paste one only for
-an address you trust: the code is sent there.
-
-- The access you pick is the most agents from this machine may do there. An
-  agent also never gets more there than its own mode here.
-- Threads a link starts are marked **From** and this machine's name there.
-- A full-access link works there like that machine's own agents. Below full
-  access, the link's agents can change only threads it started, not that
-  machine's own threads, projects or settings, and they skip its project setup
-  scripts.
-- The link shows up in that machine's **Settings → Sharing & access** like any
-  outside agent. Revoke it there to end it. **Forget** on this machine only
-  removes it here.
-- A link stays valid while agents use it. One unused for 30 days expires, as
-  does one to a machine on an older Infinitus after 30 days; link again with a
-  new pairing code.
-
-An agent can also hand a task to a linked machine with `delegate_task`: it runs
-there as an ordinary thread, in the project with the same repository (or the
-one `target.projectId` names), and this thread wakes with its result when it
-ends, as for any delegated task. It keeps following the task across restarts.
-If the other machine revokes the link, or the link is removed here, the task
-fails with that reason.
+Open a delegated task or thread link on a linked machine to follow it live (read-only) in the right panel without pairing your client directly. Click **Connect to interact** to pair and take action (one-click if the link has Full access and you can manage access). Files, images, and HTML renders stay on the remote machine until you connect directly.
 
 ## Manage or revoke access
 
+<<<<<<< HEAD
 On the host, **Settings → Sharing & access** lets authorized administrators create
 pairing links and revoke client sessions. Revoking an unused link prevents new
 pairings; revoke a device's session to remove its existing access. Command-line
 management is available through `./infinitus auth --help`.
+=======
+Manage pairing links and active client sessions in **Settings → Sharing & access** or via `t3 auth --help`.
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 
-When the app connects to more than one environment, choose one at the top of the
-page. A desktop app with **Local environment** off can manage a background
-service on the same machine this way, including its Infinitus Connect link.
+- **Scoped tokens**: Pass `--scope <scope>` (repeatable) to `t3 pair`, `t3 auth pairing create`, or `t3 auth session issue` to restrict permissions (e.g. `orchestration:read`, `source-control:write`, `filesystem:read`, `filesystem:write`, `terminal:operate`, `relay:configure`). Re-pair with a fresh link to change an existing client's scopes.
+- **Deregister from Infinitus Connect**: Open your account menu → **Infinitus Connect → Deregister** (or `t3 connect unlink` / `t3 connect logout` on CLI hosts). Idle tunnels are automatically cleaned up after 5–10 minutes offline and recreated on reconnect (hosts on older versions offline for 7+ days need an update first).
+- Treat pairing URLs and codes as passwords—never paste them into logs or screenshots.
 
-A session with an open connection stays listed after its access credential
-expires.
+## Desktop app as a remote only
 
-To choose a token's permissions, pass `--scope` once for each scope you want:
+Switch off **Settings → Environments → Local environment** in the desktop app to run with no local server, WSL backend, or incoming connections while continuing to drive remote hosts (if a local background service uses the same Infinitus home, **Open in** still works locally).
 
-```sh
-t3 pair --scope orchestration:read --scope relay:read
-```
+## Troubleshooting
 
+<<<<<<< HEAD
 The selected scopes replace the default permissions. The same option works with
 `t3 auth pairing create` and `t3 auth session issue`; each command's
 `--help` lists the available scopes. Without `--scope`, pairing tokens and issued
@@ -590,3 +452,6 @@ whichever connection you reach it through.
 
 Switch **Local environment** back on in the same place to restart with your previous local
 settings.
+=======
+See [Infinitus Connect troubleshooting](./t3-connect-troubleshooting.md) for step-by-step connection diagnostics, and [Outside agents](./outside-agents.md) for MCP connections.
+>>>>>>> upstream-sync-986826178c-upstream-renamed

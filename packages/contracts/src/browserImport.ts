@@ -5,6 +5,7 @@ import { PRODUCT_NAME } from "./productName.ts";
 
 const BROWSER_IMPORT_SOURCE_IDS = [
   "chrome",
+  "chromium",
   "edge",
   "brave",
   "vivaldi",

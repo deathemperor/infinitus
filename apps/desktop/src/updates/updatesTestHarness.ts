@@ -262,9 +262,11 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
   const updateRestartMarkers = new Set<string>();
   const updateMarkerContents = new Map<string, string>();
   const installRecords = new Map<string, string>();
+  const deletedFiles = new Set<string>();
   let previousInstallRecord = options.installRecord;
   const isInstallRecord = (path: string) =>
     path.endsWith(DesktopUpdates.DESKTOP_UPDATE_INSTALL_RECORD_FILE);
+<<<<<<< HEAD
   // Fork (#1042): a test that names `resourcesPath` writes its own
   // `app-update.yml` there, so reads under it go to the real disk.
   const realResourcesPath = options.resourcesPath;
@@ -315,6 +317,49 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
       });
     }),
   ).pipe(Layer.provide(NodeServices.layer));
+=======
+  const layerFileSystem = FileSystem.layerNoop({
+    readFileString: (path) => {
+      const installRecord = isInstallRecord(path)
+        ? (installRecords.get(path) ?? previousInstallRecord)
+        : undefined;
+      if (installRecord !== undefined) return Effect.succeed(installRecord);
+      return path === "/missing/resources/package-type" && options.packageType !== undefined
+        ? Effect.succeed(options.packageType)
+        : Effect.fail(
+            PlatformError.systemError({
+              module: "FileSystem",
+              method: "readFileString",
+              _tag: "NotFound",
+              pathOrDescriptor: path,
+            }),
+          );
+    },
+    exists: (path) => Effect.succeed(!deletedFiles.has(path)),
+    makeDirectory: () => Effect.void,
+    writeFileString: (path, data) =>
+      Effect.sync(() => {
+        if (isInstallRecord(path)) installRecords.set(path, data);
+        else {
+          if (path.endsWith("/desktop-update-restart")) updateRestartMarkers.add(path);
+          updateMarkerContents.set(path, data);
+        }
+      }),
+    rename: (from, to) =>
+      Effect.sync(() => {
+        const contents = updateMarkerContents.get(from);
+        if (contents !== undefined) updateMarkerContents.set(to, contents);
+        updateMarkerContents.delete(from);
+      }),
+    remove: (path) =>
+      Effect.sync(() => {
+        updateRestartMarkers.delete(path);
+        updateMarkerContents.delete(path);
+        installRecords.delete(path);
+        if (isInstallRecord(path)) previousInstallRecord = undefined;
+      }),
+  });
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 
   const layer = DesktopUpdates.layer.pipe(
     Layer.provide(layerFileSystem),
@@ -346,6 +391,8 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     updateInProgressMarker: () =>
       [...updateMarkerContents].find(([path]) => path.endsWith("/desktop-update-in-progress"))?.[1],
     installRecords,
+    /** Paths removed behind the app's back, as by a cache cleaner. */
+    deletedFiles,
     previousInstallRecord: () => previousInstallRecord,
     downloadCount: () => downloadCount,
     feedUrls: (): ElectronUpdater.ElectronUpdaterFeedUrl[] => feedUrls,

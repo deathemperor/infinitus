@@ -44,9 +44,11 @@ import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import { MobileAppSettingsRow } from "./MobileAppSettingsRow";
 import {
   canCheckForUpdate,
+  getDesktopUpdateActionError,
   getDesktopUpdateButtonTooltip,
   getDesktopUpdateDisabledReason,
   getDesktopUpdateInstallConfirmationMessage,
+  installDesktopUpdate,
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
 } from "../../components/desktopUpdate.logic";
@@ -296,8 +298,18 @@ function AboutVersionSection() {
         setIsUpdateActionPending(false);
         return;
       }
-      void bridge
-        .installUpdate()
+      void installDesktopUpdate(bridge)
+        .then((result) => {
+          const actionError = getDesktopUpdateActionError(result);
+          if (!actionError) return;
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: gt("Could not install update"),
+              description: actionError,
+            }),
+          );
+        })
         .catch((error: unknown) => {
           toastManager.add(
             stackedThreadToast({
@@ -562,6 +574,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? [gt("Diff colors")]
       : []),
     ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? [gt("Chat width")] : []),
+    ...(settings.htmlPreviewWidth !== DEFAULT_UNIFIED_SETTINGS.htmlPreviewWidth
+      ? [gt("HTML preview width")]
+      : []),
     ...(settings.effortDisplay !== DEFAULT_UNIFIED_SETTINGS.effortDisplay
       ? [gt("Effort display")]
       : []),
@@ -640,6 +655,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior
       ? [gt("Follow-up behavior")]
+      : []),
+    ...(settings.sideThreadOpenTarget !== DEFAULT_UNIFIED_SETTINGS.sideThreadOpenTarget
+      ? [gt("Open subagents and side chats in")]
       : []),
     ...(settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility
       ? [gt("Tool calls in chat")]
@@ -762,6 +780,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       appearanceContrast: DEFAULT_UNIFIED_SETTINGS.appearanceContrast,
       diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme,
       chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth,
+      htmlPreviewWidth: DEFAULT_UNIFIED_SETTINGS.htmlPreviewWidth,
       effortDisplay: DEFAULT_UNIFIED_SETTINGS.effortDisplay,
       mathRenderingEnabled: DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled,
       language: DEFAULT_UNIFIED_SETTINGS.language,
@@ -778,6 +797,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       composerRichTextEnabled: DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled,
       sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut,
       followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
+      sideThreadOpenTarget: DEFAULT_UNIFIED_SETTINGS.sideThreadOpenTarget,
       toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility,
       screenReaderAnnouncements: DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements,
       screenReaderWindowTitle: DEFAULT_UNIFIED_SETTINGS.screenReaderWindowTitle,
@@ -1456,6 +1476,63 @@ export function ChatSettingsPanel() {
                 </SelectItem>
                 <SelectItem value="steer">
                   <T>Steer</T>
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection id="side-threads" title={gt("Subagents and side chats")}>
+        <SettingsRow
+          {...setting("side-thread-open-target")}
+          description={
+            settings.sideThreadOpenTarget === "panel"
+              ? gt(
+                  "Where a click opens a subagent, a side chat, or a thread on a linked environment. {modifier}-click or middle-click opens it in the main view instead.",
+                  { modifier: modifierLabel },
+                )
+              : gt(
+                  "Where a click opens a subagent, a side chat, or a thread on a linked environment. {modifier}-click or middle-click opens it in the side panel instead.",
+                  { modifier: modifierLabel },
+                )
+          }
+          resetAction={
+            settings.sideThreadOpenTarget !== DEFAULT_UNIFIED_SETTINGS.sideThreadOpenTarget ? (
+              <SettingResetButton
+                ariaLabel={gt("Reset where subagents and side chats open to default")}
+                onClick={() =>
+                  updateSettings({
+                    sideThreadOpenTarget: DEFAULT_UNIFIED_SETTINGS.sideThreadOpenTarget,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.sideThreadOpenTarget}
+              onValueChange={(value) => {
+                if (value === "panel" || value === "main") {
+                  updateSettings({ sideThreadOpenTarget: value });
+                }
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-auto min-w-0"
+                aria-label={gt("Open subagents and side chats in")}
+              >
+                <SelectValue>
+                  {settings.sideThreadOpenTarget === "panel" ? gt("Side panel") : gt("Main view")}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem value="panel">
+                  <T>Side panel</T>
+                </SelectItem>
+                <SelectItem value="main">
+                  <T>Main view</T>
                 </SelectItem>
               </SelectPopup>
             </Select>

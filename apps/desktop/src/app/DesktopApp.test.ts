@@ -74,6 +74,7 @@ import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as MacPermissions from "../permissions/MacPermissions.ts";
 import * as LoopbackTunnel from "../preview/LoopbackTunnel.ts";
 import * as PreviewManager from "../preview/Manager.ts";
+<<<<<<< HEAD
 import * as InfinitusCaptureGesture from "../captures/InfinitusCaptureGesture.ts";
 import * as ElectronNotification from "../electron/ElectronNotification.ts";
 import * as InfinitusDeepLinks from "../infinitus/InfinitusDeepLinks.ts";
@@ -83,6 +84,9 @@ import * as InfinitusKeepAwake from "../infinitus/InfinitusKeepAwake.ts";
 import * as InfinitusOAuthSignIn from "../infinitus/InfinitusOAuthSignIn.ts";
 import * as InfinitusSignIn from "../infinitus/InfinitusSignIn.ts";
 import * as InfinitusSignInRedirect from "../infinitus/InfinitusSignInRedirect.ts";
+=======
+import * as AppleSpeech from "../speech/AppleSpeech.ts";
+>>>>>>> upstream-sync-986826178c-upstream-renamed
 
 interface StubbedDesktop {
   readonly localEnvironmentEnabled: boolean;
@@ -242,6 +246,7 @@ const runStubbedDesktop = (stub: StubbedDesktop) =>
           Layer.mock(ElectronTheme.ElectronTheme, {}),
           Layer.mock(ElectronWindow.ElectronWindow, {}),
           Layer.mock(MacPermissions.MacPermissions, {}),
+<<<<<<< HEAD
           Layer.mock(ElectronNotification.ElectronNotification, {}),
           Layer.mock(InfinitusCaptureGesture.InfinitusCaptureGestureService, {}),
           Layer.mock(InfinitusDeepLinks.InfinitusDeepLinksService, {}),
@@ -251,6 +256,9 @@ const runStubbedDesktop = (stub: StubbedDesktop) =>
           Layer.mock(InfinitusOAuthSignIn.InfinitusOAuthSignInService, {}),
           Layer.mock(InfinitusSignIn.InfinitusSignInService, {}),
           Layer.mock(InfinitusSignInRedirect.InfinitusSignInRedirectService, {}),
+=======
+          Layer.mock(AppleSpeech.AppleSpeech, {}),
+>>>>>>> upstream-sync-986826178c-upstream-renamed
           Layer.mock(LoopbackTunnel.LoopbackTunnel, {}),
           Layer.mock(PreviewManager.PreviewManager, {
             isBrowserPartition: () => {

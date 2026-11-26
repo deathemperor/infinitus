@@ -88,6 +88,16 @@ export function authoredImageSizeStyle(
   return undefined;
 }
 
+/**
+ * A loading or unavailable file has no dimensions, so its `aspect-video w-full`
+ * frame would fill the row and `max-height` would squash it. Bound the width so
+ * the frame stays 16:9 at the height cap.
+ */
+function unsizedImageFrameStyle(maxHeightRem: number): CSSProperties | undefined {
+  if (maxHeightRem === 30) return undefined;
+  return { maxWidth: `min(100%, 30rem, ${(maxHeightRem * 16) / 9}rem)` };
+}
+
 const CHAT_MARKDOWN_WORKSPACE_IMAGE_CLASS_NAME = cn(
   CHAT_MARKDOWN_MEDIA_LAYOUT_CLASS_NAME,
   CHAT_MARKDOWN_MEDIA_FRAME_CLASS_NAME,
@@ -188,6 +198,8 @@ export function ChatMarkdownImage(props: {
   readonly standalone: boolean;
   readonly className?: string | undefined;
   readonly style?: CSSProperties | undefined;
+  /** The loading or unavailable frame's size, when it differs from the image's. */
+  readonly frameStyle?: CSSProperties | undefined;
   readonly imageProps?:
     | Omit<ComponentProps<"img">, "src" | "alt" | "className" | "style">
     | undefined;
@@ -276,7 +288,7 @@ export function ChatMarkdownImage(props: {
           CHAT_MARKDOWN_IMAGE_FRAME_CLASS_NAME,
           "relative",
         )}
-        style={props.style}
+        style={props.frameStyle ?? props.style}
         {...(failed
           ? { role: "alert" as const }
           : { role: "status" as const, "aria-label": gt("Loading image") })}
@@ -360,6 +372,8 @@ export function assetMediaActionsSource(input: {
   readonly workspaceRoot?: string | undefined;
   readonly originalUrl?: string | undefined;
   readonly downloadable?: boolean | undefined;
+  /** The file may not exist yet: keep only actions that do not read it. */
+  readonly pending?: boolean | undefined;
 }): MediaActionSource {
   const { environmentId, resource } = input;
   const path =
@@ -378,9 +392,13 @@ export function assetMediaActionsSource(input: {
     kind: input.kind,
     name: input.name,
     src: input.src,
-    ...(input.downloadable === false ? {} : { asset: { environmentId, resource } }),
+    ...(input.downloadable === false || input.pending
+      ? {}
+      : { asset: { environmentId, resource } }),
     ...(reference ? { reference } : {}),
-    ...(relativePath && (resource._tag === "media-file" || resource._tag === "workspace-file")
+    ...(relativePath &&
+    !input.pending &&
+    (resource._tag === "media-file" || resource._tag === "workspace-file")
       ? {
           onOpenFile: () =>
             useRightPanelStore
@@ -394,6 +412,8 @@ export function assetMediaActionsSource(input: {
 export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props: {
   readonly environmentId: EnvironmentId;
   readonly resource: ChatMarkdownAssetResource;
+  /** Hold the loading frame without asking for the file, which may not exist yet. */
+  readonly pending?: boolean | undefined;
   readonly kind?: "image" | "video";
   readonly alt: string;
   readonly copyMarkdown?: string;
@@ -418,7 +438,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
   const workspaceMutationId = props.workspaceMutationId ?? threadWorkspaceMutationId;
   const assetUrl = useAssetUrlState(
     props.environmentId,
-    resource,
+    props.pending ? null : resource,
     workspaceMutationId !== undefined &&
       props.kind !== "video" &&
       (resource._tag === "media-file" || resource._tag === "workspace-file")
@@ -442,6 +462,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
         : fallbackSrc + (props.srcFragment ?? "");
   const knownSize = assetUrl._tag === "Success" ? assetUrl.imageDimensions : undefined;
   const maxHeightRem = props.maxHeightRem ?? 30;
+  const unavailable = assetUrl._tag === "Failure" && fallbackSrc === undefined;
   const style =
     props.style ??
     (knownSize
@@ -449,6 +470,8 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
       : maxHeightRem !== 30
         ? { maxHeight: `${maxHeightRem}rem` }
         : undefined);
+  // Kept until the image decodes: an SVG's URL arrives without dimensions.
+  const frameStyle = props.style ?? (knownSize ? style : unsizedImageFrameStyle(maxHeightRem));
   const actionsSource = assetMediaActionsSource({
     environmentId: props.environmentId,
     resource,
@@ -458,13 +481,14 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
     workspaceRoot: props.workspaceRoot,
     originalUrl: props.originalUrl,
     downloadable: fallbackSrc === undefined,
+    pending: props.pending,
   });
 
   if (props.kind === "video") {
     return (
       <ChatMarkdownVideo
         src={src}
-        sourceFailed={assetUrl._tag === "Failure" && fallbackSrc === undefined}
+        sourceFailed={unavailable}
         unavailableDetail={unavailableDetail}
         alt={props.alt}
         copyMarkdown={props.copyMarkdown}
@@ -482,7 +506,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
     <ChatMarkdownImage
       key={JSON.stringify([props.environmentId, props.resource, props.srcFragment])}
       src={src}
-      sourceFailed={assetUrl._tag === "Failure" && fallbackSrc === undefined}
+      sourceFailed={unavailable}
       unavailableDetail={unavailableDetail}
       alt={props.alt}
       copyMarkdown={props.copyMarkdown}
@@ -492,6 +516,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
         props.className,
       )}
       style={style}
+      frameStyle={frameStyle}
       imageProps={props.imageProps}
       actionsSource={actionsSource}
       originalUrl={props.originalUrl}
