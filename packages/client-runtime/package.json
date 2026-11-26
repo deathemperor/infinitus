@@ -595,6 +595,10 @@
       "types": "./src/state/infinitusAccounts.ts",
       "default": "./src/state/infinitusAccounts.ts"
     },
+    "./state/infinitusSignIn": {
+      "types": "./src/state/infinitusSignIn.ts",
+      "default": "./src/state/infinitusSignIn.ts"
+    },
     "./state/infinitusExhausted": {
       "types": "./src/state/infinitusExhausted.ts",
       "default": "./src/state/infinitusExhausted.ts"

@@ -222,9 +222,13 @@ describe("row actions", () => {
     expect(actionsFor({ preferred: false }, ["switch"])).not.toContain("hold");
   });
 
-  it("offers remove only on a fleet whose capabilities carry it", () => {
+  it("offers remove only on a fleet whose capabilities carry it, never on the live login", () => {
     expect(actionsFor({ preferred: false })).not.toContain("remove");
     expect(actionsFor({ preferred: false }, ["switch", "remove"])).toContain("remove");
+    // swapd refuses it: "slot N is the live login; switch away first".
+    expect(actionsFor({ active: true, preferred: false }, ["switch", "remove"])).not.toContain(
+      "remove",
+    );
   });
 
   it("hides the pick-first star on an engine whose accounts carry no preferred knob", () => {

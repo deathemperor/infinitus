@@ -1,0 +1,241 @@
+import type {
+  InfinitusCommandInput,
+  InfinitusSecretInput,
+  InfinitusSignInCodeResult,
+  InfinitusSnapshot,
+} from "@infinitus/contracts/infinitus";
+import * as Schema from "effect/Schema";
+
+/**
+ * A fleet's sign-in run by the menu-bar app with no window (#677): `signin-begin` starts it, the
+ * client opens the provider's page (the desktop shell's child window, a browser tab, the phone's
+ * auth session), polls `signin-status`, and hands the code or the loopback address back as
+ * `signin-code <flowId>` over `infinitus.secret` (#747). Web and mobile share it. Pure.
+ */
+
+const BEGIN_COMMAND = "signin-begin";
+const STATUS_COMMAND = "signin-status";
+const CANCEL_COMMAND = "signin-cancel";
+const CODE_COMMAND = "signin-code";
+
+/** How often the page asks `signin-status` while a flow runs. */
+export const SIGN_IN_POLL_MS = 2_000;
+
+export const SignInPhase = Schema.Literals([
+  "starting",
+  "waitingForCode",
+  "waitingForToken",
+  "registering",
+  "done",
+  "failed",
+]);
+export type SignInPhase = typeof SignInPhase.Type;
+
+/** Which half runs a flow: the menu-bar app's (#677, `signin-begin` polled
+    over the socket) or this shell's own, through the engine's `add-oauth`
+    (#1213). They start, cancel and end differently, so a flow says which. */
+export type SignInKind = "app" | "shell";
+
+/** One sign-in this page started: which fleet, who to sign in again as (or
+    null for a new account), the app's flow and where it stands. */
+export interface SignInFlow {
+  readonly kind: SignInKind;
+  readonly fleetKey: string;
+  readonly target: string | null;
+  readonly flowId: string | null;
+  /** The provider's page for this device to open, when no shell window shows
+      it; null while the shell has it or before the app answered. */
+  readonly url: string | null;
+  readonly pasteCode: boolean;
+  /** The loopback port the Mac's engine listens on for the OAuth redirect, when the sign-in ends on
+      one. A browser on this device is sent to ITS localhost, so the page hands the address that
+      browser ended on to the Mac over `signin-code`, which replays it against the listener. Null
+      for a paste-code flow. */
+  readonly redirectPort: number | null;
+  /** This device stands in for that listener (the desktop shell, or the
+      phone's loopback catcher): it took the port, opened the page, and will
+      hand the address on itself — nothing to paste. Off again when the port
+      was held or the hand-off was refused, and the field takes over. */
+  readonly redirectListening: boolean;
+  readonly phase: SignInPhase;
+  readonly error: string | null;
+  readonly account: string | null;
+  /** The last `signin-code` refusal, shown under the code field. */
+  readonly codeError: string | null;
+  readonly codeBusy: boolean;
+}
+
+/** What the fleet's field takes while a flow waits on this device: the code from the success page
+    (#747), the loopback address the browser ended on, or nothing. A flow the shell's window shows
+    (`url` null) reaches the listener itself, so it never asks for the address. */
+export type SignInPasteField = "code" | "address";
+
+export function signInPasteField(flow: SignInFlow | null): SignInPasteField | null {
+  if (flow === null) return null;
+  if (flow.phase === "waitingForCode" && flow.pasteCode) return "code";
+  if (
+    flow.phase === "waitingForToken" &&
+    flow.redirectPort !== null &&
+    flow.url !== null &&
+    !flow.redirectListening
+  ) {
+    return "address";
+  }
+  return null;
+}
+
+/** The in-app path exists on a build whose manifest lists `signin-begin`. */
+export function snapshotOffersSignIn(snapshot: Pick<InfinitusSnapshot, "commands">): boolean {
+  return snapshot.commands.some((command) => command.name === BEGIN_COMMAND);
+}
+
+/** Which sign-in a fleet's section draws. `inApp` is a flow this client runs (the shell's
+    `add-oauth` #1213 or the app's in-app sign-in #677); `canAdd` the older hand-off to the Mac
+    (#672). The shell's path asks the app for nothing, so the `addOAuth` capability does not gate
+    it. */
+export function fleetSignInGate(input: {
+  /** This shell can run this fleet's own `add-oauth`. */
+  readonly shellOAuth: boolean;
+  /** The running build lists `signin-begin`. */
+  readonly offers: boolean;
+  /** This client can show the app's flow itself. */
+  readonly inApp: boolean;
+  /** The running build lists `add`. */
+  readonly offersAdd: boolean;
+  /** The fleet advertises `addOAuth`. */
+  readonly canAdd: boolean;
+}): { readonly inApp: boolean; readonly canAdd: boolean } {
+  return {
+    inApp: input.shellOAuth || (input.offers && input.inApp && input.canAdd),
+    canAdd: !input.offers && !input.shellOAuth && input.offersAdd && input.canAdd,
+  };
+}
+
+/** `signin-begin <fleet> [--relogin <email>]`. */
+export function signInBeginCommandArgs(
+  fleetKey: string,
+  reloginEmail: string | null,
+): InfinitusCommandInput {
+  return {
+    command: BEGIN_COMMAND,
+    args: [fleetKey],
+    options: reloginEmail === null ? {} : { relogin: reloginEmail },
+  };
+}
+
+export function signInStatusCommandArgs(flowId: string): InfinitusCommandInput {
+  return { command: STATUS_COMMAND, args: [flowId], options: {} };
+}
+
+export function signInCancelCommandArgs(flowId: string): InfinitusCommandInput {
+  return { command: CANCEL_COMMAND, args: [flowId], options: {} };
+}
+
+/** `signin-code <flowId>` for `infinitus.secret`; the page adds the code as
+    `secret` (#747). `flowId` is the manifest's bare name for `<flowId>`. */
+export function signInCodeSecretArgs(flowId: string): Omit<InfinitusSecretInput, "secret"> {
+  return { command: CODE_COMMAND, args: { flowId } };
+}
+
+const CodeReply = Schema.Struct({
+  ok: Schema.Boolean,
+  error: Schema.optionalKey(Schema.String),
+});
+const decodeCode = Schema.decodeUnknownOption(CodeReply);
+
+/** `signin-code`'s answer, or null for anything else. The error is the
+    CLI's own wording; the code itself never comes back. */
+export function signInCodeReply(result: unknown): InfinitusSignInCodeResult | null {
+  const decoded = decodeCode(result);
+  if (decoded._tag === "None") return null;
+  return {
+    ok: decoded.value.ok,
+    ...(decoded.value.error === undefined ? {} : { error: decoded.value.error }),
+  };
+}
+
+const BeginReply = Schema.Struct({
+  flowId: Schema.String,
+  url: Schema.String,
+  pasteCode: Schema.Boolean,
+  redirectPort: Schema.optionalKey(Schema.Number),
+  label: Schema.String,
+});
+export type SignInBeginReply = typeof BeginReply.Type;
+const decodeBegin = Schema.decodeUnknownOption(BeginReply);
+
+/** `signin-begin`'s answer, or null for anything else. */
+export function signInBeginReply(result: unknown): SignInBeginReply | null {
+  const decoded = decodeBegin(result);
+  return decoded._tag === "Some" ? decoded.value : null;
+}
+
+const StatusReply = Schema.Struct({
+  phase: SignInPhase,
+  error: Schema.optionalKey(Schema.String),
+  account: Schema.optionalKey(Schema.String),
+  redirectPort: Schema.optionalKey(Schema.Number),
+});
+const decodeStatus = Schema.decodeUnknownOption(StatusReply);
+
+/** `signin-status`'s answer as the flow's next state, or null for anything
+    else. */
+export function signInStatusReply(result: unknown): {
+  phase: SignInPhase;
+  error: string | null;
+  account: string | null;
+  redirectPort: number | null;
+} | null {
+  const decoded = decodeStatus(result);
+  if (decoded._tag === "None") return null;
+  return {
+    phase: decoded.value.phase,
+    error: decoded.value.error ?? null,
+    account: decoded.value.account ?? null,
+    redirectPort: decoded.value.redirectPort ?? null,
+  };
+}
+
+export function signInEnded(phase: SignInPhase): boolean {
+  return phase === "done" || phase === "failed";
+}
+
+/** Whether the fleet's buttons take a click right now. */
+export function signInBusy(flow: SignInFlow | null): boolean {
+  return flow !== null && !signInEnded(flow.phase);
+}
+
+/** The line under the fleet's title while a flow runs or just ended. */
+export function signInStatusText(flow: SignInFlow): string {
+  const who = flow.target === null ? "" : ` as ${flow.target}`;
+  // A shell flow (#1213) runs in a private window of the browser, or of the
+  // shell's own where the browser has none; the app's own (#677) is the
+  // desktop's child window or a link on this page.
+  const where =
+    flow.kind === "shell"
+      ? "in the private window that opened"
+      : flow.url === null
+        ? "in the window"
+        : "on the sign-in page";
+  switch (flow.phase) {
+    case "starting":
+      return "Starting the sign-in…";
+    case "waitingForCode":
+      return `Sign in${who} ${where}, then paste the code from the success page here.`;
+    case "waitingForToken":
+      if (flow.pasteCode) return "Checking the code…";
+      // The redirect goes to this device's localhost, where nothing listens:
+      // the browser ends on a page that will not load, and its address is
+      // what the Mac needs.
+      if (signInPasteField(flow) === "address") {
+        return `Sign in${who} ${where}. It ends on a page that will not load: copy that page's address and paste it here.`;
+      }
+      return `Sign in${who} ${where}.`;
+    case "registering":
+      return "Adding the account…";
+    case "done":
+      return flow.account === null ? "Signed in." : `Signed in as ${flow.account}.`;
+    case "failed":
+      return `Sign-in failed: ${flow.error ?? "the app gave no reason"}`;
+  }
+}

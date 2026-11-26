@@ -16,7 +16,12 @@ import {
   resetOfferEffect,
   resetOffers,
   resetsSummary,
+  snapshotOffersAdd,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
+import {
+  fleetSignInGate,
+  snapshotOffersSignIn,
+} from "@infinitus/client-runtime/state/infinitusSignIn";
 import {
   exhaustedBand,
   type ExhaustedBandModel,
@@ -293,4 +298,30 @@ export function commandFailureMessage(cause: Cause.Cause<unknown>): string {
   return error && typeof error.message === "string" && error.message.trim().length > 0
     ? error.message
     : "The command did not reach the Mac.";
+}
+
+/** Whether this phone can sign an account into the fleet: the Mac's build runs the sign-in
+    without a window (`signin-begin`) and the fleet can add one (`addOAuth` / `addCurrent`).
+    The older `add` hand-off puts the sign-in on the Mac's own screen, so the phone skips it. */
+export function fleetSignsInFromPhone(
+  snapshot: InfinitusSnapshot,
+  section: Pick<FleetSectionModel, "canAdd">,
+): boolean {
+  return fleetSignInGate({
+    shellOAuth: false,
+    offers: snapshotOffersSignIn(snapshot),
+    inApp: true,
+    offersAdd: snapshotOffersAdd(snapshot),
+    canAdd: section.canAdd,
+  }).inApp;
+}
+
+/** Whether a failed `signin-status` ends the flow. The app's refusal does; a dropped socket
+    while the phone was in the browser does not, and the next poll asks again. */
+export function signInPollFailureEnds(cause: Cause.Cause<unknown>): boolean {
+  const error = Cause.squash(cause) as {
+    readonly _tag?: string;
+    readonly restarting?: boolean;
+  } | null;
+  return error?._tag === "InfinitusCommandFailed" && error.restarting !== true;
 }
