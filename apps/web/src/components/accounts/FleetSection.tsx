@@ -6,6 +6,14 @@ import {
   withFlip,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import type { ExhaustedBandModel } from "@infinitus/client-runtime/state/infinitusExhausted";
+import {
+  fleetSignInGate,
+  signInBusy,
+  signInEnded,
+  signInPasteField,
+  signInStatusText,
+  type SignInFlow,
+} from "@infinitus/client-runtime/state/infinitusSignIn";
 
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
@@ -18,14 +26,6 @@ import {
 } from "./addAccount.logic";
 import { ExhaustedBand } from "./ExhaustedBand";
 import { fleetProvider } from "./providerMark";
-import {
-  fleetSignInGate,
-  signInBusy,
-  signInEnded,
-  signInPasteField,
-  signInStatusText,
-  type SignInFlow,
-} from "./signIn.logic";
 
 /** The in-app sign-in (#677) as the page hands it to a fleet: whether the
     build offers it, whether this client can show it, the flow on this fleet. */
