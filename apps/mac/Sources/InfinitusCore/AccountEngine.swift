@@ -129,6 +129,15 @@ public struct EngineFleet: Codable, Sendable {
 
     /// Registry key: one FleetState per (engine, provider).
     public var key: String { "\(engineID)/\(provider.rawValue)" }
+
+    /// Which of `engineID`'s held fleet keys its snapshot no longer
+    /// reports — a provider whose last account was deleted. Nil (the
+    /// snapshot failed) drops nothing; a peer's fleets are the desktop's
+    /// to drop (`PeerFleetsModel`).
+    public static func dropped(held: [String], engineID: String, snapshot: [EngineFleet]?) -> Set<String> {
+        guard let snapshot, !PeerFleets.isPeer(engineID: engineID) else { return [] }
+        return Set(held).subtracting(snapshot.map(\.key))
+    }
 }
 
 public enum EngineError: Error, Sendable, Equatable {

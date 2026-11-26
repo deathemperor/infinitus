@@ -80,4 +80,18 @@ final class AccountEngineTests: XCTestCase {
         let other = SharedUsage(usage: Usage(sevenDay: UsageWindow(pct: 99)), at: stamp)
         XCTAssertEqual(thin.richest(with: other).usage.sevenDay?.pct, 40)
     }
+    // 9Router lists no provider without connections: deleting every
+    // Claude connection must drop that fleet, not keep it forever.
+    func testSuccessfulSnapshotDropsFleetsItNoLongerReports() {
+        let held = ["9router/claude", "9router/codex", "9router/kiro"]
+        let snapshot = [EngineFleet(engineID: "9router", provider: .codex, accounts: []),
+                        EngineFleet(engineID: "9router", provider: .kiro, accounts: [])]
+        XCTAssertEqual(EngineFleet.dropped(held: held, engineID: "9router", snapshot: snapshot),
+                       ["9router/claude"])
+        // A failed snapshot keeps every fleet; its rows go stale instead.
+        XCTAssertEqual(EngineFleet.dropped(held: held, engineID: "9router", snapshot: nil), [])
+        // A peer's fleets are the desktop's to drop (`PeerFleetsModel`).
+        let peer = PeerFleets.engineID(machine: "mini", remoteEngine: "9router")
+        XCTAssertEqual(EngineFleet.dropped(held: [peer + "/claude"], engineID: peer, snapshot: []), [])
+    }
 }
