@@ -10,6 +10,20 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.49
+
+### Mac
+- An account row's menu now has Remove…, which asks first and works on other machines' accounts too.
+- A provider an engine stops reporting, such as 9Router after its last Claude connection is deleted, now leaves Accounts instead of lingering stale across restarts.
+
+### Desktop
+- Settings › Engines, Menu bar, Team, Priority, Animations and Notifications open inside the Settings window again, with its sidebar and close button, so the per-engine on/off switches are back where you expect them.
+- Remove is no longer offered on the account in use, which the engine refuses; switch away first.
+
+### Phone
+- Accounts can add an account to any Mac's fleet and sign an expired one in again from the phone, instead of only on the Mac.
+- Remove is no longer offered on the account in use, which the engine refuses; switch away first.
+
 ## 0.5.0-alpha.48
 
 ### Mac
