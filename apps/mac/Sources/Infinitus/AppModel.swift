@@ -1683,7 +1683,7 @@ final class AppModel: ObservableObject {
             // engines is gone from the registry; its fleets would trip
             // `state(for:)`. Local engines are never removed.
             guard registry.engine(id: r.id) != nil else { continue }
-            registry.removeFleets(engineID: r.id, keeping: fleets)
+            if registry.removeFleets(engineID: r.id, keeping: fleets) { anyChanged = true }
             for reported in fleets {
                 let state = registry.state(for: reported)
                 let fleet = reported

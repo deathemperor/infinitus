@@ -41,13 +41,14 @@ final class EngineRegistry: ObservableObject {
     /// Drop the fleet states an engine's successful snapshot stopped
     /// reporting, so a deleted provider leaves the popup and the launch
     /// cache instead of lingering stale forever.
-    func removeFleets(engineID: String, keeping snapshot: [EngineFleet]) {
+    func removeFleets(engineID: String, keeping snapshot: [EngineFleet]) -> Bool {
         let held = fleets.filter { $0.engineID == engineID }.map(\.id)
         let gone = EngineFleet.dropped(held: held, engineID: engineID, snapshot: snapshot)
-        guard !gone.isEmpty else { return }
+        guard !gone.isEmpty else { return false }
         for id in gone { sinks[id] = nil }
         fleets.removeAll { gone.contains($0.id) }
         host.forwardFleetChange()
+        return true
     }
 
     /// This Mac's own fleets: what the `fleets` verb, the launch cache
