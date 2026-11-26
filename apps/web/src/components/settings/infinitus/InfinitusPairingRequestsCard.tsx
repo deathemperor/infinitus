@@ -14,6 +14,7 @@ import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
+import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "../itemRows";
 import { SettingsSection } from "../settingsLayout";
 import { FORBIDDEN_NOTICE } from "./pairingAccess.logic";
 import { decisionNotice, formatCountdown, pairingRequestRows } from "./pairingRequests.logic";
@@ -50,71 +51,66 @@ export function InfinitusPairingRequestsCard() {
 
   return (
     <SettingsSection id="infinitus-pairing-requests" title="Pairing requests">
-      <div className="flex flex-col gap-3 px-3 py-3 text-sm sm:px-4">
-        {access.kind === "forbidden" ? (
-          <p role="status" className="text-muted-foreground">
-            {FORBIDDEN_NOTICE}
-          </p>
-        ) : access.kind === "failed" ? (
-          <p role="alert" className="text-muted-foreground">
-            Could not read the pairing requests: {access.message}
-          </p>
-        ) : rows.length === 0 ? (
-          <p role="status" className="text-muted-foreground">
-            {EMPTY_NOTICE}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {rows.map((row) => (
-              <li
-                key={row.id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/60 px-3 py-2"
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-medium text-foreground">{row.deviceName}</span>
-                  {row.detail === null ? null : (
-                    <span className="truncate text-muted-foreground">{row.detail}</span>
-                  )}
-                  <span className="text-muted-foreground">
-                    Expires in{" "}
-                    <span className="tabular-nums text-foreground">
-                      {formatCountdown(row.secondsLeft)}
-                    </span>
+      {access.kind === "forbidden" ? (
+        <p role="status" className={`${ITEM_ROW_CLASSNAME} text-sm text-muted-foreground`}>
+          {FORBIDDEN_NOTICE}
+        </p>
+      ) : access.kind === "failed" ? (
+        <p role="alert" className={`${ITEM_ROW_CLASSNAME} text-sm text-muted-foreground`}>
+          Could not read the pairing requests: {access.message}
+        </p>
+      ) : rows.length === 0 ? (
+        <p role="status" className={`${ITEM_ROW_CLASSNAME} text-sm text-muted-foreground`}>
+          {EMPTY_NOTICE}
+        </p>
+      ) : (
+        rows.map((row) => (
+          <div key={row.id} className={ITEM_ROW_CLASSNAME}>
+            <div className={ITEM_ROW_INNER_CLASSNAME}>
+              <div className="flex min-w-0 flex-1 flex-col text-sm">
+                <span className="truncate font-medium text-foreground">{row.deviceName}</span>
+                {row.detail === null ? null : (
+                  <span className="truncate text-xs text-muted-foreground">{row.detail}</span>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  Expires in{" "}
+                  <span className="tabular-nums text-foreground">
+                    {formatCountdown(row.secondsLeft)}
                   </span>
-                </div>
-                <span
-                  className="font-mono text-2xl tracking-widest text-foreground"
-                  aria-label={`Match code ${row.matchCode}`}
-                >
-                  {row.matchCode}
                 </span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    disabled={deciding !== null}
-                    onClick={() => void settle(row.id, true)}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={deciding !== null}
-                    onClick={() => void settle(row.id, false)}
-                  >
-                    Deny
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {notice === null ? null : (
-          <p role="alert" className="text-muted-foreground">
-            {notice}
-          </p>
-        )}
-      </div>
+              </div>
+              <span
+                className="font-mono text-2xl tracking-widest text-foreground"
+                aria-label={`Match code ${row.matchCode}`}
+              >
+                {row.matchCode}
+              </span>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  size="sm"
+                  disabled={deciding !== null}
+                  onClick={() => void settle(row.id, true)}
+                >
+                  Approve
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={deciding !== null}
+                  onClick={() => void settle(row.id, false)}
+                >
+                  Deny
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+      {notice === null ? null : (
+        <p role="alert" className={`${ITEM_ROW_CLASSNAME} text-sm text-muted-foreground`}>
+          {notice}
+        </p>
+      )}
     </SettingsSection>
   );
 }

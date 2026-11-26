@@ -857,17 +857,26 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
-- `apps/web/src/routes/settings.{menu-bar,animations,priority,team,notifications,devices,engines}.tsx`
-  and `settings.infinitus.$.tsx` (new files in upstream's routes
-  directory; the pages are top-level since 2026-09-18 — no "Infinitus"
-  section, the whole app is Infinitus — and the splat redirects the old
-  `/settings/infinitus[/…]` paths older menu bar apps and bookmarks still
-  send, `settingsInfinitusRedirect.logic.ts`; Animations is an
-  `InfinitusPrefsPanel` page over the catalog's `animations` section, #747
-  step 1, the Menu bar page keeps `display` + `themes` + `about`, and a
-  section the build lacks renders "no … settings yet") and
+- `apps/web/src/routes/_chat.settings.{menu-bar,animations,priority,team,notifications,engines,engines_.activity}.tsx`
+  and `_chat.settings.infinitus.$.tsx` (new files in upstream's routes
+  directory, named under `_chat.settings` so they render inside upstream's
+  Settings modal — sidebar, breadcrumb, close button, scope provider — since
+  upstream moved Settings there (#24847); a plain `settings.*.tsx` name
+  parents on the root and draws a bare page. The pages are top-level since
+  2026-09-18 — no "Infinitus" section, the whole app is Infinitus — and the
+  splat redirects the old `/settings/infinitus[/…]` paths older menu bar apps
+  and bookmarks still send, `settingsInfinitusRedirect.logic.ts`; Animations
+  is an `InfinitusPrefsPanel` page over the catalog's `animations` section,
+  #747 step 1, the Menu bar page keeps `display` + `themes` + `about`, and a
+  section the build lacks renders "no … settings yet"; Engines re-provides
+  the settings scope as the machine it manages, so a project scope retained
+  from another page never makes its rows environment-wide) and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
+- `apps/web/src/components/settings/SettingsScopeSentence.tsx` —
+  `...INFINITUS_DEVICE_ONLY_PATHS` (from `infinitus/settingsNav.ts`) spread
+  into `SETTINGS_DEVICE_ONLY_PATHS`: the fork's pages each drive one
+  Infinitus app, so they hide the scope picker and skip the scope boundary.
 - `apps/web/src/components/files/AttachmentFilePreview.browser.test.tsx` — the
   `#1711` quarantines for hosted runners.
 - `apps/server/src/provider/agentContextBudget.json` — the fork's measured
@@ -876,8 +885,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/routes/_chat.settings.devices.tsx` — upstream's Devices page
   (#25651) owns `/settings/devices`, so the fork's Devices pane (pairing
   requests, the catalog's `devices` prefs, crash reports) renders under it
-  when the environment has the `infinitus` capability; the fork's own
-  `routes/settings.devices.tsx` left with that sync.
+  when the environment has the `infinitus` capability, passed as children of
+  `DevicesSettingsPanel` and drawn container-less (`contained={false}`) so
+  the page keeps one scroller and one search-target provider.
+- `apps/web/src/components/settings/IntegrationsSettings.tsx` —
+  `DevicesSettingsPanel` takes `children`, drawn after upstream's devices
+  settings inside its `SettingsPageContainer`.
 - `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
   `@tanstack/router-generator`, never hand-edited) whenever a fork route is
   added; the upstream sync re-generates it.

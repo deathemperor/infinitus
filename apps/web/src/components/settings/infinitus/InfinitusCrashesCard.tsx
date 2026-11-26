@@ -12,6 +12,7 @@ import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
+import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "../itemRows";
 import { SettingsSection } from "../settingsLayout";
 import {
   type CrashReport,
@@ -99,31 +100,26 @@ export function InfinitusCrashesCard() {
 
   return (
     <SettingsSection id="infinitus-crashes" title="Crash reports">
-      <div className="flex flex-col gap-3 px-3 py-3 text-sm sm:px-4">
-        {reports !== null && shown.length === 0 ? (
-          <p role="status" className="text-muted-foreground">
-            {EMPTY_NOTICE}
-          </p>
-        ) : null}
-        {shown.length === 0 ? null : (
-          <ul className="flex flex-col gap-2">
-            {shown.map((report) => (
-              <li
-                key={report.id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border/60 px-3 py-2"
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-foreground">{crashSummary(report)}</span>
-                  <span className="truncate text-muted-foreground">{crashDetail(report)}</span>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => void copy(report.id)}>
-                  {copied === report.id ? "Copied" : "Copy report"}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="text-muted-foreground">
+      {reports !== null && shown.length === 0 ? (
+        <p role="status" className={`${ITEM_ROW_CLASSNAME} text-sm text-muted-foreground`}>
+          {EMPTY_NOTICE}
+        </p>
+      ) : null}
+      {shown.map((report) => (
+        <div key={report.id} className={ITEM_ROW_CLASSNAME}>
+          <div className={ITEM_ROW_INNER_CLASSNAME}>
+            <div className="flex min-w-0 flex-1 flex-col text-sm">
+              <span className="truncate text-foreground">{crashSummary(report)}</span>
+              <span className="truncate text-xs text-muted-foreground">{crashDetail(report)}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void copy(report.id)}>
+              {copied === report.id ? "Copied" : "Copy report"}
+            </Button>
+          </div>
+        </div>
+      ))}
+      <div className={`${ITEM_ROW_CLASSNAME} text-xs text-muted-foreground`}>
+        <p>
           Nothing leaves the Mac on its own. Copy a report to read it, or to hand it to a session
           for triage.
         </p>

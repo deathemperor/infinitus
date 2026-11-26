@@ -8,6 +8,6 @@ function SettingsTeamRoute() {
   return <InfinitusTeamPanel />;
 }
 
-export const Route = createFileRoute("/settings/team")({
+export const Route = createFileRoute("/_chat/settings/team")({
   component: SettingsTeamRoute,
 });

@@ -1,0 +1,1 @@
+Desktop: Settings › Engines, Menu bar, Team, Priority, Animations and Notifications open inside the Settings window again, with its sidebar and close button, so the per-engine on/off switches are back where you expect them.

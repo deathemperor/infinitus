@@ -10,17 +10,17 @@ import {
 function SettingsDevicesRoute() {
   const { capability } = useInfinitusEnvironment();
   return (
-    <>
-      <DevicesSettingsPanel />
+    <DevicesSettingsPanel>
       {capability === true ? (
         <InfinitusPrefsPanel
+          contained={false}
           sectionSlugs={["devices"]}
           title="Paired devices"
           lead={<InfinitusPairingRequestsCard />}
           footer={<InfinitusCrashesCard />}
         />
       ) : null}
-    </>
+    </DevicesSettingsPanel>
   );
 }
 
