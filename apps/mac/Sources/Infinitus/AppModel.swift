@@ -102,6 +102,15 @@ final class AppModel: ObservableObject {
             else { for fleet in registry.fleets { fleet.pendingReset = nil } }
         }
     }
+    /// The same staging for a row's Remove…, on any fleet, a peer's too.
+    var pendingRemoveFleet: FleetState? { registry.fleets.first { $0.pendingRemove != nil } }
+    var pendingRemove: Int? {
+        get { pendingRemoveFleet?.pendingRemove }
+        set {
+            if let newValue { primary?.pendingRemove = newValue }
+            else { for fleet in registry.fleets { fleet.pendingRemove = nil } }
+        }
+    }
     @Published var dataPulseTick = 0
 
     /// A fleet's rows changed: whoever observes the host (title, popup
@@ -1908,6 +1917,12 @@ final class AppModel: ObservableObject {
         fleet.redeemReset(pick)
         pendingReset = nil
     }
+    /// The confirm alert's Remove: the fleet that staged it.
+    func commitPendingRemove() {
+        guard let fleet = pendingRemoveFleet, let number = fleet.pendingRemove else { return }
+        fleet.remove(number)
+        pendingRemove = nil
+    }
     func rotate() { primary?.rotate() }
 
     @Published var reorderError: String?
@@ -1931,6 +1946,7 @@ final class AppModel: ObservableObject {
     }
     func setPreferred(_ number: Int, _ on: Bool) { primary?.setPreferred(number, on) }
     func setAutoIgnite(_ number: Int, _ on: Bool) { primary?.setAutoIgnite(number, on) }
+    func remove(_ number: Int) { primary?.remove(number) }
     func reorder(_ order: [Int], done: (() -> Void)? = nil) {
         guard let primary else { done?(); return }
         primary.reorder(order, done: done)

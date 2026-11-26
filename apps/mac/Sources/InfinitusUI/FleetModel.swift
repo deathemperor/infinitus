@@ -116,6 +116,10 @@ public protocol FleetModel: ObservableObject {
     /// and `redeemReset` spends it. The provider gives none back.
     var pendingReset: ResetPick? { get set }
     func redeemReset(_ pick: ResetPick)
+    /// A row's Remove… staged the account's removal; the host confirms it
+    /// (the login is deleted for good) and `remove` carries it out.
+    var pendingRemove: Int? { get set }
+    func remove(_ number: Int)
 }
 
 // `FleetLabel` moved to InfinitusCore (FleetPanel.swift) so the Windows
@@ -159,6 +163,11 @@ public extension FleetModel {
         set {}
     }
     func redeemReset(_ pick: ResetPick) {}
+    var pendingRemove: Int? {
+        get { nil }
+        set {}
+    }
+    func remove(_ number: Int) {}
 }
 
 /// The cash column's source — the estimated-spend report the mac app

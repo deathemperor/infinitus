@@ -637,6 +637,14 @@ struct AccountRowMenu<M: FleetModel>: View {
                 .disabled(offer.hold != nil)
             }
         }
+        if AccountRemoval.offered(account, capabilities: model.capabilities) {
+            Divider()
+            Button(role: .destructive) {
+                model.pendingRemove = account.number
+            } label: {
+                Label("Remove…", systemImage: "trash")
+            }
+        }
     }
 }
 

@@ -101,6 +101,24 @@ public extension EngineFleet {
     }
 }
 
+/// Forgetting an account from its row's menu. The login is deleted for
+/// good, so the popup only stages it and asks first, naming the account
+/// and the machine whose engine holds it.
+public enum AccountRemoval {
+    /// The live login is never offered: swapd refuses to remove it.
+    public static func offered(_ account: Account, capabilities: EngineCapabilities) -> Bool {
+        capabilities.contains(.remove) && !account.active
+    }
+
+    /// `machine` is a peer's label; nil is this Mac.
+    public static func confirmText(_ account: Account, machine: String?) -> String {
+        let name = account.alias.flatMap { $0.isEmpty ? nil : $0 }
+            ?? String(account.email.prefix(while: { $0 != "@" }))
+        return "This deletes \(name)'s saved login (\(account.email)) on \(machine ?? "this Mac") "
+            + "for good. Only signing in again brings it back."
+    }
+}
+
 /// The account panel's CONTENT, decided without touching any UI toolkit.
 public enum FleetPanel {
     /// One usage window as a panel draws it: a label, a percentage, a
