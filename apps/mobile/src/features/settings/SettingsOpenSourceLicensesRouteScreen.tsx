@@ -18,7 +18,8 @@ import {
   UPSTREAM_REPOSITORY_URL,
 } from "@infinitus/shared/productName";
 import { useMemo, useState } from "react";
-import { Linking, Platform, Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SymbolView } from "../../components/ui/AppSymbol";
@@ -204,7 +205,7 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
             <Pressable
               accessibilityHint={gt("Opens the project website")}
               accessibilityRole="link"
-              onPress={() => void Linking.openURL(sourceUrl)}
+              onPress={() => void tryOpenExternalUrl(sourceUrl)}
               className="min-h-12 flex-row items-center gap-2 self-start py-2 active:opacity-60"
             >
               <Text className="font-infinitus-medium text-primary-text">

@@ -1,5 +1,6 @@
 # Running the server in the background
 
+<<<<<<< HEAD
 A Linux machine can run the Infinitus server as a service for your user, so it
 stays available to your phone, a browser or the desktop app without a terminal
 kept open.
@@ -82,12 +83,42 @@ network. `infinitus status` says so, and `infinitus up --no-lan` turns it off. A
 Put custom environment variables in `service.env` under the service's Infinitus home
 directory, normally `~/.infinitus/service.env`. This file survives service installation
 and updates. For example:
+=======
+Run Infinitus as a background user service on Linux, macOS, or Windows so your host stays reachable without keeping a terminal open.
+
+## Manage the service
+
+Install the `t3` CLI first ([Command line](./install.md#command-line)), then run these commands on the host machine:
+
+| Task                                    | Command                                                   |
+| --------------------------------------- | --------------------------------------------------------- |
+| Set up access from other devices        | `t3 up`                                                   |
+| Check how other devices reach it        | `t3 status`                                               |
+| Install and start (or repair)           | `t3 service install`                                      |
+| Check status and log path               | `t3 service status`                                       |
+| Update to a newer release               | `t3 update`                                               |
+| Restart                                 | `t3 service restart`                                      |
+| Stop and remove from startup            | `t3 service uninstall`                                    |
+| Remove service, launcher, and downloads | `t3 uninstall` (keeps `~/.t3/userdata` and `service.env`) |
+
+- Pairing codes are never written to logs; run `t3 pair` or `t3 up` on the host to connect a device.
+- `t3 update` asks before restarting (pass `--yes` in scripts). Pin a version with `t3 update 0.0.42`, switch tracks with `--channel nightly`, or downgrade with `--allow-downgrade`.
+
+## Local network access
+
+New services bind to localhost only. Run `t3 up --lan` (sets `T3CODE_LAN=true` in `service.env`) to listen on LAN and Tailscale addresses for direct desktop/mobile connections, or `t3 up --no-lan` to disable it. Anyone on that network can reach the port (gated by pairing). `T3CODE_HOST` overrides `T3CODE_LAN`. Hosted `app.t3.codes` always uses Infinitus Connect.
+
+## Configure the service environment
+
+Add `KEY=VALUE` entries to `service.env` in your Infinitus home directory (`~/.t3/service.env` by default). Values are literal (quote spaces or `#`; no shell expansion) and survive installs and updates.
+>>>>>>> upstream-sync-d878f7b192-upstream-renamed
 
 ```dotenv
 T3CODE_PORT=3773
 T3CODE_HOST=127.0.0.1
 ```
 
+<<<<<<< HEAD
 Use `KEY=VALUE` entries, quoting values that contain spaces or `#`. Values are
 literal: shell commands and variable expansion are not evaluated. Entries
 override the inherited service environment, except for `PATH`, `T3CODE_HOME`,
@@ -111,14 +142,22 @@ macOS: the service commands exist, but no macOS server archive is published
 yet (the install script says so and stops), so there is nothing to install
 them from. Keep the desktop app running on
 the Mac instead; it hosts remote clients the same way.
+=======
+- `PATH`, `T3CODE_HOME`, `T3_BOOT_SERVICE_UNIT`, and `T3_SERVICE_LAUNCHER_CONTEXT` cannot be overridden here.
+- Run `t3 service restart` after editing (and `chmod 600 ~/.t3/service.env` if it holds secrets).
 
-Windows starts the service when you log in and stops it when you sign out. It
-runs without a window as the `t3code-<domain>-<user name>` task in Task Scheduler, and Task
-Scheduler starts it again within a minute if it exits. Lock the screen instead
-of signing out, and keep the PC awake, for unattended remote access. Installing
-over SSH while nobody is signed in at the PC can fail at the final start step;
-the service is still installed and will start at the next sign-in.
+## Platform support
 
+- **Linux**: Requires systemd user services with lingering enabled so Infinitus starts at boot and survives logout.
+- **macOS**: Starts at login, stops at logout. Keep the Mac logged in and awake for unattended access. If agents can't read Desktop/Documents/Downloads, grant Full Disk Access to the `t3` path in `~/Library/LaunchAgents/com.t3tools.t3code.service.plist`.
+- **Windows**: Runs windowless via Task Scheduler (`t3code-<domain>-<user>`) while signed in and auto-restarts on exit. Lock the screen instead of signing out for unattended access.
+
+> Note: Signing out of Infinitus Connect does not stop or uninstall the background service.
+>>>>>>> upstream-sync-d878f7b192-upstream-renamed
+
+## Keep the server responsive under memory pressure (Linux)
+
+<<<<<<< HEAD
 `infinitus up` installs the service when you set up Infinitus Connect, but the two are managed
 separately. Signing out of Infinitus Connect does not stop or uninstall the service.
 
@@ -128,27 +167,35 @@ On Linux, agents already run with lower priority than the server. When they
 fill the machine's memory, though, the kernel may still slow down or stop the
 server, because only an administrator can reserve memory for it. Run, as your
 normal user:
+=======
+On Linux, agents run at lower priority than the server, but heavy memory use can still trigger the OOM killer. Run as your normal user:
+>>>>>>> upstream-sync-d878f7b192-upstream-renamed
 
 ```sh
 t3 service protect
 ```
 
-It shows the system settings it will change, asks before applying them, and
-then asks for your sudo password. If the machine runs Tailscale or SSH, it
-also offers to protect them, so you can still reach the machine. Memory
-protection takes effect at once. The server's protection from the kernel's
-out-of-memory killer takes effect after `t3 service restart`. `t3 service status` reports whether
-the protection is in place, and `t3 service protect --undo` removes it.
+It previews system changes, asks for confirmation and `sudo`, and optionally protects Tailscale and SSH too. Run `t3 service restart` for OOM-killer protection to take effect, or `t3 service protect --undo` to remove it.
 
 ## Troubleshooting
 
+<<<<<<< HEAD
 Start with `infinitus service status` on the host. It prints the log path and checks
 whether the installed service is running, enabled, and allowed to survive
 logout.
+=======
+Run `t3 service status` on the host to see the log path and health checks:
+>>>>>>> upstream-sync-d878f7b192-upstream-renamed
 
-If it stops when your SSH session closes, check for `linger-disabled`. An
-administrator can enable lingering with:
+| Status                                 | Fix                                                                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `linger-disabled`                      | Run `sudo loginctl enable-linger "$(id -un)"` (or `ssh -t your-server '...'`), then retry setup as your normal user. Never run Infinitus as root. |
+| `linger-unavailable`                   | Check `loginctl show-user "$(id -un)" --property=Linger` and verify `systemd-logind`.                                                             |
+| `user-manager-unavailable`             | Run `systemctl --user status` in a login session to verify systemd user support.                                                                  |
+| `service-disabled` / `service-stopped` | Check the log and `systemctl --user status t3code.service`, then run `t3 service install`.                                                        |
+| `restart-pending`                      | Run `t3 service restart` to switch to the newly installed version.                                                                                |
 
+<<<<<<< HEAD
 ```sh
 sudo loginctl enable-linger "$(id -un)"
 ```
@@ -173,22 +220,17 @@ and keep that session open.
 
 For failures after signing in to Infinitus Connect, see
 [connection troubleshooting](./t3-connect-troubleshooting.md).
+=======
+For Infinitus Connect issues, see [Infinitus Connect troubleshooting](./t3-connect-troubleshooting.md).
+>>>>>>> upstream-sync-d878f7b192-upstream-renamed
 
 ## Reclaim database space
 
-Infinitus removes internal history older than a day on its own while it runs;
-your conversations are kept. Databases created before this shrank automatically
-still hold the freed space on disk until a one-time offline repair returns it
-and turns on automatic shrinking. Settings > Maintenance (web and desktop) or
-Settings > Maintenance (mobile) suggests the repair when at least 1 GiB can be
-reclaimed.
+Infinitus automatically prunes old internal history while keeping conversations. Older databases that still hold freed space show a **Reclaim** button in **Settings → Maintenance** when at least 1 GiB is reclaimable (pauses the server/agents during repair).
 
-When the desktop app or the background service runs Infinitus on that machine,
-select **Reclaim** in Settings on web or desktop. Infinitus checks for free disk
-space, then stops, repairs the database, and starts again. It is offline while
-the repair runs, and running agents stop. If the repair fails, Settings shows
-why.
+For manually started servers (or CLI use), stop any hand-started server or desktop app and run:
 
+<<<<<<< HEAD
 In other cases, such as a server you started by hand, run `infinitus doctor` on the
 machine that hosts the environment. It reports the database size and the
 space it can reclaim, then asks which repairs to run;
@@ -217,3 +259,13 @@ is gone, a version before 0.1.0 starts with no threads or settings. It does
 not offer to delete it while any project or thread you have not deleted is
 missing from the current database, so the old file stays available for
 recovery.
+=======
+```sh
+t3 doctor          # Interactive repair (auto-stops/restarts a background service)
+t3 doctor --dry-run
+t3 doctor --fix    # Non-interactive recommended repairs
+```
+
+- Needs free disk space of ~2× active data size (in `TMPDIR`/`/var/tmp` and beside the database). Large databases can take over an hour.
+- `t3 doctor` optionally offers to remove the legacy pre-0.1.0 `state.sqlite` backup only when all active projects and threads exist in the current database (`--fix` never deletes it automatically).
+>>>>>>> upstream-sync-d878f7b192-upstream-renamed

@@ -1,4 +1,3 @@
-import type { TranscriptionResult } from "@react-native-ai/apple/src/NativeAppleTranscription";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -8,10 +7,9 @@ import {
 import { resetVoiceInputGlobalsForTests } from "../../../../packages/client-runtime/src/voice-input/controller";
 
 const mocks = vi.hoisted(() => ({
-  isAvailable: vi.fn<(locale: string) => boolean>(),
-  prepare: vi.fn<(locale: string) => Promise<string>>(),
-  transcribe: vi.fn<(audio: ArrayBufferLike, locale: string) => Promise<TranscriptionResult>>(),
-  readAudio: vi.fn<() => Promise<ArrayBuffer>>(),
+  isAvailable: vi.fn<() => boolean>(),
+  prepare: vi.fn<(locale: string) => Promise<string | null>>(),
+  transcribe: vi.fn<(uri: string, locale: string) => Promise<string>>(),
   preferredLanguages: [] as unknown,
 }));
 
@@ -20,33 +18,15 @@ vi.mock("react-native", () => ({
   Settings: { get: (key: string) => (key === "AppleLanguages" ? mocks.preferredLanguages : null) },
 }));
 
-vi.mock("@react-native-ai/apple/src/NativeAppleTranscription", () => ({
-  default: {
-    isAvailable: mocks.isAvailable,
-    prepare: mocks.prepare,
-    transcribe: mocks.transcribe,
-  },
-}));
-
-vi.mock("expo-file-system", () => ({
-  File: class {
-    arrayBuffer = mocks.readAudio;
-  },
+vi.mock("expo", () => ({
+  requireOptionalNativeModule: () => ({
+    isAppleSpeechAvailable: mocks.isAvailable,
+    prepareAppleSpeech: mocks.prepare,
+    transcribeWithAppleSpeech: mocks.transcribe,
+  }),
 }));
 
 import { getLocalVoiceTranscriber } from "./voiceTranscription.ios";
-
-const audio = new ArrayBuffer(4);
-const nativeTranscript: TranscriptionResult = {
-  duration: 2,
-  segments: [
-    { text: " Hej", startSecond: 0, endSecond: 1 },
-    { text: "världen. ", startSecond: 1, endSecond: 2 },
-  ],
-};
-
-const unsupportedLocale = () =>
-  Object.assign(new Error("unsupported"), { code: "AppleTranscriptionUnsupportedLocale" });
 
 function useLanguages(preferred: ReadonlyArray<string>, appLocale: string) {
   mocks.preferredLanguages = preferred;
@@ -109,8 +89,7 @@ beforeEach(() => {
   useLanguages([], "sv-SE");
   mocks.isAvailable.mockReturnValue(true);
   mocks.prepare.mockResolvedValue("sv-SE");
-  mocks.readAudio.mockResolvedValue(audio);
-  mocks.transcribe.mockResolvedValue(nativeTranscript);
+  mocks.transcribe.mockResolvedValue("Hej världen.");
 });
 
 afterEach(() => {
@@ -140,19 +119,19 @@ describe("getLocalVoiceTranscriber", () => {
   ])("prepares $case", async ({ preferred, supported, tried }) => {
     useLanguages(preferred, "en-US");
     mocks.prepare.mockImplementation(async (candidate) => {
-      if (!supported.includes(candidate)) throw unsupportedLocale();
+      if (!supported.includes(candidate)) return null;
       return candidate;
     });
 
     const locale = tried.at(-1)!;
     expect(await transcribeOnce()).toEqual({ text: "Hej världen.", locale });
     expect(mocks.prepare.mock.calls.map(([candidate]) => candidate)).toEqual(tried);
-    expect(mocks.transcribe).toHaveBeenCalledWith(audio, locale);
+    expect(mocks.transcribe).toHaveBeenCalledWith("file:///voice.m4a", locale);
   });
 
   it("reports an unsupported language when neither preferred nor app locales are supported", async () => {
     useLanguages(["gsw-CH"], "yi");
-    mocks.prepare.mockRejectedValue(unsupportedLocale());
+    mocks.prepare.mockResolvedValue(null);
 
     expect(await transcribeOnce()).toMatchObject({ code: "unsupported-locale" });
     expect(mocks.prepare.mock.calls.map(([candidate]) => candidate)).toEqual(["gsw-CH", "yi"]);
@@ -163,7 +142,7 @@ describe("getLocalVoiceTranscriber", () => {
     async (failure) => {
       useLanguages(["ko-KR", "ja-JP"], "en-US");
       const entered = Promise.withResolvers<void>();
-      const nativePrepare = Promise.withResolvers<string>();
+      const nativePrepare = Promise.withResolvers<string | null>();
       mocks.prepare.mockImplementation(() => {
         entered.resolve();
         return nativePrepare.promise;
@@ -174,7 +153,7 @@ describe("getLocalVoiceTranscriber", () => {
       await entered.promise;
       if (failure === "cancellation") {
         controller.abort();
-        nativePrepare.reject(unsupportedLocale());
+        nativePrepare.resolve(null);
       } else {
         nativePrepare.reject(Object.assign(new Error("download failed"), { code: "Network" }));
       }
@@ -187,7 +166,7 @@ describe("getLocalVoiceTranscriber", () => {
   );
 
   it("records while Apple prepares its speech model and transcribes once it is ready", async () => {
-    const nativePrepare = Promise.withResolvers<string>();
+    const nativePrepare = Promise.withResolvers<string | null>();
     mocks.prepare.mockReturnValue(nativePrepare.promise);
     const dictation = createDictation();
 
@@ -207,7 +186,7 @@ describe("getLocalVoiceTranscriber", () => {
   it.each(["cancel", "cancel after stop", "model failure", "model failure after stop"] as const)(
     "discards early audio without a late commit after %s",
     async (ending) => {
-      const nativePrepare = Promise.withResolvers<string>();
+      const nativePrepare = Promise.withResolvers<string | null>();
       mocks.prepare.mockReturnValue(nativePrepare.promise);
       const dictation = createDictation();
       await dictation.controller.start();
@@ -243,12 +222,12 @@ describe("getLocalVoiceTranscriber", () => {
     },
   );
 
-  it("does not start native transcription after cancellation during a file read", async () => {
-    const enteredRead = Promise.withResolvers<void>();
-    const readResult = Promise.withResolvers<ArrayBuffer>();
-    mocks.readAudio.mockImplementation(() => {
-      enteredRead.resolve();
-      return readResult.promise;
+  it("discards transcription if cancelled while the native module reads the recording", async () => {
+    const entered = Promise.withResolvers<void>();
+    const transcription = Promise.withResolvers<string>();
+    mocks.transcribe.mockImplementation(() => {
+      entered.resolve();
+      return transcription.promise;
     });
     const controller = new AbortController();
     const options = { signal: controller.signal };
@@ -257,13 +236,12 @@ describe("getLocalVoiceTranscriber", () => {
       .transcribe("file:///voice.m4a", options)
       .catch((error: unknown) => error);
 
-    await enteredRead.promise;
+    await entered.promise;
     controller.abort();
-    readResult.resolve(audio);
+    transcription.resolve("Hej världen.");
 
     const error = await result;
     expect(error).toBeInstanceOf(VoiceTranscriptionError);
     expect(error).toMatchObject({ code: "cancelled" });
-    expect(mocks.transcribe).not.toHaveBeenCalled();
   });
 });
