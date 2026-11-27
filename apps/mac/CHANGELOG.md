@@ -10,6 +10,23 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.50
+
+### Desktop
+- Brings in upstream T3 Code v0.1.12 and v0.1.13.
+- Workflows: durable, scheduled agent runs you define in files, with pools that cap how many run at once.
+- A project can cover several repositories, and issues can come from several Linear teams or accounts.
+- Linked environments: read another machine's threads from this one, and connect to it from a read-only thread.
+- The environments page is a map of your machines, and sidebar thread rows show their environment.
+- Dictate on this Mac with Apple Speech.
+- Sign in to an agent's MCP server straight from its warning.
+- Copy file previews, chat tables as HTML and paths from the file sidebar; duplicate and reload browser tabs from their menu.
+- Stop devices one by one or all at once from the Device panel.
+- Agents with a limited mode can no longer steer into a turn that has more access than they do.
+
+### Phone
+- Workflows, side chats, subagents and previews come to the phone, and Android's terminal gets a close button.
+
 ## 0.5.0-alpha.49
 
 ### Mac
