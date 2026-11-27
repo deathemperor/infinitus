@@ -33,7 +33,12 @@ import { useRemoteConnections } from "../../state/use-remote-environment-registr
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
-import { autoConnectReport, devAutoConnectAttemptAtom } from "./devAutoConnect";
+import {
+  autoConnectReport,
+  devAutoConnectAttemptAtom,
+  pairingLinksAllowed,
+} from "./devAutoConnect";
+import { linkedEnvironmentPrefillAtom } from "./linkedEnvironmentPrefill";
 import { splitEnvironmentSections } from "./environmentSections";
 import { routePairingPrefill } from "./pairPrefill.logic";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
@@ -46,6 +51,8 @@ type ConnectionsNewRouteParams = {
   readonly pairingUrl?: string;
   readonly autoConnect?: string;
   readonly routeFor?: EnvironmentId;
+  /** A linked machine this app chose to pair with; its details come from app state, never the link. */
+  readonly linked?: string;
 };
 
 export function ConnectionsNewRouteScreen({
@@ -56,15 +63,18 @@ export function ConnectionsNewRouteScreen({
   // (#724); auto-connect stays development-only. See pairPrefill.logic.
   const { pairingUrl: routePairingUrl } = routePairingPrefill({
     params,
-    dev: __DEV__,
+    dev: pairingLinksAllowed(),
     appVariant: Constants.expoConfig?.extra?.appVariant,
   });
+  const known = useAtomValue(linkedEnvironmentPrefillAtom);
+  const linked = known !== null && known.environmentId === params.linked ? known : null;
   // A new prefill link replaces whatever the form held.
   return (
     <PairingForm
-      key={routePairingUrl}
+      key={`${routePairingUrl}:${linked?.environmentId ?? ""}`}
       routePairingUrl={routePairingUrl}
-      routeFor={params.routeFor}
+      routeFor={params.routeFor ?? linked?.environmentId}
+      linked={linked}
     />
   );
 }
@@ -72,9 +82,11 @@ export function ConnectionsNewRouteScreen({
 function PairingForm({
   routePairingUrl,
   routeFor,
+  linked,
 }: {
   readonly routePairingUrl: string;
   readonly routeFor: EnvironmentId | undefined;
+  readonly linked: { readonly label: string; readonly host: string | null } | null;
 }) {
   const gt = useGT();
   const { connectionPairingUrl, onChangeConnectionPairingUrl, onConnectPress } =
@@ -82,7 +94,7 @@ function PairingForm({
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [initialPairing] = useState(() => parsePairingUrl(routePairingUrl || connectionPairingUrl));
-  const [hostInput, setHostInput] = useState(initialPairing.host);
+  const [hostInput, setHostInput] = useState(linked?.host ?? initialPairing.host);
   const [codeInput, setCodeInput] = useState(initialPairing.code);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -214,7 +226,11 @@ function PairingForm({
 
   return (
     <SettingsScreen
-      title={gt("Add environment")}
+      title={
+        linked
+          ? gt("Connect to {environment}", { environment: linked.label })
+          : gt("Add environment")
+      }
       actions={[
         {
           accessibilityLabel: connecting
@@ -299,9 +315,14 @@ function PairingForm({
                   ? gt(
                       "Now type the pairing code from the Mac's Devices card, or ask the Mac to approve.",
                     )
-                  : gt(
-                      "For machines on your local network or tailnet. The machine keeps its own provider credentials.",
-                    ))}
+                  : linked
+                    ? gt(
+                        "Create a pairing code on {environment}, in its Settings → Sharing & access or with `t3 auth pairing create`, and enter it here.",
+                        { environment: linked.label },
+                      )
+                    : gt(
+                        "For machines on your local network or tailnet. The machine keeps its own provider credentials.",
+                      ))}
             </Text>
           </View>
 
@@ -452,7 +473,7 @@ function PairingInputRow({
   readonly label: string;
 }) {
   return (
-    <View collapsable={false} className="h-13 flex-row items-center gap-3 px-4">
+    <View collapsable={false} className="min-h-[48px] flex-row items-center gap-3 px-4">
       <Text
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
@@ -465,7 +486,8 @@ function PairingInputRow({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
-        className="min-h-0 flex-1 rounded-none border-0 bg-transparent p-0 text-base leading-[23px]"
+        textAlignVertical="center"
+        className="min-h-[48px] flex-1 self-stretch rounded-none border-0 bg-transparent p-0 text-base leading-[23px]"
       />
     </View>
   );

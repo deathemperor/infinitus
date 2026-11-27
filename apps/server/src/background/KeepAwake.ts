@@ -14,6 +14,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 
 import * as OrchestrationEventStore from "../persistence/OrchestrationEventStore.ts";
+import { windowsPowerShellPath } from "@infinitus/shared/windowsSystem";
 import { forkParked } from "../serverActivation.ts";
 import * as Settings from "../serverSettings.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
@@ -28,10 +29,11 @@ const WINDOWS_HOLD_SCRIPT = `$t = Add-Type -Name Power -Namespace T3 -PassThru -
  * Each command writes a line to stdout once it holds its inhibitor, holds it until it exits, and
  * exits on its own if the server dies.
  */
-function inhibitorCommand(
+export function inhibitorCommand(
   platform: NodeJS.Platform,
   serverPid: number,
   isWsl: boolean,
+  env: NodeJS.ProcessEnv,
 ):
   | {
       readonly command: string;
@@ -78,7 +80,7 @@ function inhibitorCommand(
       };
     case "win32":
       return {
-        command: "powershell.exe",
+        command: windowsPowerShellPath(env),
         args: [
           "-NoProfile",
           "-NonInteractive",
@@ -146,7 +148,7 @@ export const layer = Layer.effectDiscard(
         Effect.map((release) => release.toLowerCase().includes("microsoft")),
         Effect.orElseSucceed(() => false),
       ));
-    const command = inhibitorCommand(platform, process.pid, isWsl);
+    const command = inhibitorCommand(platform, process.pid, isWsl, yield* HostProcess.Environment);
     if (command === undefined) return;
     const settings = yield* Settings.ServerSettingsService;
     const events = yield* OrchestrationEventStore.OrchestrationEventStore;

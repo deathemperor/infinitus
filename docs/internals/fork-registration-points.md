@@ -572,8 +572,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   The versionless AppImage name reads `resolveDesktopUpdateChannel`:
   `Infinitus-<arch>` on the `infinitus` track, `Infinitus-Nightly-<arch>` otherwise.
 - `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`, `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon project in place of upstream's PlanetScale database (#1322, #1366); `infra/relay/package.json` and `pnpm-workspace.yaml` carry `@alchemy.run/neon` in place of `@alchemy.run/planetscale`. Rules and traps: `docs/internals/release-and-updates.md`.
-- `docs/operations/connect-setup.md` — the "Sign in with Apple (phone)" section: the Apple Services ID, key and Clerk connection App Review's guideline 4.8 requires next to Google (#10, 2026-09-22).
-- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
+- `docs/operations/02_connect-setup.md` — the "Sign in with Apple (phone)" section: the Apple Services ID, key and Clerk connection App Review's guideline 4.8 requires next to Google (#10, 2026-09-22).
+- `docs/operations/00_development.md` — the "Publishing to the Mac app" subsection: only the installed desktop's bundled server publishes its port to the Mac app, `INFINITUS_PUBLISH_SERVER_PORT=1` opts a dev server in (#1487).
+- `docs/internals/12_mobile-navigation.md` — the native-media bullet on why an attachment preview reuses its thumbnail's signed URL (`previewUrlReuse.logic.ts`).
+- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/02_connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
   `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
   #1375) added to `RelayApi` beside upstream's server group, and its handler
@@ -812,7 +814,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/modules/t3-agent-notifications/android/.../AgentNotifications.kt`
   — `contentIntent` takes `/settings/accounts` beside `/threads/…` for the
   same alert (#1375).
-- `apps/mobile/src/components/FilePreviewModal.tsx` (+ `FilePreviewModal.types.ts`, where the source types moved) — the optional `cachedUrl` on an environment-hosted source, and the one retry with a fresh URL when a reused one is refused (`previewUrlReuse.logic.ts`). Why: `docs/internals/mobile-navigation.md`.
+- `apps/mobile/src/components/FilePreviewModal.tsx` (+ `FilePreviewModal.types.ts`, where the source types moved) — the optional `cachedUrl` on an environment-hosted source, and the one retry with a fresh URL when a reused one is refused (`previewUrlReuse.logic.ts`). Why: `docs/internals/12_mobile-navigation.md`.
 - `packages/client-runtime/package.json` — the fork's `./state/infinitus*` subpath exports (`infinitusAccounts`, `infinitusUtilization`, `infinitusQuotaTimeline` and the rest), one entry per fork-owned model file, and `./relay/infinitusTeam` + `./relay/infinitusTeamLogic` (#1592).
 - `apps/web/src/timestampFormat.ts` — `timestampLocale` exported, so the Accounts page's quota timeline (`QuotaTimeline.tsx`) writes its day labels in the same locale as every other timestamp.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — `MessageAttachmentImage`: a haptic on press, and the thumbnail's URL handed to the preview as `cachedUrl` (`previewUrlReuse.logic.ts`). The trash beside a queued reply's pencil (`confirmDeletePendingMessage.ts`, #1501); both hide on `sendingMessageId`, the prop that replaced `dispatchingMessageId` here and in `ThreadDetailScreen.tsx` / `ThreadRouteScreen.tsx`, fed by `use-thread-composer-state.ts`'s `sendingQueuedMessageId`.
@@ -843,7 +845,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `SettingsPath` union, `INFINITUS_SECTION_LABELS`, `INFINITUS_CATEGORY_SCOPES`
   and `INFINITUS_SETTINGS_SEARCH_ITEMS`, the last at the Infinitus pages'
   place in result order), `INFINITUS_NAV_PATHS` as one heading-less group in
-  `SETTINGS_NAV_GROUPS` before Maintenance, the `infinitusOnly` search flag with the
+  `ALL_SETTINGS_NAV_GROUPS` before Maintenance, the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, `isSettingsSectionActive`
   so a nested page's nav item is the only one lit, `CONNECT_NAME` as the
   Connect section's title, and search terms naming `infinitus.json` and the
@@ -851,7 +853,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — one import from
   `infinitus/settingsNav.ts`, `...INFINITUS_SECTION_ICONS` spread into the icon
-  map, `useInfinitusNavGroups(SETTINGS_NAV_GROUPS)` feeding the groups loop,
+  map, `useInfinitusNavGroups(settingsNavGroups(…))` feeding the groups loop,
   and the `isSettingsSectionActive(activePath, to)` call (#1565).
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
@@ -921,10 +923,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   paths (#1192). `docs/user/install.md` (the install sections) and
   `docs/user/background-service.md` (whole) say the same; `updating.md`,
   `remote-access.md`, `install.md`'s mobile section
-  (installed from a build, no store), `docs/operations/release.md` (a fork
+  (installed from a build, no store) and `docs/operations/03_release.md` (a fork
   note at the top pointing at `infinitus-release.yml` and
-  `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) and
-  `docs/operations/observability.md`'s two `npx t3` examples follow (#1207).
+  `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) follow (#1207).
 - `docs/user/mobile-notifications.md` — the "Alerts from an Infinitus Mac"
   section appended at the end (#1178, rewritten for #1375): a Mac's account
   alerts ride Infinitus Connect's Device Notifications and open Settings ›

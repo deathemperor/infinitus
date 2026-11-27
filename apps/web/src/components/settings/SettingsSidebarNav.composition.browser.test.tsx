@@ -2,21 +2,24 @@ import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, render } from "../../../test/render";
+import { AppRouteModal } from "../AppRouteModal";
 import { SidebarProvider } from "../ui/sidebar";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
 import { INFINITUS_NAV_PATHS } from "./infinitus/settingsSearchItems";
-import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS } from "./settingsSearch";
+import { settingsNavGroups, SETTINGS_SECTION_LABELS } from "./settingsSearch";
 
 // Fork: no environment here has the Infinitus capability, so its group is hidden.
-const VISIBLE_NAV_GROUPS = SETTINGS_NAV_GROUPS.filter(
-  (group) => group.paths !== INFINITUS_NAV_PATHS,
+const VISIBLE_NAV_GROUPS = settingsNavGroups(false).filter(
+  (group) => !group.paths.some((to) => (INFINITUS_NAV_PATHS as ReadonlyArray<string>).includes(to)),
 );
 
 vi.mock("./useAvailableSettingsSearchItems", () => ({
   useAvailableSettingsSearchItems: () => [
     { id: "theme", title: "Theme", to: "/settings/appearance" },
   ],
+  useHasSecretProvidersEnvironment: () => false,
 }));
+vi.mock("../chat/GlobalVoiceInputIndicator", () => ({ GlobalVoiceInputIndicator: () => null }));
 
 it("ignores composing keys in the search", async () => {
   await using screen = await render(
@@ -48,6 +51,41 @@ it("ignores composing keys in the search", async () => {
   await vi.waitFor(() =>
     expect(screen.router?.state.location.pathname).toBe("/settings/appearance"),
   );
+});
+
+it("Esc clears a search of spaces and a held Esc keeps Settings open", async () => {
+  await using _screen = await render(
+    <AppRouteModal label="Settings">
+      <SidebarProvider defaultOpen>
+        <SettingsSidebarNav pathname="/settings/general" />
+      </SidebarProvider>
+    </AppRouteModal>,
+    { router: "/settings/general" },
+  );
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  const search = page.getByRole("combobox", { name: "Search settings" });
+  await expect.element(settings).toHaveFocus();
+
+  for (const text of ["theme", "   "]) {
+    await search.fill(text);
+    await userEvent.keyboard("{Escape}");
+    await expect.element(search).toHaveValue("");
+    await expect.element(search).toHaveFocus();
+    await act(() =>
+      search.element().dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          repeat: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    await expect.element(settings).toHaveAttribute("data-open");
+  }
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(settings).not.toBeInTheDocument();
 });
 
 function renderNav() {

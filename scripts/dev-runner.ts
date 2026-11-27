@@ -22,6 +22,7 @@ import { Argument, Command, Flag } from "effect/cli";
 import { ChildProcess } from "effect/process";
 
 import { defaultDevMemoryLimitBytes, enforceDevMemoryLimit } from "./lib/dev-memory-limit.ts";
+import { acquireDevRunnerLock } from "./lib/dev-runner-lock.ts";
 import { type DevShareError, shareDevServer, unshareDevServer } from "./lib/dev-share.ts";
 import { loadRepoEnv } from "./lib/public-config.ts";
 
@@ -101,7 +102,7 @@ type DevMode = keyof typeof MODE_ARGS;
 type PortAvailabilityCheck<R = never> = (
   port: number,
   role?: "server" | "web",
-) => Effect.Effect<boolean, never, R>;
+) => Effect.Effect<boolean, NetService.NetListenError, R>;
 
 const DEV_RUNNER_MODES = Object.keys(MODE_ARGS) as Array<DevMode>;
 
@@ -435,11 +436,11 @@ function portPairForOffset(offset: number): {
 }
 
 export const checkPortAvailabilityOnHosts = Effect.fn("dev-runner.checkPortAvailabilityOnHosts")(
-  function* <R>(
+  function* <E, R>(
     port: number,
     hosts: ReadonlyArray<string>,
-    canListenOnHost: (port: number, host: string) => Effect.Effect<boolean, never, R>,
-  ): Effect.fn.Return<boolean, never, R> {
+    canListenOnHost: (port: number, host: string) => Effect.Effect<boolean, E, R>,
+  ): Effect.fn.Return<boolean, E, R> {
     for (const host of hosts) {
       if (!(yield* canListenOnHost(port, host))) {
         return false;
@@ -465,7 +466,7 @@ const makeDefaultCheckPortAvailability =
       const net = yield* NetService.NetService;
       const hosts = role === "web" ? DEV_PORT_PROBE_HOSTS : devPortProbeHosts(configuredHost);
       return yield* checkPortAvailabilityOnHosts(port, hosts, (candidatePort, host) =>
-        net.canListenOnHost(candidatePort, host),
+        net.probeListenOnHost(candidatePort, host),
       );
     });
 
@@ -485,7 +486,11 @@ export const findFirstAvailableOffset = Effect.fn("dev-runner.findFirstAvailable
   requireServerPort,
   requireWebPort,
   checkPortAvailability,
-}: FindFirstAvailableOffsetInput<R>): Effect.fn.Return<number, DevRunnerPortExhaustedError, R> {
+}: FindFirstAvailableOffsetInput<R>): Effect.fn.Return<
+  number,
+  DevRunnerPortExhaustedError | NetService.NetListenError,
+  R
+> {
   const checkPort = (checkPortAvailability ??
     defaultCheckPortAvailability) as PortAvailabilityCheck<R>;
 
@@ -506,7 +511,7 @@ export const findFirstAvailableOffset = Effect.fn("dev-runner.findFirstAvailable
       continue;
     }
 
-    const checks: Array<Effect.Effect<boolean, never, R>> = [];
+    const checks: Array<Effect.Effect<boolean, NetService.NetListenError, R>> = [];
     if (requireServerPort) {
       checks.push(checkPort(serverPort, "server"));
     }
@@ -552,7 +557,7 @@ export const resolveModePortOffsets = Effect.fn("dev-runner.resolveModePortOffse
   checkPortAvailability,
 }: ResolveModePortOffsetsInput<R>): Effect.fn.Return<
   { readonly serverOffset: number; readonly webOffset: number },
-  DevRunnerPortExhaustedError,
+  DevRunnerPortExhaustedError | NetService.NetListenError,
   R
 > {
   const checkPort = (checkPortAvailability ??
@@ -817,6 +822,15 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
     return;
   }
 
+  // Same state directory as the server's deriveServerPaths, so `dev:web` (no server) skips it.
+  if (input.mode !== "dev:web") {
+    const path = yield* Path.Path;
+    yield* acquireDevRunnerLock(
+      env.T3CODE_HOME ? path.join(env.T3CODE_HOME, "userdata") : path.join(baseDir, "dev"),
+      `pid ${String(process.pid)}, ${input.mode}, server port ${String(env.T3CODE_PORT)}, web port ${String(env.PORT)}`,
+    );
+  }
+
   const sharedWebPort = BASE_WEB_PORT + webOffset;
   let built = false;
   if (input.share) {
@@ -926,8 +940,10 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
     extendEnv: false,
     shell: spawnCommand.shell,
     // Its own process group: teardown signals the whole group, because vp
-    // does not pass SIGTERM on to Vite and the server.
-    detached: true,
+    // does not pass SIGTERM on to Vite and the server. Windows tears down with
+    // taskkill /T instead, and a detached shell there leaves vp to open a
+    // visible console of its own.
+    detached: (yield* HostProcess.Platform) !== "win32",
     forceKillAfter: "1500 millis",
   }).pipe(
     Effect.mapError(
