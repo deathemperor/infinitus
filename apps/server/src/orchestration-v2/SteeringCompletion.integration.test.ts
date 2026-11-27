@@ -1985,11 +1985,17 @@ it.effect(
         assert.equal(refused.runtimeMode, "full-access");
         yield* worker.drain();
         assert.deepEqual(steered, []);
+        const steerRun = Effect.map(orchestrator.getThreadProjection(threadId), (projection) =>
+          projection.runs.find((run) => run.userMessageId === steer.messageId),
+        );
+        assert.isUndefined(yield* steerRun);
 
-        // The refusal records nothing, and a caller without the limit still reaches the turn.
+        // The refusal records nothing, and a caller without the limit still reaches the turn:
+        // the fork parks its steer for the turn's next tool boundary.
         yield* orchestrator.dispatch(steer);
         yield* worker.drain();
-        assert.lengthOf(steered, 1);
+        assert.deepEqual(steered, []);
+        assert.equal((yield* steerRun)?.sendAt, "tool_boundary");
 
         // The turn's own record decides: one that started within the limit takes the steer.
         const attempt = (yield* orchestrator.getThreadProjection(threadId)).attempts[0]!;
@@ -2016,7 +2022,7 @@ it.effect(
           })
           .pipe(Effect.provideService(DispatchModeLimit, supervised));
         yield* worker.drain();
-        assert.lengthOf(steered, 2);
+        assert.lengthOf(steered, 1);
       }).pipe(Effect.provide(layer));
     }),
 );

@@ -8041,15 +8041,16 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       }
     }
     // Fork (#1318, #1627): a composer steer into a live turn queues with `sendAt: "tool_boundary"`;
-    // `InfinitusToolBoundarySteer` promotes it at the turn's next tool result, else the idle drain
-    // takes it. A run not yet in a turn keeps upstream's steer-when-ready above; `auto`, mailbox
-    // deliveries and restarts keep upstream's immediate delivery.
+    // `InfinitusToolBoundarySteer` promotes it into the next turn to finish a tool, without the
+    // caller's limit, else the idle drain takes it. A run not yet in a turn, `auto`, mailbox
+    // deliveries, restarts and a caller that may not park a steer keep upstream's paths.
     let sendAt: OrchestrationV2Run["sendAt"];
     if (
       command.deliveryIntent === "steer" &&
       dispatchMode.type === "steer_active" &&
       delegatedCompletion === undefined &&
-      command.notification === undefined
+      command.notification === undefined &&
+      !(yield* limitForbidsParkedSteer)
     ) {
       dispatchMode = { type: "queue_after_active" };
       sendAt = "tool_boundary";

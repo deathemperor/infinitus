@@ -983,7 +983,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   provide the passthrough. `Orchestrator.ts` (`message.dispatch`): a
   `deliveryIntent: "steer"` that resolves to `steer_active` and is not a
   mailbox delivery becomes `queue_after_active` with `sendAt: "tool_boundary"`
-  on the queued run; a targeted `steer_active` and `auto` stay upstream's. The
+  on the queued run; a targeted `steer_active`, `auto` and a caller whose
+  `DispatchModeLimit` forbids parking a steer (`limitForbidsParkedSteer`:
+  promotion runs without the caller's limit) stay upstream's, so a limited
+  caller meets upstream's refusal of a turn started above its limit. The
   block runs after upstream's steer-when-ready step, so a steer into a run not
   yet in a turn (preparing, starting) waits for the turn and goes in as upstream's.
   `packages/contracts/src/orchestrationV2.ts` — `OrchestrationV2Run.sendAt`
