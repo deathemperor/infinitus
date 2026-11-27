@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { CONNECT_NAME } from "@infinitus/shared/productName";
+
 import { webhookAddress } from "./webhookAddress.ts";
 
 const endpoint = {
@@ -19,11 +21,11 @@ describe("webhookAddress", () => {
     expect(result.note).toBeNull();
   });
 
-  it("is not copyable and points at T3 Connect when no base URL exists", () => {
+  it("is not copyable and points at Infinitus Connect when no base URL exists", () => {
     const result = webhookAddress(endpoint, null);
     expect(result.address).toBe("/hooks/abc");
     expect(result.copyable).toBe(false);
-    expect(result.note).toContain("T3 Connect");
+    expect(result.note).toContain(CONNECT_NAME);
   });
 
   it("warns that loopback addresses only work on this computer", () => {
