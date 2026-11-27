@@ -319,7 +319,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `provider/CodexDeveloperInstructions.test.ts`). The one exception is
   `orchestration-v2/RestartBackgroundNote.ts`: a Claude replay fixture
   records the note verbatim, so it keeps upstream's words (allowlisted in
-  `scripts/connect-name.guard.test.ts`).
+  `scripts/connect-name.guard.test.ts`); `process/processLauncherWorker.ts`
+  drops the name instead ("started by the server"), since it loads only Node
+  builtins.
 - `packages/provider-*/src/**` — the same rule for the provider packages
   (status messages, text-generation errors, the Muse `clientInfo` title, the
   shared orchestration instructions in `provider-core`), with their tests
@@ -329,7 +331,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `scripts/connect-name.guard.test.ts` scans these roots too, and
   `packages/shared/src/promptLinks.ts` and
   `packages/client-runtime/src/relay/errorPresentation.ts` (+
-  `connection/errors.test.ts`) follow the same rule.
+  `connection/errors.test.ts`) follow the same rule, as do the guard's other
+  roots (`apps/mobile/src`, `packages/contracts/src`, `infra/relay/src`): a
+  `{product}` value handed to `msg()`/`gt()` is the constant, the English
+  around it stays a literal.
 - Resume-on-limit (#648, #1486, #1107, #1627; `docs/internals/resume-on-limit.md`):
   `orchestration-v2/Orchestrator.ts` — `message.dispatch` lets a server-created
   `system` notification start immediately, not only a restart continuation;
@@ -370,8 +375,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `t3-code`), and the agent-facing texts in
   `packages/provider-core/src/server/{runtimeInstructions,orchestrationInstructions}.ts`.
   Thread history still spells the old names, so the readers accept both:
-  `packages/shared/src/t3McpToolPresentation.ts` and
-  `packages/provider-acp/src/server/runtimeModel.ts` (its title regexes).
+  `packages/shared/src/t3McpToolPresentation.ts`,
+  `packages/provider-acp/src/server/runtimeModel.ts` (its title regexes) and
+  `apps/server/src/feedback/FeedbackReport.ts` (`T3_PREFIX` and the OpenCode
+  gate; `FeedbackService.test.ts`'s active-run calls use the fork's spelling).
   Pi's extension keeps upstream's `mcp__t3-code__` tool names. The adapter
   tests assert the new spelling; the Muse and OpenCode replay testkits
   (`MuseAdapterV2.testkit.ts`, `OpenCodeAdapterV2.testkit.ts`) compare the
@@ -931,7 +938,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   alerts ride Infinitus Connect's Device Notifications and open Settings ›
   Accounts; the Devices page names the Mac and pairs a phone. Upstream's
   text above it says Infinitus Connect (#1368) and is otherwise untouched.
-- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `use-new-task-project-defaults.ts` through the fork's `features/infinitus/useProjectFileRead.ts`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
+- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `workspace/TaskFolders.ts`'s layout commands and `workspace/WorkspaceFolders.ts`'s `ignoreRepositories` (one case in each test file writes `infinitus.json`), `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `use-new-task-project-defaults.ts` through the fork's `features/infinitus/useProjectFileRead.ts`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch, and the Lint job
@@ -950,7 +957,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
 - `infra/relay/migrations/postgres/20261005232034_managed_endpoint_tunnel_released_at/snapshot.json` — its `prevIds` also names the fork's Team snapshot, so the chain has one head that includes the Team tables. Procedure: `docs/internals/release-and-updates.md`.
 - `apps/server/src/vcs/GitVcsDriverCore.test.ts` — the "keeps complete stats for files beyond the combined patch limit" fixture rewrites `a-large.txt` to a different byte length (#1517): upstream's same-size rewrite in the same second as its commit intermittently read as unchanged through the index stat cache and dropped the file from the working-tree stats on CI.
-- `apps/server/src/project/AgentSessionScanner.ts` — the base and worktrees dirs are also compared by their realpath (#1661): the candidate was realpath'd but the roots were not, so a T3 home behind a symlink (macOS temp dirs, a linked home) let its own sandboxes into the import list.
 - `apps/server/src/ws.test.ts` — the compression test that builds `Ws.layer` adds `layerInfinitusWsRpcUnused` (`infinitus/Layers/InfinitusWsRpc.testkit.ts`) to its services, since the fork's RPC layer reads seven fork services.
 - `apps/server/src/cli/invocation.test.ts` — the "manual server installation ownership" prefix fixtures realpath their temp root (#1661): the resolver reports the realpath'd prefix, which on macOS is `/private/var/…`, not `/var/…`.
 - `apps/server/src/orchestration-v2/RunExecutionService.ts` — the run's event filter takes a `turn.terminal` for another turn of its own provider thread and run ordinal as the root's while the root turn is open, and the ingest loop logs the mismatch (#1514, `ProviderEventRouteIdentity.runOrdinal`); the "auxiliary or stale provider terminals" test models those as a child provider thread's and another ordinal's.

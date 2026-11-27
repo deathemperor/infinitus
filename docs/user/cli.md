@@ -2,7 +2,7 @@
 
 The `t3` command runs and manages Infinitus servers, background services, remote access, threads, workflows, and diagnostics. Run `t3 --help` or `t3 <command> --help` for full flags.
 
-See [Install Infinitus](./install.md#command-line) for installation (`curl -fsSL https://t3.codes/install.sh | sh`, `irm https://t3.codes/install.ps1 | iex`, or `npx t3@latest`).
+See [Install Infinitus](./install.md#headless-server-linux) for installation (`curl -fsSL https://infinitus.run/install.sh | sh` on Linux; there is no npm package).
 
 ## Running and connecting
 
@@ -22,7 +22,7 @@ See [Install Infinitus](./install.md#command-line) for installation (`curl -fsSL
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `t3 service`                  | Manage the background service (`install`, `status`, `restart`, `uninstall`, `protect [--undo]`). See [Background service](./background-service.md). |
 | `t3 update [version]`         | Update `t3` and the service (`--channel nightly`, `--allow-downgrade`, `--yes`).                                                                    |
-| `t3 install` / `t3 uninstall` | Install or remove the `t3` launcher and background service (keeps `~/.t3/userdata`).                                                                |
+| `t3 install` / `t3 uninstall` | Install or remove the `t3` launcher and background service (keeps `~/.infinitus/userdata`).                                                         |
 
 ## Threads, projects, and workflows
 

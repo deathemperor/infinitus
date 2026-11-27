@@ -217,8 +217,9 @@ it.layer(NodeServices.layer)("WorkspaceFolders", (it) => {
       yield* fileSystem.makeDirectory(path.join(outside, ".git"), { recursive: true });
       // A link to a repository elsewhere is not inside the project.
       yield* fileSystem.symlink(outside, path.join(workspaceRoot, "linked"));
+      // The fork's own name; the case below writes upstream's t3.json.
       yield* fileSystem.writeFileString(
-        path.join(workspaceRoot, "t3.json"),
+        path.join(workspaceRoot, "infinitus.json"),
         JSON.stringify({ ignoreRepositories: ["vendor/big"] }),
       );
       // The stored list is only trusted for what someone added.

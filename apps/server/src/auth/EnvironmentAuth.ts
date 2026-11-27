@@ -57,7 +57,7 @@ import {
   PEER_LINK_PAIRING_SUBJECT_PREFIX,
 } from "../persistence/AuthPairingLinks.ts";
 import { requestUrl } from "../requestUrl.ts";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const DEFAULT_SESSION_SUBJECT = "cli-issued-session";
 export const INTERNAL_ADMINISTRATIVE_BOOTSTRAP_SUBJECT = "administrative-bootstrap";
@@ -111,7 +111,7 @@ export interface McpClientSession {
 export const clientSessionLabel = (client: AuthClientMetadata | undefined): string =>
   client?.label ??
   ([client?.browser, client?.os].filter((part) => part !== undefined).join(" on ") ||
-    "T3 Code client");
+    `${PRODUCT_NAME} client`);
 
 export interface AuthenticatedSession {
   readonly sessionId: AuthSessionId;

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { AgentFeedbackKind, AgentFeedbackTrace } from "@infinitus/contracts";
 import { resolveT3McpToolId } from "@infinitus/shared/t3McpToolPresentation";
 import * as Effect from "effect/Effect";
@@ -12,7 +13,9 @@ export const FEEDBACK_TRACE_TURNS = 5;
 
 const reportFields = {
   kind: AgentFeedbackKind,
-  subject: Schema.String.annotate({ description: "T3 tool name, `t3` command, or `general`." }),
+  subject: Schema.String.annotate({
+    description: `${PRODUCT_NAME} tool name, \`t3\` command, or \`general\`.`,
+  }),
   expected: FeedbackText,
   actual: FeedbackText,
   workaround: FeedbackText.annotate({ description: "What you did instead, or empty." }),
@@ -65,8 +68,7 @@ export const FeedbackAwaitingApproval = Schema.Struct({
 });
 export type FeedbackAwaitingApproval = typeof FeedbackAwaitingApproval.Type;
 
-export const FEEDBACK_OFF_MESSAGE =
-  "Agent feedback is off. Turn it on in T3 Code under Settings > Labs, then try again.";
+export const FEEDBACK_OFF_MESSAGE = `Agent feedback is off. Turn it on in ${PRODUCT_NAME} under Settings > Labs, then try again.`;
 
 export class FeedbackOffError extends Schema.TaggedError<FeedbackOffError>()(
   "FeedbackOffError",
@@ -210,19 +212,21 @@ export const T3_CLI_COMMANDS: ReadonlyArray<string> = [
 export type FeedbackInput = typeof FeedbackInput.Type;
 export type FeedbackReport = typeof FeedbackReport.Type;
 
-export const FEEDBACK_SUBJECT_MESSAGE =
-  "Set subject to the exact T3 tool name, the t3 command, or `general`.";
+export const FEEDBACK_SUBJECT_MESSAGE = `Set subject to the exact ${PRODUCT_NAME} tool name, the t3 command, or \`general\`.`;
 
 // The shared resolver knows the presented tools; the prefix covers the rest, such as these.
-// Codex also registers `t3-code-direct` for T3 tools it keeps out of Code Mode.
-const T3_PREFIX = /^(?:mcp__t3[-_]?code(?:[-_]direct)?__|t3[-_]?code(?:[-_]direct)?[.:/])/iu;
+// Codex also registers `infinitus-direct` for tools it keeps out of Code Mode. Upstream's
+// `t3-code` id stays accepted for older thread history.
+const T3_PREFIX =
+  /^(?:mcp__(?:infinitus|t3[-_]?code)(?:[-_]direct)?__|(?:infinitus|t3[-_]?code)(?:[-_]direct)?[.:/])/iu;
 
 /** The bare name of a registered T3 tool however a provider prefixed it, else undefined. */
 export const resolveT3ToolName = (name: string, toolNames: ReadonlyArray<string>) => {
   const tool = resolveT3McpToolId(name) ?? name.replace(T3_PREFIX, "");
   if (toolNames.includes(tool)) return tool;
-  // OpenCode 2 prefixes tools with `t3-code-<thread>_`, underscores and all: the longest name wins.
-  if (!/^t3-code-/iu.test(name)) return undefined;
+  // OpenCode 2 prefixes tools with `infinitus-<thread>_` (upstream's `t3-code-<thread>_`),
+  // underscores and all: the longest name wins.
+  if (!/^(?:infinitus|t3-code)-/iu.test(name)) return undefined;
   return toolNames
     .filter((candidate) => name.endsWith(`_${candidate}`))
     .toSorted((a, b) => b.length - a.length)[0];

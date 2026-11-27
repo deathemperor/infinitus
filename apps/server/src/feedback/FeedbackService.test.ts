@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NodeOS from "node:os";
 
 import { expect, it } from "@effect/vitest";
@@ -103,9 +104,10 @@ const turnItems = [
   item(6, { type: "dynamic_tool", toolName: "t3-code.t3_thread_read", status: "running" }),
   item(5, { type: "dynamic_tool", toolName: "mcp__t3-code__t3_feedback", status: "running" }),
   item(6, { type: "dynamic_tool", toolName: "mcp__t3-code__t3_feedback", status: "failed" }),
-  // The call making the card in the active run, as Claude names it and as OpenCode 2 does.
-  item(6, { type: "dynamic_tool", toolName: "mcp__t3-code__t3_feedback", status: "running" }),
-  item(6, { type: "dynamic_tool", toolName: "t3-code-thread_1_t3_feedback", status: "running" }),
+  // The call making the card in the active run, as Claude names it and as OpenCode 2 does,
+  // under the fork's server id (the turns above carry upstream's, as older history does).
+  item(6, { type: "dynamic_tool", toolName: "mcp__infinitus__t3_feedback", status: "running" }),
+  item(6, { type: "dynamic_tool", toolName: "infinitus-thread_1_t3_feedback", status: "running" }),
 ];
 
 it("says so when the report asks for more turns than a trace can hold", () => {
@@ -518,7 +520,7 @@ it.effect(
         for (const subject of ["", "acme payments roadmap", "mcp__other__t3_thread_read"]) {
           const error = yield* Effect.flip(feedback.submit({ ...input, subject }, fromThread));
           expect(error.message).toBe(
-            "Set subject to the exact T3 tool name, the t3 command, or `general`.",
+            `Set subject to the exact ${PRODUCT_NAME} tool name, the t3 command, or \`general\`.`,
           );
         }
         const refused = (report: Partial<typeof input>, caller: Feedback.FeedbackCaller) =>

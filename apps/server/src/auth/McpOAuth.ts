@@ -1,3 +1,4 @@
+import { DEFAULT_HOME_DIR_NAME } from "@infinitus/shared/homeDir";
 import {
   AuthAccessWriteScope,
   type AuthMcpApprovalDecision,
@@ -353,8 +354,7 @@ const make = Effect.gen(function* () {
       if (peerLink && !(yield* linksEnabled)) {
         return yield* new AuthMcpRegistrationError({
           error: "invalid_client_metadata",
-          error_description:
-            'Linked environments is off on that machine. Turn it on in its Settings → Labs, or without a desktop, set "linkedEnvironmentsEnabled": true in userdata/settings.json in its T3 home (~/.t3 by default).',
+          error_description: `Linked environments is off on that machine. Turn it on in its Settings → Labs, or without a desktop, set "linkedEnvironmentsEnabled": true in userdata/settings.json in its ${PRODUCT_NAME} home (~/${DEFAULT_HOME_DIR_NAME} by default).`,
         });
       }
       const clientId = yield* signClientId(name, redirectUris, peerLink);

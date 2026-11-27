@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
   type AuthEnvironmentScope,
   type AuthSessionId,
@@ -169,7 +170,7 @@ const make = Effect.gen(function* () {
           sessions.find((session) => session.sessionId === sessionId)?.client,
         ),
       ),
-      Effect.orElseSucceed(() => "T3 Code client"),
+      Effect.orElseSucceed(() => `${PRODUCT_NAME} client`),
     );
 
   /** Asks the linked environment for a pairing; `payload` says for whom. */

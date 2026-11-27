@@ -303,7 +303,7 @@ export const headlessServeOutput = Effect.fn("headlessServeOutput")(function* (o
     return formatHeadlessServeOutput(yield* issueHeadlessServeAccessInfo());
   }
   return [
-    "T3 Code server is ready.",
+    `${PRODUCT_NAME} server is ready.`,
     `Connection string: ${yield* resolveServeConnectionString}`,
     "Run `t3 pair` on this machine to connect a device.",
     "",

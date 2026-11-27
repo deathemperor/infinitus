@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
   type ConnectionRouteKind,
@@ -205,7 +206,7 @@ const ROUTE_STYLES: Record<
 function routeKindLabel(kind: ConnectionRouteKind, gt: GT): string {
   switch (kind) {
     case "relay":
-      return "T3 Connect";
+      return CONNECT_NAME;
     case "loopback":
       return gt("This device");
     case "lan":

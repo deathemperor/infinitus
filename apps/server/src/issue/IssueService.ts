@@ -1,6 +1,7 @@
 // A project bound to a standalone tracker (Linear) in settings lists it beside its git host's.
 // References outside the project's own repositories (upstream and fork) may be read on the host,
 // but every write must pass through requireWritable.
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
@@ -894,7 +895,7 @@ const make = Effect.gen(function* () {
         if (found === null) {
           return yield* new IssueOperationError({
             operation: "resolveUrl",
-            detail: `No project in T3 Code is on ${link.host}. Add any ${link.host} project to read its issues.`,
+            detail: `No project in ${PRODUCT_NAME} is on ${link.host}. Add any ${link.host} project to read its issues.`,
           });
         }
         return found.resolved;
@@ -937,11 +938,11 @@ const make = Effect.gen(function* () {
       }
       return yield* (
         failure ??
-          new IssueOperationError({
-            operation: "resolveUrl",
-            reason: "not-found",
-            detail: "This issue URL does not belong to the connected workspace.",
-          })
+        new IssueOperationError({
+          operation: "resolveUrl",
+          reason: "not-found",
+          detail: "This issue URL does not belong to the connected workspace.",
+        })
       );
     },
   );

@@ -19,6 +19,7 @@ import {
   type WorkspaceLayoutCommandsResult,
   type WorktreeLayoutCommandKind,
   T3_PROJECT_FILE_NAME,
+  T3_PROJECT_FILE_NAMES,
 } from "@infinitus/contracts";
 import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import {
@@ -383,12 +384,17 @@ const make = Effect.gen(function* () {
     (cause: unknown): TaskFolderError =>
       new TaskFolderError({ operation, detail: `${prefix}: ${failureDetail(cause)}`, cause });
 
-  // A project that lays its own thread folder out says so in its `t3.json`.
-  const projectFile = (projectRoot: string) =>
-    fileSystem.readFileString(path.join(projectRoot, T3_PROJECT_FILE_NAME)).pipe(
-      Effect.map(parseT3ProjectFile),
-      Effect.orElseSucceed(() => null),
-    );
+  // A project that lays its own thread folder out says so in its project file. The first
+  // project file that reads decides, in the server's order.
+  const projectFile = Effect.fnUntraced(function* (projectRoot: string) {
+    for (const fileName of T3_PROJECT_FILE_NAMES) {
+      const contents = yield* fileSystem
+        .readFileString(path.join(projectRoot, fileName))
+        .pipe(Effect.orElseSucceed(() => null));
+      if (contents !== null) return parseT3ProjectFile(contents);
+    }
+    return null;
+  });
   const worktreeLayout = (projectRoot: string) =>
     projectFile(projectRoot).pipe(Effect.map((config) => config?.worktreeLayout ?? null));
   /**
@@ -421,14 +427,16 @@ const make = Effect.gen(function* () {
         return refuse(
           `and ${managedPolicyDeniedMessage(layoutCommandsOffBy, "project worktree layout commands")}`,
         );
-      const approved = yield* approvals
-        .isApproved({ projectId: project.projectId, kind, command: text })
-        // An approval that cannot be read is not one.
-        .pipe(
-          Effect.catch((cause) =>
-            Effect.logWarning(cause.detail, { cause }).pipe(Effect.as(false)),
-          ),
-        );
+      const approved = yield* (
+        approvals
+          .isApproved({ projectId: project.projectId, kind, command: text })
+          // An approval that cannot be read is not one.
+          .pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning(cause.detail, { cause }).pipe(Effect.as(false)),
+            ),
+          )
+      );
       if (!approved)
         return refuse(
           "which nobody has approved as it is written now. Review and approve it in the web or desktop app, under Worktree layout in the project's settings or when starting a worktree thread there.",

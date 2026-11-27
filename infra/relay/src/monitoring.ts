@@ -212,7 +212,7 @@ const relayMonitors: ReadonlyArray<RelayMonitor> = [
     id: "RelayAccountDeletionFailingMonitor",
     // Pages because a stuck deletion is a privacy request we have accepted and not carried out.
     severity: "page",
-    name: "T3 Connect relay: account deletions failing",
+    name: `${CONNECT_NAME} relay: account deletions failing`,
     description:
       "Failed account deletion passes, plus sweeps that failed outright, in 2 h. The cron retries every 5 min, so one stuck deletion or a broken sweep fails 24 times in 2 h; a one-off Cloudflare blip fails once or twice. Healthy: 0. Pending rows and their attempts are in relay_account_deletions.",
     query: (dataset) =>

@@ -14,7 +14,7 @@ import { expandHomePath } from "@infinitus/provider-core/server/pathExpansion";
 import { splitsSurrogatePair } from "@infinitus/shared/assistantCitations";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { fromLenientJson } from "@infinitus/shared/schemaJson";
-import { T3_PROJECT_FILE_NAME } from "@infinitus/contracts";
+import { T3_PROJECT_FILE_NAMES } from "@infinitus/contracts";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -326,13 +326,17 @@ export const discoverFolders = Effect.fn("WorkspaceFolders.discover")(function* 
   const path = yield* Path.Path;
   const { realPath, ownsHistory } = yield* folderProbes;
   const root = path.resolve(expandHomePath(workspaceRoot.trim(), yield* HostProcess.HomeDirectory));
-  const ignored = (
-    parseT3ProjectFile(
-      yield* fileSystem
-        .readFileString(path.join(root, T3_PROJECT_FILE_NAME))
-        .pipe(Effect.orElseSucceed(() => "")),
-    )?.ignoreRepositories ?? []
-  ).map((entry) => path.resolve(root, entry));
+  // The first project file that reads decides, in the server's order.
+  let contents: string | null = null;
+  for (const fileName of T3_PROJECT_FILE_NAMES) {
+    contents = yield* fileSystem
+      .readFileString(path.join(root, fileName))
+      .pipe(Effect.orElseSucceed(() => null));
+    if (contents !== null) break;
+  }
+  const ignored = (parseT3ProjectFile(contents ?? "")?.ignoreRepositories ?? []).map((entry) =>
+    path.resolve(root, entry),
+  );
   // Everything the scan could find would be dropped, so skip the walk.
   if (ignored.some((entry) => isWithinRoot(path, root, entry))) return [];
   // Uncapped: the folders outside the project are dropped below, and must not use up the room.

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { Button } from "../../components/ui/Button";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import * as Dialog from "../../components/ui/Dialog";
@@ -50,7 +51,6 @@ import { mcpAppRelayDocument } from "./mcpAppRelayDocument";
 import { MCP_APP_INLINE_MAX_HEIGHT, mcpAppInlineHeight } from "./mcpAppSizing";
 
 const ROW_BOTTOM_MARGIN = 8;
-const PRODUCT_NAME = "T3 Code";
 
 const commandFailure = (result: {
   readonly cause: Parameters<typeof squashAtomCommandFailure>[0]["cause"];

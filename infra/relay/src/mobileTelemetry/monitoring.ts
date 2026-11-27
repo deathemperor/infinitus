@@ -105,7 +105,7 @@ const mobileMonitors: ReadonlyArray<MobileMonitor> = [
   {
     id: "MobileOsKillSpikeMonitor",
     severity: "warn",
-    name: "T3 Code mobile: Android OS kills spike",
+    name: `${PRODUCT_NAME} mobile: Android OS kills spike`,
     description:
       "Android killing the app (low memory, freezes) per hour well above the same time over the last 7 days. Usually a release that leaks memory or blocks the main thread: compare app versions on the dashboard.",
     query: ({ logs }) => `${osKills(logs)}\n| summarize kills = count() by bin_auto(_time)`,

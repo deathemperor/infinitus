@@ -1,4 +1,4 @@
-import type { ManagedPolicyDocument } from "@infinitus/contracts";
+import { T3_PROJECT_FILE_NAME, type ManagedPolicyDocument } from "@infinitus/contracts";
 import {
   WINDOWS_POLICY_KEY,
   WINDOWS_POLICY_GROUPS,
@@ -129,7 +129,7 @@ const policies = (): ReadonlyArray<Policy> => [
   {
     id: "WorktreeLayoutCommands",
     title: "Allow project worktree layout commands",
-    help: "Disabled stops T3 Code from running the worktreeLayout commands a project's t3.json declares, whether or not a user approved them. Such a project gets no new worktree threads; existing thread folders are restored and removed without the project's commands.",
+    help: `Disabled stops ${PRODUCT_NAME} from running the worktreeLayout commands a project's ${T3_PROJECT_FILE_NAME} declares, whether or not a user approved them. Such a project gets no new worktree threads; existing thread folders are restored and removed without the project's commands.`,
     toggle: "WorktreeLayoutCommands",
   },
   {

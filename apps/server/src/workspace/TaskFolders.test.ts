@@ -720,8 +720,9 @@ it.live.each([{ linked: false }, { linked: true }])(
         const origin = yield* repository(linked ? "origin" : "mono");
         const mono = path.join(tmp, "mono");
         if (linked) yield* run(origin, "worktree", "add", "-q", "-b", "dev", mono);
+        // The fork's own name; the other cases write upstream's t3.json.
         yield* fileSystem.writeFileString(
-          path.join(mono, "t3.json"),
+          path.join(mono, "infinitus.json"),
           JSON.stringify({
             worktreeLayout: {
               create:

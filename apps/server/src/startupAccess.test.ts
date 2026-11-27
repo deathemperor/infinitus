@@ -1,4 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NodeHttp from "node:http";
 import * as NodeNet from "node:net";
 import type * as NodeOS from "node:os";
@@ -238,7 +239,7 @@ describe("headlessServeOutput", () => {
       expect(text).not.toContain("oken");
       expect(text).toBe(
         [
-          "T3 Code server is ready.",
+          `${PRODUCT_NAME} server is ready.`,
           "Connection string: http://127.0.0.1:3773",
           "Run `t3 pair` on this machine to connect a device.",
           "",

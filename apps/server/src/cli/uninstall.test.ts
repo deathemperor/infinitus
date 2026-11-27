@@ -1,4 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off - The test observes a real cleanup-shell spawn failure.
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
@@ -115,7 +116,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NetService.layer))("t3 uninstall com
       label: "leaves a service that serves another home by the time it is removed",
       otherFromRead: 2,
       removed: [],
-      output: "Left the background service: it now serves another T3 home.",
+      output: `Left the background service: it now serves another ${PRODUCT_NAME} home.`,
     },
   ])("$label", (input) =>
     Effect.gen(function* () {

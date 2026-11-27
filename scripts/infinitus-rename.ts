@@ -110,8 +110,9 @@ export const RENAMES: ReadonlyArray<Rename> = [
     what: "a bare T3 as the product noun in the user guides",
     // Only the user guides: in docs/internals a bare T3 is as often
     // upstream's (its glyph, mark, Clerk instance) as the product, and the
-    // publisher, T3 Tools, Inc., stays everywhere.
-    pattern: /\bT3(?! Tools\b| Chat\b)(?![_A-Za-z0-9])/g,
+    // publisher, T3 Tools, Inc., stays everywhere. `= T3` and `T3.workflow`
+    // in a workflow example are the file API's global, not the product.
+    pattern: /(?<!=\s*)\bT3(?! Tools\b| Chat\b)(?![_A-Za-z0-9])(?!\.[A-Za-z_])/g,
     replacement: "Infinitus",
     within: "docs/user/",
     prose: true,

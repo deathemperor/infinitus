@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { thrownErrorMessage } from "@infinitus/client-runtime/errors";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -118,13 +119,13 @@ function NewConnectDeviceToast({
           ? m(
               msg("{device} connected through {product}. Not you? Review it.", {
                 device: describeConnectDeviceClient(first),
-                product: "T3 Connect",
+                product: CONNECT_NAME,
               }),
             )
           : m(
               msg(
                 "{count, plural, one {{count} device} other {{count} devices}} connected through {product}. Not you? Review them.",
-                { count: unseen.length, product: "T3 Connect" },
+                { count: unseen.length, product: CONNECT_NAME },
               ),
             ),
       timeout: 0,

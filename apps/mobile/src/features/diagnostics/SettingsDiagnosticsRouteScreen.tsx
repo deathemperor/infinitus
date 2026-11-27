@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import * as Application from "expo-application";
@@ -220,7 +221,7 @@ function ConnectionTracesSetting() {
       <Text className="px-2 text-sm leading-normal text-foreground-muted">
         {gt(
           "When the app connects to a computer through {product}, it sends the Infinitus team how long each step took, any error type, an ID for this app session, and the app version. Traces never include your threads, prompts, or code.",
-          { product: "T3 Connect" },
+          { product: CONNECT_NAME },
         )}
       </Text>
     </View>

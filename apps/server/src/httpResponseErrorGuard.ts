@@ -1,5 +1,6 @@
 // These guards run on the raw Node HTTP server before Effect handles requests.
 // @effect-diagnostics nodeBuiltinImport:off
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type * as NodeHttp from "node:http";
 import type * as NodeStream from "node:stream";
 import type { DatabaseMigrationProgress, ServerStartupStatus } from "@infinitus/contracts";
@@ -61,9 +62,9 @@ export function rejectRequestsUntilServing<T extends NodeHttp.Server>(
     const status: ServerStartupStatus = { status: "starting", migration };
     const message = migration
       ? `Upgrading database (${migration.current} of ${migration.total})`
-      : "Starting T3 Code…";
+      : `Starting ${PRODUCT_NAME}…`;
     const body = html
-      ? `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="1"><title>Starting T3 Code</title><style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-content:center;text-align:center;font:16px system-ui}h1{font-size:20px}p{opacity:.7}</style></head><body><h1>${message}</h1><p>The app will open when startup finishes.</p></body></html>`
+      ? `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="1"><title>Starting ${PRODUCT_NAME}</title><style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-content:center;text-align:center;font:16px system-ui}h1{font-size:20px}p{opacity:.7}</style></head><body><h1>${message}</h1><p>The app will open when startup finishes.</p></body></html>`
       : JSON.stringify(status);
     response
       .writeHead(503, {
