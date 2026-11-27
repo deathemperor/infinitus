@@ -5177,7 +5177,7 @@ it.effect("finalizes the run when the provider finishes under another turn id", 
     const closed = yield* Deferred.await(ingestionDone).pipe(Effect.timeoutOption("2 seconds"));
     assert.isTrue(Option.isSome(closed), "event ingestion fiber did not finish");
     assert.deepEqual(yield* Ref.get(finalized), [
-      { status: "waiting", effects: ["checkpoint.capture"] },
+      { status: "completed", effects: ["checkpoint.capture"] },
     ]);
     const warning = logs.find(
       (message) =>
