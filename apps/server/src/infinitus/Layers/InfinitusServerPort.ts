@@ -46,7 +46,7 @@ export const DESKTOP_CREDENTIAL_TTL = Duration.days(90);
  * The opt-in (#1487): a server that is not the desktop's bundled one — a dev
  * runner, a worktree `.t3`, a showcase's temp home — keeps its port to itself
  * unless this is set, and one that is set takes the app's slot even from a
- * live installed desktop. Documented in `docs/operations/development.md`.
+ * live installed desktop. Documented in `docs/operations/00_development.md`.
  */
 export const PUBLISH_OPT_IN_ENV = "INFINITUS_PUBLISH_SERVER_PORT";
 

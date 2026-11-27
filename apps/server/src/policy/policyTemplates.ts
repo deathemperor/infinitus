@@ -1,4 +1,4 @@
-import type { ManagedPolicyDocument } from "@infinitus/contracts";
+import { T3_PROJECT_FILE_NAME, type ManagedPolicyDocument } from "@infinitus/contracts";
 import {
   WINDOWS_POLICY_KEY,
   WINDOWS_POLICY_GROUPS,
@@ -125,6 +125,12 @@ const policies = (): ReadonlyArray<Policy> => [
     title: "Allow the preview tunnel",
     help: `Disabled stops other devices from opening this machine's local servers through ${PRODUCT_NAME}: no in-app browser tabs loaded on the device, no Open on this device, no port forwarding. Browser tabs still stream from this machine.`,
     toggle: "PreviewTunnel",
+  },
+  {
+    id: "WorktreeLayoutCommands",
+    title: "Allow project worktree layout commands",
+    help: `Disabled stops ${PRODUCT_NAME} from running the worktreeLayout commands a project's ${T3_PROJECT_FILE_NAME} declares, whether or not a user approved them. Such a project gets no new worktree threads; existing thread folders are restored and removed without the project's commands.`,
+    toggle: "WorktreeLayoutCommands",
   },
   {
     id: "Telemetry",

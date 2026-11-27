@@ -319,7 +319,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `provider/CodexDeveloperInstructions.test.ts`). The one exception is
   `orchestration-v2/RestartBackgroundNote.ts`: a Claude replay fixture
   records the note verbatim, so it keeps upstream's words (allowlisted in
-  `scripts/connect-name.guard.test.ts`).
+  `scripts/connect-name.guard.test.ts`); `process/processLauncherWorker.ts`
+  drops the name instead ("started by the server"), since it loads only Node
+  builtins.
 - `packages/provider-*/src/**` — the same rule for the provider packages
   (status messages, text-generation errors, the Muse `clientInfo` title, the
   shared orchestration instructions in `provider-core`), with their tests
@@ -329,7 +331,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `scripts/connect-name.guard.test.ts` scans these roots too, and
   `packages/shared/src/promptLinks.ts` and
   `packages/client-runtime/src/relay/errorPresentation.ts` (+
-  `connection/errors.test.ts`) follow the same rule.
+  `connection/errors.test.ts`) follow the same rule, as do the guard's other
+  roots (`apps/mobile/src`, `packages/contracts/src`, `infra/relay/src`): a
+  `{product}` value handed to `msg()`/`gt()` is the constant, the English
+  around it stays a literal.
 - Resume-on-limit (#648, #1486, #1107, #1627; `docs/internals/resume-on-limit.md`):
   `orchestration-v2/Orchestrator.ts` — `message.dispatch` lets a server-created
   `system` notification start immediately, not only a restart continuation;
@@ -370,8 +375,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `t3-code`), and the agent-facing texts in
   `packages/provider-core/src/server/{runtimeInstructions,orchestrationInstructions}.ts`.
   Thread history still spells the old names, so the readers accept both:
-  `packages/shared/src/t3McpToolPresentation.ts` and
-  `packages/provider-acp/src/server/runtimeModel.ts` (its title regexes).
+  `packages/shared/src/t3McpToolPresentation.ts`,
+  `packages/provider-acp/src/server/runtimeModel.ts` (its title regexes) and
+  `apps/server/src/feedback/FeedbackReport.ts` (`T3_PREFIX` and the OpenCode
+  gate; `FeedbackService.test.ts`'s active-run calls use the fork's spelling).
   Pi's extension keeps upstream's `mcp__t3-code__` tool names. The adapter
   tests assert the new spelling; the Muse and OpenCode replay testkits
   (`MuseAdapterV2.testkit.ts`, `OpenCodeAdapterV2.testkit.ts`) compare the
@@ -572,8 +579,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   The versionless AppImage name reads `resolveDesktopUpdateChannel`:
   `Infinitus-<arch>` on the `infinitus` track, `Infinitus-Nightly-<arch>` otherwise.
 - `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`, `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon project in place of upstream's PlanetScale database (#1322, #1366); `infra/relay/package.json` and `pnpm-workspace.yaml` carry `@alchemy.run/neon` in place of `@alchemy.run/planetscale`. Rules and traps: `docs/internals/release-and-updates.md`.
-- `docs/operations/connect-setup.md` — the "Sign in with Apple (phone)" section: the Apple Services ID, key and Clerk connection App Review's guideline 4.8 requires next to Google (#10, 2026-09-22).
-- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
+- `docs/operations/02_connect-setup.md` — the "Sign in with Apple (phone)" section: the Apple Services ID, key and Clerk connection App Review's guideline 4.8 requires next to Google (#10, 2026-09-22).
+- `docs/operations/00_development.md` — the "Publishing to the Mac app" subsection: only the installed desktop's bundled server publishes its port to the Mac app, `INFINITUS_PUBLISH_SERVER_PORT=1` opts a dev server in (#1487).
+- `docs/internals/12_mobile-navigation.md` — the native-media bullet on why an attachment preview reuses its thumbnail's signed URL (`previewUrlReuse.logic.ts`).
+- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/02_connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
   `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
   #1375) added to `RelayApi` beside upstream's server group, and its handler
@@ -812,7 +821,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/modules/t3-agent-notifications/android/.../AgentNotifications.kt`
   — `contentIntent` takes `/settings/accounts` beside `/threads/…` for the
   same alert (#1375).
-- `apps/mobile/src/components/FilePreviewModal.tsx` (+ `FilePreviewModal.types.ts`, where the source types moved) — the optional `cachedUrl` on an environment-hosted source, and the one retry with a fresh URL when a reused one is refused (`previewUrlReuse.logic.ts`). Why: `docs/internals/mobile-navigation.md`.
+- `apps/mobile/src/components/FilePreviewModal.tsx` (+ `FilePreviewModal.types.ts`, where the source types moved) — the optional `cachedUrl` on an environment-hosted source, and the one retry with a fresh URL when a reused one is refused (`previewUrlReuse.logic.ts`). Why: `docs/internals/12_mobile-navigation.md`.
 - `packages/client-runtime/package.json` — the fork's `./state/infinitus*` subpath exports (`infinitusAccounts`, `infinitusUtilization`, `infinitusQuotaTimeline` and the rest), one entry per fork-owned model file, and `./relay/infinitusTeam` + `./relay/infinitusTeamLogic` (#1592).
 - `apps/web/src/timestampFormat.ts` — `timestampLocale` exported, so the Accounts page's quota timeline (`QuotaTimeline.tsx`) writes its day labels in the same locale as every other timestamp.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — `MessageAttachmentImage`: a haptic on press, and the thumbnail's URL handed to the preview as `cachedUrl` (`previewUrlReuse.logic.ts`). The trash beside a queued reply's pencil (`confirmDeletePendingMessage.ts`, #1501); both hide on `sendingMessageId`, the prop that replaced `dispatchingMessageId` here and in `ThreadDetailScreen.tsx` / `ThreadRouteScreen.tsx`, fed by `use-thread-composer-state.ts`'s `sendingQueuedMessageId`.
@@ -843,7 +852,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `SettingsPath` union, `INFINITUS_SECTION_LABELS`, `INFINITUS_CATEGORY_SCOPES`
   and `INFINITUS_SETTINGS_SEARCH_ITEMS`, the last at the Infinitus pages'
   place in result order), `INFINITUS_NAV_PATHS` as one heading-less group in
-  `SETTINGS_NAV_GROUPS` before Maintenance, the `infinitusOnly` search flag with the
+  `ALL_SETTINGS_NAV_GROUPS` before Maintenance, the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, `isSettingsSectionActive`
   so a nested page's nav item is the only one lit, `CONNECT_NAME` as the
   Connect section's title, and search terms naming `infinitus.json` and the
@@ -851,7 +860,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — one import from
   `infinitus/settingsNav.ts`, `...INFINITUS_SECTION_ICONS` spread into the icon
-  map, `useInfinitusNavGroups(SETTINGS_NAV_GROUPS)` feeding the groups loop,
+  map, `useInfinitusNavGroups(settingsNavGroups(…))` feeding the groups loop,
   and the `isSettingsSectionActive(activePath, to)` call (#1565).
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
@@ -878,7 +887,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   into `SETTINGS_DEVICE_ONLY_PATHS`: the fork's pages each drive one
   Infinitus app, so they hide the scope picker and skip the scope boundary.
 - `apps/web/src/components/files/AttachmentFilePreview.browser.test.tsx` — the
-  `#1711` quarantines for hosted runners.
+  `#1711` quarantines for hosted runners, and a 10 s wait for the Office size
+  error, which hosted runners draw after the default 1 s.
+- `packages/client-runtime/src/state/threadRequests.test.ts` — the split test
+  runs on a quarter megabyte: a megabyte outran the 5 s ceiling on hosted runners.
 - `apps/server/src/provider/agentContextBudget.json` — the fork's measured
   agent context (product names, fork MCP tools and instructions); re-measure
   with `AgentContextBudget.test.ts` on every sync.
@@ -919,18 +931,18 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   below the rule: this product's releases (the DMG, the Linux server archives,
   what is not published yet) in place of upstream's npm, winget, brew and AUR
   paths (#1192). `docs/user/install.md` (the install sections) and
-  `docs/user/background-service.md` (whole) say the same; `updating.md`,
+  `docs/user/background-service.md` (whole) say the same, as does `cli.md`'s
+  install line (its command names are still upstream's `t3`); `updating.md`,
   `remote-access.md`, `install.md`'s mobile section
-  (installed from a build, no store), `docs/operations/release.md` (a fork
+  (installed from a build, no store) and `docs/operations/03_release.md` (a fork
   note at the top pointing at `infinitus-release.yml` and
-  `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) and
-  `docs/operations/observability.md`'s two `npx t3` examples follow (#1207).
+  `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) follow (#1207).
 - `docs/user/mobile-notifications.md` — the "Alerts from an Infinitus Mac"
   section appended at the end (#1178, rewritten for #1375): a Mac's account
   alerts ride Infinitus Connect's Device Notifications and open Settings ›
   Accounts; the Devices page names the Mac and pairs a phone. Upstream's
   text above it says Infinitus Connect (#1368) and is otherwise untouched.
-- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `use-new-task-project-defaults.ts` through the fork's `features/infinitus/useProjectFileRead.ts`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
+- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `workspace/TaskFolders.ts`'s layout commands and `workspace/WorkspaceFolders.ts`'s `ignoreRepositories` (one case in each test file writes `infinitus.json`), `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `use-new-task-project-defaults.ts` through the fork's `features/infinitus/useProjectFileRead.ts`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch, and the Lint job
@@ -949,7 +961,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
 - `infra/relay/migrations/postgres/20261005232034_managed_endpoint_tunnel_released_at/snapshot.json` — its `prevIds` also names the fork's Team snapshot, so the chain has one head that includes the Team tables. Procedure: `docs/internals/release-and-updates.md`.
 - `apps/server/src/vcs/GitVcsDriverCore.test.ts` — the "keeps complete stats for files beyond the combined patch limit" fixture rewrites `a-large.txt` to a different byte length (#1517): upstream's same-size rewrite in the same second as its commit intermittently read as unchanged through the index stat cache and dropped the file from the working-tree stats on CI.
-- `apps/server/src/project/AgentSessionScanner.ts` — the base and worktrees dirs are also compared by their realpath (#1661): the candidate was realpath'd but the roots were not, so a T3 home behind a symlink (macOS temp dirs, a linked home) let its own sandboxes into the import list.
 - `apps/server/src/ws.test.ts` — the compression test that builds `Ws.layer` adds `layerInfinitusWsRpcUnused` (`infinitus/Layers/InfinitusWsRpc.testkit.ts`) to its services, since the fork's RPC layer reads seven fork services.
 - `apps/server/src/cli/invocation.test.ts` — the "manual server installation ownership" prefix fixtures realpath their temp root (#1661): the resolver reports the realpath'd prefix, which on macOS is `/private/var/…`, not `/var/…`.
 - `apps/server/src/orchestration-v2/RunExecutionService.ts` — the run's event filter takes a `turn.terminal` for another turn of its own provider thread and run ordinal as the root's while the root turn is open, and the ingest loop logs the mismatch (#1514, `ProviderEventRouteIdentity.runOrdinal`); the "auxiliary or stale provider terminals" test models those as a child provider thread's and another ordinal's.
@@ -975,7 +986,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   provide the passthrough. `Orchestrator.ts` (`message.dispatch`): a
   `deliveryIntent: "steer"` that resolves to `steer_active` and is not a
   mailbox delivery becomes `queue_after_active` with `sendAt: "tool_boundary"`
-  on the queued run; a targeted `steer_active` and `auto` stay upstream's. The
+  on the queued run; a targeted `steer_active`, `auto` and a caller whose
+  `DispatchModeLimit` forbids parking a steer (`limitForbidsParkedSteer`:
+  promotion runs without the caller's limit) stay upstream's, so a limited
+  caller meets upstream's refusal of a turn started above its limit. The
   block runs after upstream's steer-when-ready step, so a steer into a run not
   yet in a turn (preparing, starting) waits for the turn and goes in as upstream's.
   `packages/contracts/src/orchestrationV2.ts` — `OrchestrationV2Run.sendAt`

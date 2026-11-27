@@ -24,6 +24,9 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   ["apps/server/src/vcs/GitVcsDriver.ts", "T3-Head-Moved-At"],
   // A PowerShell type namespace the keep-awake helper declares, never shown.
   ["apps/server/src/background/KeepAwake.ts", "-Namespace T3 "],
+  // `T3` is the global a workflow file's API hangs off; renaming it breaks existing files.
+  ["apps/server/src/workflows/WorkflowRuntime.ts", "T3.workflow"],
+  ["apps/server/src/workflows/WorkflowRuntime.ts", "T3: { ...t3, workflow }"],
   // Recorded provider fixtures and replay assertions: upstream's transcripts, never shown.
   // The restart note is replayed verbatim against one of them, so it keeps upstream's words.
   ["apps/server/src/orchestration-v2/RestartBackgroundNote.ts", "T3"],

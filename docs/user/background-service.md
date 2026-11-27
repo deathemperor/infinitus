@@ -42,6 +42,9 @@ Run these on the machine that will host the server:
 | Restart                               | `infinitus service restart`   |
 | Stop and remove from startup          | `infinitus service uninstall` |
 
+The service never writes a pairing code to its log. To connect a device, run
+`infinitus pair` on the host, or `infinitus up` to set up access from your other devices.
+
 The service reuses the copy the install script put under
 `~/.infinitus/runtime`; a hand-unpacked `./infinitus` downloads that version's
 archive there first, so the machine needs to reach the releases (or

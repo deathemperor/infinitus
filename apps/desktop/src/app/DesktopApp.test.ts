@@ -83,6 +83,7 @@ import * as InfinitusKeepAwake from "../infinitus/InfinitusKeepAwake.ts";
 import * as InfinitusOAuthSignIn from "../infinitus/InfinitusOAuthSignIn.ts";
 import * as InfinitusSignIn from "../infinitus/InfinitusSignIn.ts";
 import * as InfinitusSignInRedirect from "../infinitus/InfinitusSignInRedirect.ts";
+import * as AppleSpeech from "../speech/AppleSpeech.ts";
 
 interface StubbedDesktop {
   readonly localEnvironmentEnabled: boolean;
@@ -251,6 +252,7 @@ const runStubbedDesktop = (stub: StubbedDesktop) =>
           Layer.mock(InfinitusOAuthSignIn.InfinitusOAuthSignInService, {}),
           Layer.mock(InfinitusSignIn.InfinitusSignInService, {}),
           Layer.mock(InfinitusSignInRedirect.InfinitusSignInRedirectService, {}),
+          Layer.mock(AppleSpeech.AppleSpeech, {}),
           Layer.mock(LoopbackTunnel.LoopbackTunnel, {}),
           Layer.mock(PreviewManager.PreviewManager, {
             isBrowserPartition: () => {

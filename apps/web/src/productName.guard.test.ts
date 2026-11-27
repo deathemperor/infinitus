@@ -13,6 +13,10 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   // Copied standalone into a bare temp root by bundledDev.test, so it cannot
   // import the constant; vite.config's productNamePlugin rewrites every one at build.
   ["lib/bootError.ts", "T3 Code"],
+  // The new-file template destructures `T3`, the global a workflow file's API hangs off.
+  ["components/workflows/WorkflowDefinitionEditor.tsx", "} = T3;"],
+  // A nonce-tagged placeholder the markdown pass inserts and strips again, never rendered.
+  ["markdown/wordsHast.ts", "T3-INSIGHT-"],
 ];
 
 /** A bare "T3" used as the product noun ("T3 Account", "Open T3"), #1368.

@@ -69,6 +69,7 @@ describe("infinitus-rename", () => {
       "Agents drive the device through the command line. T3",
       "Code installs it on demand, and a",
       "T3 Code theme follows.",
+      "const { workflow, step } = T3; then T3.workflow(…) defines one.",
     ].join("\n");
     const out = applyRenames(guide, "docs/user/telemetry.md");
     expect(out).toBe(
@@ -81,6 +82,7 @@ describe("infinitus-rename", () => {
         "Agents drive the device through the command line. Infinitus",
         "installs it on demand, and an",
         "Infinitus theme follows.",
+        "const { workflow, step } = T3; then T3.workflow(…) defines one.",
       ].join("\n"),
     );
     expect(applyRenames(out, "docs/user/telemetry.md")).toBe(out);

@@ -10,8 +10,11 @@ import { describe, expect } from "vite-plus/test";
 import * as ServerConfig from "../config.ts";
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
+import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as TaskFolders from "../workspace/TaskFolders.ts";
+import { ThreadWorktreeRestore } from "../workspace/restoreMissingWorktree.ts";
 import * as ContextHandoffService from "./ContextHandoffService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
@@ -69,6 +72,9 @@ describe("TurnStartGate (#720, #1627)", () => {
             Layer.mock(ServerConfig.ServerConfig)({} as never),
             Layer.mock(ServerSettings.ServerSettingsService)({}),
             Layer.mock(TurnItemPositionStore.TurnItemPositionStoreV2)({}),
+            Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({}),
+            Layer.mock(TaskFolders.TaskFolders)({}),
+            Layer.mock(ThreadWorktreeRestore)({}),
           ),
         ),
       );

@@ -67,8 +67,11 @@ v2). Two halves:
   `queued-message.promote-to-steer` (the row's Steer button, the
   `thread.steerQueuedMessage` key, `t3_queue_promote_to_steer`), and
   `restart_active`. That line is also what keeps upstream's steering tests
-  (`SteeringCompletion.integration.test.ts`, `runtimeLayer.test.ts`) valid
-  unchanged.
+  (`SteeringCompletion.integration.test.ts`, `runtimeLayer.test.ts`) valid,
+  bar the one whose unlimited caller's steer now parks. A caller whose
+  dispatch mode limit forbids parking a steer (`limitForbidsParkedSteer`)
+  keeps upstream's path too: promotion carries no caller limit, so a parked
+  steer would skip upstream's refusal of a turn started above that limit.
 - `InfinitusToolBoundarySteer` tails the orchestrator's domain events. A
   `turn-item.updated` that ends a tool call (`command_execution`,
   `file_change`, `file_search`, `web_search`, `dynamic_tool`, `subagent`;
