@@ -887,7 +887,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   into `SETTINGS_DEVICE_ONLY_PATHS`: the fork's pages each drive one
   Infinitus app, so they hide the scope picker and skip the scope boundary.
 - `apps/web/src/components/files/AttachmentFilePreview.browser.test.tsx` — the
-  `#1711` quarantines for hosted runners.
+  `#1711` quarantines for hosted runners, and a 10 s wait for the Office size
+  error, which hosted runners draw after the default 1 s.
+- `packages/client-runtime/src/state/threadRequests.test.ts` — the split test
+  runs on a quarter megabyte: a megabyte outran the 5 s ceiling on hosted runners.
 - `apps/server/src/provider/agentContextBudget.json` — the fork's measured
   agent context (product names, fork MCP tools and instructions); re-measure
   with `AgentContextBudget.test.ts` on every sync.

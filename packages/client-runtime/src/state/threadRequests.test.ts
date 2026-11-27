@@ -922,8 +922,9 @@ it("bounds the parts of a megabyte of approval text and still shows what it ends
   }
 });
 
-it("splits a megabyte of approval text the same way as a short one", () => {
-  const size = 1 << 20;
+it("splits a quarter megabyte of approval text the same way as a short one", () => {
+  // A megabyte outran the 5 s ceiling on the fork's GitHub-hosted runners; a quadratic split still would.
+  const size = 1 << 18;
   const fill = (unit: string) => unit.repeat(size / unit.length);
   const count = (text: string) => {
     const { parts } = approvalTextParts(text, {

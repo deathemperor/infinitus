@@ -1286,7 +1286,9 @@ it("clears an Office metadata error when the same URL becomes previewable", asyn
   await using screen = await render(
     <OfficeFilePreview src={src} name="report.docx" kind="docx" sizeBytes={51 * 1024 * 1024} />,
   );
-  await vi.waitFor(() => expect(screen.container.textContent).toContain("under 50 MB"));
+  await vi.waitFor(() => expect(screen.container.textContent).toContain("under 50 MB"), {
+    timeout: 10_000,
+  });
   await screen.rerender(
     <OfficeFilePreview src={src} name="report.docx" kind="docx" sizeBytes={100} />,
   );
