@@ -8,7 +8,7 @@ import {
 } from "@infinitus/client-runtime/pull-request-editing";
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type { PullRequestDetail } from "@infinitus/contracts";
-import { setMarkdownTaskChecked } from "@infinitus/shared/markdownTaskList";
+import { setMarkdownTaskChecked } from "@infinitus/shared/markdownTaskEdits";
 import { AsyncResult } from "effect/reactivity";
 import { useGT } from "gt-react-native";
 import { useRef, useState } from "react";
