@@ -190,6 +190,6 @@ it("/compact stays in the slash menu while a turn runs, since a typed command qu
 
   const running = { ...history.runs[1]!, status: "running" as const, completedAt: null };
   await act(() => emitThreadEvent(history.id, { type: "run.updated", payload: running }));
-  await expect.element(page.getByRole("button", { name: "Steer message" })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "Send at next step" })).toBeVisible();
   await expect.element(compact).toBeVisible();
 });
