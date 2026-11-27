@@ -99,7 +99,7 @@ describe("collectServerUpdateTargets", () => {
       ["no-scope", "no permission"],
       ["busy", "already updating"],
       ["manual", "needs a manual update"],
-      ["wsl-backend", "update T3 Code on that machine"],
+      ["wsl-backend", "update Infinitus on that machine"],
     ]);
   });
 
@@ -294,7 +294,7 @@ describe("collectChannelSwitchTargets", () => {
         `its database has changes ${NIGHTLY} does not support yet; stay on Stable until Nightly has them`,
       ],
       ["old-desktop", "change the update track on that machine"],
-      ["behind-desktop", "update T3 Code on that machine"],
+      ["behind-desktop", "update Infinitus on that machine"],
       [
         "no-nightly",
         "Example Corp manages Infinitus updates. Only stable releases can be installed.",
