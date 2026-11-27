@@ -928,7 +928,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   below the rule: this product's releases (the DMG, the Linux server archives,
   what is not published yet) in place of upstream's npm, winget, brew and AUR
   paths (#1192). `docs/user/install.md` (the install sections) and
-  `docs/user/background-service.md` (whole) say the same; `updating.md`,
+  `docs/user/background-service.md` (whole) say the same, as does `cli.md`'s
+  install line (its command names are still upstream's `t3`); `updating.md`,
   `remote-access.md`, `install.md`'s mobile section
   (installed from a build, no store) and `docs/operations/03_release.md` (a fork
   note at the top pointing at `infinitus-release.yml` and

@@ -385,7 +385,7 @@ const make = Effect.gen(function* () {
       new TaskFolderError({ operation, detail: `${prefix}: ${failureDetail(cause)}`, cause });
 
   // A project that lays its own thread folder out says so in its project file. The first
-  // project file that reads decides, in the server's order.
+  // project file that reads decides, in the server's order. Untraced: its callers' spans cover it.
   const projectFile = Effect.fnUntraced(function* (projectRoot: string) {
     for (const fileName of T3_PROJECT_FILE_NAMES) {
       const contents = yield* fileSystem
