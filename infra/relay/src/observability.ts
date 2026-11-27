@@ -34,8 +34,14 @@ export const RelayObservability = Effect.gen(function* () {
   const traces = yield* Axiom.Dataset("RelayTracesDataset", {
     name: relayResourceNameForStage("t3-code-relay-traces", stage),
     kind: "otel:traces:v1",
+<<<<<<< HEAD
     description: `${PRODUCT_NAME} relay Worker HTTP request spans.`,
     retentionDays: 30,
+=======
+    description: "T3 Code relay Worker HTTP request spans.",
+    // Spans carry user ids; this keeps them inside the 30 days we promise for deleting account data.
+    retentionDays: 28,
+>>>>>>> upstream-sync-e3cd83a299-upstream-renamed
     useRetentionPeriod: true,
   });
 

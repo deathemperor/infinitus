@@ -96,9 +96,20 @@ describe("T3 device instructions", () => {
       t3AcpPromptWithInstructions({ prompt: "Again.", state, previousState: state }),
       "Again.",
     );
+<<<<<<< HEAD
     assert.notInclude(
       t3AcpPromptWithInstructions({ prompt: "Hi.", state }),
       `## ${PRODUCT_NAME} devices`,
     );
+=======
+    assert.notInclude(t3AcpPromptWithInstructions({ prompt: "Hi.", state }), "## T3 Code devices");
+    const withProxy = t3AcpPromptWithInstructions({
+      prompt: "Render a chart.",
+      state: { ...state, toolExposure: "deferred-proxy" },
+    });
+    assert.include(withProxy, "including `delegate_task`");
+    assert.include(withProxy, "tool_call({ name, arguments })");
+    assert.notInclude(t3AcpPromptWithInstructions({ prompt: "Hi.", state }), "tool_call(");
+>>>>>>> upstream-sync-e3cd83a299-upstream-renamed
   });
 });
