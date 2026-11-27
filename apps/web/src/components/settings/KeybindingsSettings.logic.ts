@@ -465,6 +465,10 @@ const COMMAND_LABELS: Partial<Record<KeybindingCommand, string>> = {
   "thread.copyReference": msg("Pull Request: Copy Link or Thread"),
   // Fork (#270 C)
   "thread.nextAttention": msg("Thread: Jump to Next Waiting Thread"),
+  // Fork (#433)
+  "accounts.open": msg("Accounts: Open"),
+  "captures.toggle": msg("Captures: Toggle"),
+  "captures.add": msg("Captures: Add"),
   "sidebar.toggle": msg("Sidebar: Toggle"),
   "navigation.back": msg("Navigation: Back"),
   "navigation.forward": msg("Navigation: Forward"),
