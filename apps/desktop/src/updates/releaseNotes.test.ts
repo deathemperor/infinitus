@@ -304,7 +304,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     const result = normalizeDesktopUpdateReleaseNotes(
       `- ${"a".repeat(215)} 🚀 trailing text`,
       "1.2.3",
-      "latest",
+      "infinitus",
     );
 
     const item = result.releaseNotes[0]?.items[0];
