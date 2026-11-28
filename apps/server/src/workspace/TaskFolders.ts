@@ -421,14 +421,16 @@ const make = Effect.gen(function* () {
         return refuse(
           `and ${managedPolicyDeniedMessage(layoutCommandsOffBy, "project worktree layout commands")}`,
         );
-      const approved = yield* approvals
-        .isApproved({ projectId: project.projectId, kind, command: text })
-        // An approval that cannot be read is not one.
-        .pipe(
-          Effect.catch((cause) =>
-            Effect.logWarning(cause.detail, { cause }).pipe(Effect.as(false)),
-          ),
-        );
+      const approved = yield* (
+        approvals
+          .isApproved({ projectId: project.projectId, kind, command: text })
+          // An approval that cannot be read is not one.
+          .pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning(cause.detail, { cause }).pipe(Effect.as(false)),
+            ),
+          )
+      );
       if (!approved)
         return refuse(
           "which nobody has approved as it is written now. Review and approve it in the web or desktop app, under Worktree layout in the project's settings or when starting a worktree thread there.",
@@ -505,8 +507,11 @@ const make = Effect.gen(function* () {
     const pointer = yield* fileSystem
       .readFileString(path.join(folder, ".git"))
       .pipe(Effect.orElseSucceed(() => ""));
-    const gitDir = /^gitdir:\s*(.+?)\s*$/m.exec(pointer)?.[1];
-    return gitDir === undefined ? null : path.resolve(folder, gitDir);
+    const prefix = "gitdir: ";
+    const gitDir = pointer.startsWith(prefix)
+      ? pointer.slice(prefix.length).replace(/[\r\n]+$/u, "")
+      : "";
+    return gitDir === "" ? null : path.resolve(folder, gitDir);
   });
   // A repository that is itself a linked worktree registers worktrees under the Git dir it shares.
   const commonGitDir = Effect.fnUntraced(function* (repositoryPath: string) {

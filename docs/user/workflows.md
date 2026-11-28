@@ -18,7 +18,7 @@ Place `.ts` files in `~/.t3/workflows/` (or the path in `T3CODE_WORKFLOWS`). The
 Example (`~/.t3/workflows/release.ts`):
 
 ```ts
-const { workflow, step, ask, stop, title } = Infinitus;
+const { workflow, step, ask, stop, title } = T3;
 
 export default workflow(
   "release",

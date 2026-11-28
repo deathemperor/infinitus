@@ -1024,6 +1024,8 @@ export interface LocalDispatchSnapshot {
   startedAt: string;
   preparingWorktree: boolean;
   submissionIntent: ComposerSubmissionIntent;
+  /** The send's provider; the thread still names the previous one until the server switches. */
+  providerInstanceId: ProviderInstanceId | null;
   latestUserMessageId: ChatMessage["id"] | null;
   latestRunId: RunId | null;
   latestRunRequestedAt: string | null;
@@ -1040,6 +1042,7 @@ export function createLocalDispatchSnapshot(
     preparingWorktree?: boolean;
     latestUserMessageId?: ChatMessage["id"] | null;
     submissionIntent?: ComposerSubmissionIntent;
+    providerInstanceId?: ProviderInstanceId;
   },
 ): LocalDispatchSnapshot {
   const environmentId = options?.environmentId ?? activeThread?.environmentId;
@@ -1051,6 +1054,7 @@ export function createLocalDispatchSnapshot(
     ).toISOString(),
     preparingWorktree: Boolean(options?.preparingWorktree),
     submissionIntent: options?.submissionIntent ?? "foreground",
+    providerInstanceId: options?.providerInstanceId ?? null,
     latestUserMessageId: options?.latestUserMessageId ?? null,
     latestRunId: latestRun?.runId ?? null,
     latestRunRequestedAt: latestRun?.requestedAt ?? null,

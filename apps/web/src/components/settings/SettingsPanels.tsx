@@ -2587,7 +2587,7 @@ export function AboutSettingsPanel() {
           description={
             telemetryOff === undefined
               ? gt(
-                  "How we handle your data, including the anonymous usage data Infinitus collects.",
+                  "How we handle your data, including the pseudonymous product usage data Infinitus collects.",
                 )
               : gt("How we handle your data. {telemetryOff}", { telemetryOff })
           }
