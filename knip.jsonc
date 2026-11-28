@@ -65,7 +65,6 @@
       "entry": [
         "src/bin.ts!",
         "src/claude-history-worker.ts!",
-        "src/process-launcher.ts!",
         "scripts/cli.ts",
         "scripts/fetch-expo-schema.ts",
         "scripts/probe-claude-fork-local-rollback-replay.ts",
@@ -114,6 +113,7 @@
     "apps/web": {
       // Worktree setup (scripts/setup-worktree.ts) runs this directly, and evidence
       // fixtures run under node.
+<<<<<<< HEAD
       "entry": ["scripts/warm-dep-cache.ts", "test/fixtures/**/*.mjs"],
       // Upstream's "Usage providers" hub section is not mounted in the fork
       // (#1554); the two files stay unedited so upstream merges stay small.
@@ -121,6 +121,9 @@
         "src/components/settings/UsageProviderSettings.tsx",
         "src/components/settings/AddUsageLimitSourceDialog.tsx",
       ],
+=======
+      "entry": ["src/epubPreviewMain.tsx!", "scripts/warm-dep-cache.ts", "test/fixtures/**/*.mjs"],
+>>>>>>> upstream-sync-b927b1fd93-upstream-renamed
       // UI component modules are copied and adapted as cohesive sets. Keep their
       // named subcomponents even before they have callers; the file audit still
       // reports an entire component module when nothing imports it.

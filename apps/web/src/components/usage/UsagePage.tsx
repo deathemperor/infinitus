@@ -81,7 +81,11 @@ import {
   WorkspaceBreadcrumbText,
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
+<<<<<<< HEAD
 import { UsageAccountsSection } from "./UsageAccounts";
+=======
+import { UsageAccessQuestion, type UsageAccessPrompt } from "./UsageAccessDialog";
+>>>>>>> upstream-sync-b927b1fd93-upstream-renamed
 import { UsageLimitsSection } from "./UsageLimits";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart } from "./UsageProviderChart";
@@ -237,6 +241,15 @@ export function UsagePage() {
     reportFailure: false,
   });
 
+  const accessPrompts: UsageAccessPrompt[] = selectedEnvironments.flatMap((environment) =>
+    environment.accessRequests.map((request) => ({
+      environmentId: environment.environmentId,
+      environmentLabel: environment.label,
+      instanceId: request.instanceId,
+      driver: request.driver,
+    })),
+  );
+
   const canReadDiagnostics = selectedEnvironments.some(
     (environment) => environment.canReadDiagnostics,
   );
@@ -267,7 +280,7 @@ export function UsagePage() {
           if (presentation.connection.phase === "connected" && presentation.serverConfig !== null) {
             return refreshUsageLimits(
               environmentId,
-              () => refreshProviders({ environmentId, input: {} }),
+              () => refreshProviders({ environmentId, input: { limitsOnly: true } }),
               automatic,
             );
           }
@@ -533,7 +546,9 @@ export function UsagePage() {
 
         <ScrollArea className="min-h-0 flex-1" observeContent>
           <WorkspacePageContainer width="wide">
-            {selectedEnvironments.length === 0 ? (
+            {accessPrompts.length > 0 ? (
+              <UsageAccessQuestion prompts={accessPrompts} />
+            ) : selectedEnvironments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {environments.length === 0
                   ? showingLimits

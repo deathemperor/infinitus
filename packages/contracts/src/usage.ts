@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { ForwardCompatibleArray, NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { ProviderDriverKind, ProviderInstanceId } from "./providerInstance.ts";
 
 /** Bump for incompatible UsageSummary changes; skipped unknown array variants need no bump. */
 export const USAGE_CONTRACT_VERSION = 6 as const;
@@ -148,6 +149,7 @@ export const UsageSummaryInput = Schema.Struct({
 });
 export type UsageSummaryInput = typeof UsageSummaryInput.Type;
 
+<<<<<<< HEAD
 /**
  * Per-account spend (#779): Claude records attributed to the account active when
  * written, from the swap engine's history. Estimates. `unattributed` holds records
@@ -180,6 +182,17 @@ export const UsageAccountAttribution = Schema.Struct({
   basis: TrimmedNonEmptyString,
 });
 export type UsageAccountAttribution = typeof UsageAccountAttribution.Type;
+=======
+/** An enabled provider whose usage files T3 has not been allowed to read yet. Nothing was read. */
+export const UsageAccessRequest = Schema.Struct({
+  instanceId: ProviderInstanceId,
+  driver: ProviderDriverKind,
+  provider: UsageProviderKind,
+  /** Folders a grant would let T3 read; empty when finding them would itself read the provider. */
+  paths: Schema.Array(TrimmedNonEmptyString),
+});
+export type UsageAccessRequest = typeof UsageAccessRequest.Type;
+>>>>>>> upstream-sync-b927b1fd93-upstream-renamed
 
 export const UsageSummary = Schema.Struct({
   contractVersion: Schema.Number,
@@ -195,6 +208,8 @@ export const UsageSummary = Schema.Struct({
   accounts: Schema.optional(UsageAccountAttribution),
   /** The filter the server applied; absent means unfiltered, including servers that predate filters. */
   modelFilter: Schema.optional(UsageModelFilter),
+  /** Absent from servers that read every provider without asking. */
+  accessRequests: Schema.optional(ForwardCompatibleArray(UsageAccessRequest)),
 });
 export type UsageSummary = typeof UsageSummary.Type;
 

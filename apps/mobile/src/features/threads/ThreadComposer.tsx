@@ -5,6 +5,9 @@ import { useAppearancePreferences } from "../settings/appearance/AppearancePrefe
 import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
 import { settlePromise, squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
+import { isSkillReloadCommand } from "@infinitus/client-runtime/providerSkills";
+import { serverEnvironment } from "../../state/server";
+import { useAtomCommand } from "../../state/use-atom-command";
 import { useAtomValue } from "@effect/atom-react";
 import { clampFileAttachmentUploadBytes } from "@infinitus/client-runtime/state/attachments";
 import { pastedTextDisposition, replaceTextSelection } from "@infinitus/client-runtime/text-paste";
@@ -371,6 +374,9 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     });
   };
   const { onSendMessage, onChangeDraftMessage, onShowUsageLimits } = props;
+  const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
+    reportFailure: false,
+  });
   const usageLimitsOffered =
     selectedProviderStatus !== null &&
     hasProviderUsageLimits(
@@ -594,6 +600,16 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
       return;
     }
     if (sent.value === null) return;
+    if (isSkillReloadCommand(draftAtSend.text) && props.projectCwd) {
+      void refreshProviders({
+        environmentId: props.environmentId,
+        input: {
+          instanceId: currentModelSelection.instanceId,
+          cwd: props.projectCwd,
+          fresh: true,
+        },
+      });
+    }
     // Arm after send so preference reads and native Activity startup do not delay tap-frame feedback.
     armAgentAwarenessLiveActivityForLocalWork({
       environmentId: props.environmentId,

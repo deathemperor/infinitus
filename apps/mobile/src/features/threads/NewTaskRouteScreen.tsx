@@ -13,7 +13,10 @@ import {
   type StaticScreenProps,
 } from "@react-navigation/native";
 import { SymbolView } from "../../components/ui/AppSymbol";
-import { pickableProjectGroups } from "@infinitus/client-runtime/state/project-grouping";
+import {
+  groupIconFallbacks,
+  pickableProjectGroups,
+} from "@infinitus/client-runtime/state/project-grouping";
 import { isScratchProject } from "@infinitus/client-runtime/state/projects";
 import {
   isAtomCommandInterrupted,
@@ -645,6 +648,10 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                           size={24}
                           projectTitle={scope.representative.title}
                           workspaceRoot={scope.representative.workspaceRoot}
+                          fallbackProjects={groupIconFallbacks(
+                            scope.projects,
+                            scope.representative,
+                          )}
                         />
                       }
                     />
@@ -670,6 +677,10 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                           size={20}
                           projectTitle={scope.representative.title}
                           workspaceRoot={scope.representative.workspaceRoot}
+                          fallbackProjects={groupIconFallbacks(
+                            scope.projects,
+                            scope.representative,
+                          )}
                         />
                       </View>
                       <View className="min-w-0 flex-1">
