@@ -264,6 +264,16 @@ const loadPersistedObservabilitySettings = Effect.fn(function* (settingsPath: st
   return parsePersistedServerObservabilitySettings(raw);
 });
 
+export const normalizeServerCwdArgument = Effect.fn("config.normalizeServerCwdArgument")(function* (
+  argument: string,
+) {
+  const cwd = argument.trimEnd();
+  const trimmed = cwd.trimStart();
+  if (cwd === trimmed || trimmed === "." || trimmed === "..") return trimmed;
+  const path = yield* Path.Path;
+  return path.parse(yield* expandHomePath(trimmed)).root === "" ? cwd : trimmed;
+});
+
 export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(function* (
   flags: CliServerFlags,
   cliLogLevel: Option.Option<LogLevel.LogLevel>,
@@ -271,6 +281,7 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     readonly startupPresentation?: ServerConfig.StartupPresentation;
     readonly forceAutoBootstrapProjectFromCwd?: boolean;
     readonly rejectRunningServer?: boolean;
+    readonly prepareDirectories?: boolean;
     readonly selectAutomaticPort?: (
       preferred: number,
       host: string | undefined,
@@ -328,8 +339,10 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
       resolveOptionPrecedence(explicitBaseDir, Option.fromUndefinedOr(bootstrap?.t3Home)),
     ),
   );
-  const rawCwd = Option.getOrElse(normalizedFlags.cwd, () => process.cwd());
-  const cwd = path.resolve(yield* expandHomePath(rawCwd.trim()));
+  const rawCwd = Option.isSome(normalizedFlags.cwd)
+    ? yield* normalizeServerCwdArgument(normalizedFlags.cwd.value)
+    : process.cwd().trim();
+  const cwd = path.resolve(yield* expandHomePath(rawCwd));
   const derivedPaths = yield* ServerConfig.deriveServerPaths(baseDir, devUrl, {
     baseDirIsExplicit: Option.isSome(explicitBaseDir),
   });
@@ -357,13 +370,15 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
       });
     }
   }
-  yield* fs.makeDirectory(cwd, { recursive: true });
-  yield* ServerConfig.ensureServerDirectories(derivedPaths);
+  const serverTracePath = env.traceFile ?? derivedPaths.serverTracePath;
+  if (options?.prepareDirectories !== false) {
+    yield* fs.makeDirectory(cwd, { recursive: true });
+    yield* ServerConfig.ensureServerDirectories(derivedPaths);
+    yield* fs.makeDirectory(path.dirname(serverTracePath), { recursive: true });
+  }
   const persistedObservabilitySettings = yield* loadPersistedObservabilitySettings(
     derivedPaths.settingsPath,
   );
-  const serverTracePath = env.traceFile ?? derivedPaths.serverTracePath;
-  yield* fs.makeDirectory(path.dirname(serverTracePath), { recursive: true });
   const startupPresentation = options?.startupPresentation ?? "browser";
   const isHeadlessStartup = startupPresentation === "headless";
   const noBrowser = Option.getOrElse(
@@ -548,7 +563,7 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
 export const resolveCliAuthConfig = (
   flags: CliAuthLocationFlags,
   cliLogLevel: Option.Option<LogLevel.LogLevel>,
-  options?: { readonly quietLogs?: boolean },
+  options?: { readonly quietLogs?: boolean; readonly prepareDirectories?: boolean },
 ) => {
   const resolved = resolveServerConfig(
     {
@@ -567,6 +582,7 @@ export const resolveCliAuthConfig = (
       lan: Option.none(),
     },
     cliLogLevel,
+    options,
   );
   // Logs go to stdout, where --json and --token-only print, and resolving can
   // log, for example when it sweeps abandoned attachment uploads.

@@ -49,6 +49,7 @@ import { NativeWorkspaceTabActivityContext } from "../../native/v5-workspace-con
 import { useUsage, type EnvironmentUsageStatus } from "../../state/usage";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { usageAxisDayLabel, usageAxisHourLabel } from "./usageAxisLabels";
+import { UsageAccessCard, type UsageAccessPrompt } from "./UsageAccessCard";
 import { UsageDailyChart } from "./UsageDailyChart";
 import { toggleUsageEnvironment } from "./usageEnvironmentSelection";
 import { InfinitusAccounts } from "../accounts/InfinitusAccounts";
@@ -149,6 +150,13 @@ function UsageScreen(props: {
   );
   const canReadDiagnostics = selectedEnvironments.some(
     (environment) => environment.canReadDiagnostics,
+  );
+  const accessPrompts: UsageAccessPrompt[] = selectedEnvironments.flatMap((environment) =>
+    environment.accessRequests.map((request) => ({
+      ...request,
+      environmentId: environment.environmentId,
+      environmentLabel: environment.label,
+    })),
   );
 
   const days = enumerateDays(window.sinceDay, window.untilDay);
@@ -303,8 +311,20 @@ function UsageScreen(props: {
               entering={FadeIn.duration(160).reduceMotion(ReduceMotion.System)}
               className="gap-6"
             >
+<<<<<<< HEAD
               {showingLimits ? (
                 <InfinitusAccounts environmentIds={selectedEnvironmentIds} />
+=======
+              {accessPrompts.length > 0 ? (
+                <UsageAccessCard prompts={accessPrompts} />
+              ) : showingLimits ? (
+                <UsageLimitsSection
+                  now={limits.now}
+                  failedLabels={limits.failedLabels}
+                  selectedEnvironmentIds={selectedEnvironmentIds}
+                  wide={wide}
+                />
+>>>>>>> upstream-sync-b927b1fd93-upstream-renamed
               ) : (
                 <>
                   {wide ? null : (

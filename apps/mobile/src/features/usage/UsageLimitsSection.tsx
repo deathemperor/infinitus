@@ -1,4 +1,4 @@
-import { errorDisplayMessage } from "@infinitus/client-runtime/errors";
+import { resetCreditFailureText } from "@infinitus/client-runtime/state/usage";
 import * as Dialog from "../../components/ui/Dialog";
 import { RegistryContext, useAtomMount, useAtomValue } from "@effect/atom-react";
 import { normalizeProviderAccentColor } from "@infinitus/client-runtime/state/provider-instance-display";
@@ -346,11 +346,7 @@ function ResetCreditLine(props: {
       );
       return;
     }
-    setStatus(
-      "error" in result.cause && result.cause.error instanceof Error
-        ? (errorDisplayMessage(result.cause.error, resolveNow) ?? result.cause.error.message)
-        : resolveNow(msg("Could not use the reset credit.")),
-    );
+    setStatus(resetCreditFailureText(result, resolveNow));
   };
 
   const confirm = () => {

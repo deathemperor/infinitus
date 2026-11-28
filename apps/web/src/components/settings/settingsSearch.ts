@@ -292,6 +292,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: [
+      msg("Delete worktrees with deleted threads"),
       msg(
         "disk storage automatic delete deleted archived threads old inactive merged settled unchanged worktrees retention days project inherit off custom",
       ),
@@ -326,7 +327,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "project-overview",
     title: msg("Project overview"),
     to: "/settings/projects",
-    searchTerms: [msg("name icon emoji image checkout remove delete")],
+    searchTerms: [
+      msg("Pin"),
+      msg("Pinned projects come first in project pickers."),
+      msg("name icon emoji image checkout remove delete"),
+    ],
   },
   {
     id: "default-model",
@@ -651,7 +656,10 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "speech-dictionary",
     title: msg("Dictionary"),
     to: "/settings/voice",
-    searchTerms: [msg("speech voice transcription vocabulary names glossary alias")],
+    searchTerms: [
+      msg("Your dictionary"),
+      msg("speech voice transcription vocabulary names glossary alias"),
+    ],
   },
   {
     id: "speech-project-dictionary",
@@ -1038,7 +1046,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "diagnostics",
     title: msg("Diagnostics"),
     to: "/settings/maintenance",
-    searchTerms: [msg("logs traces processes resource history failures spans cpu memory")],
+    searchTerms: [
+      msg("logs traces processes resource history failures spans cpu memory"),
+      msg("Live Processes"),
+      msg("Latest Failures"),
+      msg("Most Common Failures"),
+      msg("Slowest Spans"),
+      msg("Top Span Names"),
+    ],
   },
   {
     id: "agent-feedback",
@@ -1054,6 +1069,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "open-source-licenses",
     title: msg("Open source licenses"),
     to: "/settings/about",
+    searchTerms: [msg("Third-party notices")],
   },
   {
     id: "keybindings",
@@ -1106,6 +1122,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: msg("Providers"),
     to: "/settings/providers",
     searchTerms: [
+      msg("ChatGPT account"),
       msg(
         "agents cli codex claude cursor grok fx kiro omp oh-my-pi opencode antigravity pi google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume",
       ),
@@ -1367,9 +1384,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "project-actions",
     title: msg("Actions"),
     to: "/settings/projects",
+<<<<<<< HEAD
     searchTerms: [
       msg("commands scripts setup run dev server checkout worktree infinitus.json t3.json import"),
     ],
+=======
+    scope: "project-defaults",
+    searchTerms: [msg("commands scripts setup run dev server checkout worktree t3.json import")],
+>>>>>>> upstream-sync-b927b1fd93-upstream-renamed
   },
   {
     id: "project-repositories",
@@ -1431,6 +1453,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("managed tunnel cloud other devices remote tunnels limit t3 chat")],
     desktopOnly: true,
     cloudOnly: true,
+  },
+  {
+    id: "mcp-url",
+    localEnvironmentOnly: true,
+    title: msg("MCP URL"),
+    to: "/settings/access",
+    targetId: "connections-environment",
+    searchTerms: [msg("outside agents chatgpt claude codex hosted bot oauth server address copy")],
   },
   {
     id: "connect-device-approval",
@@ -1723,6 +1753,7 @@ export function settingsForThisPlatform(
   );
 }
 
+<<<<<<< HEAD
 const SETTINGS_SECTION_PATHS = new Set<string>(Object.keys(SETTINGS_SECTION_LABELS));
 
 /**
@@ -1742,6 +1773,13 @@ export function isSettingsSectionActive(pathname: string, to: SettingsPath): boo
     }
   }
   return true;
+=======
+function titleMatchRank(title: string, query: string, queryTokens: ReadonlyArray<string>): number {
+  if (title === query) return 5;
+  if (title.startsWith(query)) return 4;
+  if (title.includes(query)) return 3;
+  return queryTokens.every((token) => title.includes(token)) ? 2 : 0;
+>>>>>>> upstream-sync-b927b1fd93-upstream-renamed
 }
 
 export function searchSettings(
@@ -1756,30 +1794,29 @@ export function searchSettings(
   return settingsForThisPlatform(items)
     .flatMap((item, index) => {
       const title = normalizeSearchText(decodeMsg(item.title));
+      // The title as displayed, so search also works in the active language.
+      const displayedTitle = normalizeSearchText(translate(item.title));
+      const navLabel = SETTINGS_NAV_LABELS[item.to];
+      const displayedNavLabel = translate(navLabel);
       const fields = [
         title,
         normalizeSearchText(SETTINGS_SECTION_LABELS[item.to]),
-        // The labels as displayed, so search also works in the active language.
-        normalizeSearchText(translate(item.title)),
+        displayedTitle,
         normalizeSearchText(translate(SETTINGS_SECTION_LABELS[item.to])),
+        // Decode only the untranslated label: decodeMsg truncates a translation at its first colon.
+        normalizeSearchText(
+          displayedNavLabel === navLabel ? decodeMsg(navLabel) : displayedNavLabel,
+        ),
         ...(item.searchTerms ?? []).map(normalizeSearchText),
         ...(item.searchTerms ?? []).map((term) => normalizeSearchText(translate(term))),
       ];
       if (!queryTokens.every((token) => fields.some((field) => field.includes(token)))) return [];
 
-      const exactPhraseField = fields.findIndex((field) => field.includes(normalizedQuery));
-      const rank =
-        title === normalizedQuery
-          ? 5
-          : title.startsWith(normalizedQuery)
-            ? 4
-            : title.includes(normalizedQuery)
-              ? 3
-              : queryTokens.every((token) => title.includes(token))
-                ? 2
-                : exactPhraseField >= 0
-                  ? 1
-                  : 0;
+      const rank = Math.max(
+        titleMatchRank(title, normalizedQuery, queryTokens),
+        titleMatchRank(displayedTitle, normalizedQuery, queryTokens),
+        fields.some((field) => field.includes(normalizedQuery)) ? 1 : 0,
+      );
       return [{ item, index, rank }];
     })
     .toSorted(

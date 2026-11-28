@@ -749,6 +749,7 @@
     "@infinitus/source-control-core": "workspace:*",
     "@infinitus/source-control-definitions": "workspace:*",
     "@pierre/diffs": "catalog:",
+    "@zip.js/zip.js": "2.25.0",
     "effect": "catalog:",
     "gt-i18n": "1.0.40",
     "jszip": "3.10.1",

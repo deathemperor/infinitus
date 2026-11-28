@@ -20,7 +20,9 @@ import { CONNECT_NAME } from "@infinitus/shared/productName";
 const T3_CONNECT_NAME = CONNECT_NAME;
 
 export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): string {
-  const authority = target.username ? `${target.username}@${target.hostname}` : target.hostname;
+  const host =
+    target.port && target.hostname.includes(":") ? `[${target.hostname}]` : target.hostname;
+  const authority = target.username ? `${target.username}@${host}` : host;
   return target.port ? `${authority}:${target.port}` : authority;
 }
 

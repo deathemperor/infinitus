@@ -10,6 +10,7 @@ import {
 } from "@infinitus/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { normalizeProviderAccentColor } from "@infinitus/client-runtime/state/provider-instance-display";
+import { resetCreditFailureText } from "@infinitus/client-runtime/state/usage";
 import {
   type LimitPace,
   paceOf,
@@ -300,11 +301,7 @@ export function useResetCredit(
       );
       return;
     }
-    setStatus(
-      "error" in result.cause && result.cause.error instanceof Error
-        ? result.cause.error.message
-        : m(msg("Could not use the reset credit.")),
-    );
+    setStatus(resetCreditFailureText(result, m));
   };
 
   return { canManageProviders, confirming, setConfirming, busy, status, redeem };
